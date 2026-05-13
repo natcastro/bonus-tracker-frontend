@@ -163,7 +163,7 @@ export default function UsaDashboard() {
   const submitAppeal = async (e: React.FormEvent) => {
     e.preventDefault();
     const { year: appealYear, cycleId: appealCycleId } = getCycleFromDate(appealForm.date);
-    await addAppeal({ ...appealForm, agentId: Number(appealForm.agentId), year: appealYear, cycleId: appealCycleId });
+    await addAppeal({ ...appealForm, agentId: Number(appealForm.agentId), year: appealYear, cycleId: appealCycleId, platform: appealForm.platform as "Amazon" | "TikTok", status: appealForm.status as "inProgress" | "completed", outcome: appealForm.outcome as "fullRefund" | "partialRefund" | "fee" | "lost" });
     await load();
     setAppealForm({ agentId: 0, date: "", orderNumber: "", platform: "Amazon", status: "inProgress", outcome: "fullRefund" });
   };
@@ -180,18 +180,6 @@ export default function UsaDashboard() {
     requireAdmin(async () => { await deleteAppeal(id); await load(); });
   };
 
-  // ── Period data save
-  const savePeriodData = async (agentId: number, field: "amazonHealth" | "csQuality", value: string) => {
-    const existing = getPeriod(agentId);
-    await upsertPeriodData({
-      agentId,
-      year: Number(year),
-      cycleId,
-      amazonHealth: field === "amazonHealth" ? value as any : (existing?.amazonHealth ?? "bad"),
-      csQuality: field === "csQuality" ? value as any : (existing?.csQuality ?? "2"),
-    });
-    await load();
-  };
 
   // ── TikTok form (date range)
   const [tiktokForm, setTiktokForm] = useState({ startDate: "", endDate: "", score: "" });
