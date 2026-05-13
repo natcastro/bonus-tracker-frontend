@@ -1,0 +1,6 @@
+@BonusTrackerApi_HostAddress = http://localhost:5221
+
+GET {{BonusTrackerApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
