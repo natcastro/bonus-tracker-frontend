@@ -265,12 +265,11 @@ export default function MexicoDashboard() {
                     <label>{ag.name}</label>
                     <select
                       className="form-control"
-                      value={attendanceDraft[ag.id] ?? "multiple"}
+                      value={attendanceDraft[ag.id] ?? "absent"}
                       onChange={(e) => setAttendanceDraft((prev) => ({ ...prev, [ag.id]: e.target.value }))}
                     >
-                      <option value="none">Sin faltas (MXN $500)</option>
-                      <option value="justified">1 falta justificada, 24h+ anticipación (MXN $200)</option>
-                      <option value="multiple">Más de 1 falta (MXN $0)</option>
+                      <option value="full">Asistencia completa (MXN $1,500)</option>
+                      <option value="absent">Falta o incumplimiento de horario (MXN $0)</option>
                     </select>
                   </div>
                   <button
@@ -475,7 +474,7 @@ export default function MexicoDashboard() {
                         ["$5,000 – $9,999", "$100"],
                         ["$10,000 – $19,999", "$220"],
                         ["$20,000 – $34,999", "$450"],
-                        ["$35,000+", "$750"],
+                        ["$35,000+", "$600"],
                       ].map(([range, bonus]) => (
                         <tr key={range}><td>{range} MXN</td><td>MXN {bonus}</td></tr>
                       ))}

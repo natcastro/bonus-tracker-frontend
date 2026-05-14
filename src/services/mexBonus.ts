@@ -4,8 +4,11 @@ export const MONTHS = [
 ];
 
 export const ATTENDANCE_BONUS: Record<string, number> = {
-  none: 500,
-  justified: 200,
+  full: 1500,
+  absent: 0,
+  // legacy keys (kept for existing DB records)
+  none: 1500,
+  justified: 0,
   multiple: 0,
 };
 
@@ -18,7 +21,7 @@ export function calcGoalBonus(goalAmount: number, actualAmount: number): number 
 }
 
 export function calcLiveSaleBonus(salesAmount: number): number {
-  if (salesAmount >= 35000) return 750;
+  if (salesAmount >= 35000) return 600;
   if (salesAmount >= 20000) return 450;
   if (salesAmount >= 10000) return 220;
   if (salesAmount >= 5000) return 100;
