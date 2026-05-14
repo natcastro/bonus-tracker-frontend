@@ -71,12 +71,24 @@ export default function MexicoDashboard() {
     }
   };
 
-  const getAttendance = (agentId: number) =>
-    attendance.find((a) => a.agentId === agentId)?.status ?? "multiple";
+  // ── Attendance draft (local state before saving)
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<number, string>>({});
+  const [attSaved, setAttSaved] = useState<Record<number, boolean>>({});
 
-  const saveAttendance = async (agentId: number, status: string) => {
+  useEffect(() => {
+    const draft: Record<number, string> = {};
+    agents.forEach((ag) => {
+      draft[ag.id] = attendance.find((a) => a.agentId === ag.id)?.status ?? "multiple";
+    });
+    setAttendanceDraft(draft);
+  }, [agents, attendance]);
+
+  const saveAttendance = async (agentId: number) => {
+    const status = attendanceDraft[agentId] ?? "multiple";
     await upsertMexAttendance({ agentId, year: Number(year), month, status: status as any });
     await load();
+    setAttSaved((prev) => ({ ...prev, [agentId]: true }));
+    setTimeout(() => setAttSaved((prev) => ({ ...prev, [agentId]: false })), 2000);
   };
 
   // ── Totals per agent
@@ -245,13 +257,26 @@ export default function MexicoDashboard() {
                 Registra la asistencia de cada agente para {MONTHS[month - 1]} {year}.
               </p>
               {agents.map((ag) => (
-                <div key={ag.id} className="form-group">
-                  <label>{ag.name}</label>
-                  <select className="form-control" value={getAttendance(ag.id)} onChange={(e) => saveAttendance(ag.id, e.target.value)}>
-                    <option value="none">Sin faltas (MXN $500)</option>
-                    <option value="justified">1 falta justificada, 24h+ anticipación (MXN $200)</option>
-                    <option value="multiple">Más de 1 falta (MXN $0)</option>
-                  </select>
+                <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", marginBottom: "1rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <label>{ag.name}</label>
+                    <select
+                      className="form-control"
+                      value={attendanceDraft[ag.id] ?? "multiple"}
+                      onChange={(e) => setAttendanceDraft((prev) => ({ ...prev, [ag.id]: e.target.value }))}
+                    >
+                      <option value="none">Sin faltas (MXN $500)</option>
+                      <option value="justified">1 falta justificada, 24h+ anticipación (MXN $200)</option>
+                      <option value="multiple">Más de 1 falta (MXN $0)</option>
+                    </select>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ whiteSpace: "nowrap", background: attSaved[ag.id] ? "#16a34a" : undefined }}
+                    onClick={() => saveAttendance(ag.id)}
+                  >
+                    {attSaved[ag.id] ? "¡Guardado! ✓" : "Guardar"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -376,6 +401,26 @@ export default function MexicoDashboard() {
                   const totalBonus = agSales.reduce((s, sale) => s + calcLiveSaleBonus(sale.salesAmount), 0);
                   return (
                     <div key={ag.id} className="card" style={{ overflowX: "auto" }}>
+                      {/* Banner de advertencia */}
+                      <div style={{
+                        background: "#fef9c3",
+                        border: "1px solid #fde047",
+                        borderRadius: "6px",
+                        padding: "0.6rem 0.9rem",
+                        marginBottom: "1rem",
+                        fontSize: "0.82rem",
+                        color: "#713f12",
+                        display: "flex",
+                        gap: "0.5rem",
+                        alignItems: "flex-start",
+                      }}>
+                        <span style={{ fontSize: "1rem" }}>⚠️</span>
+                        <span>
+                          <strong>Importante:</strong> todas las ventas realizadas en un mismo día deben registrarse como
+                          una sola entrada con el total sumado. Subir entradas separadas por el mismo día puede afectar
+                          el cálculo del bono mensual.
+                        </span>
+                      </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                         <h3>{ag.name}</h3>
                         <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
