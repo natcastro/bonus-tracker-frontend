@@ -14,6 +14,14 @@ import {
 const YEARS = ["2025", "2026", "2027", "2028"];
 const ADMIN_PASSWORD = "mex2026";
 
+const TAB_LABELS: Record<string, string> = {
+  summary: "Resumen",
+  asistencia: "Asistencia",
+  meta: "Meta",
+  ventas: "Ventas",
+  settings: "Configuración",
+};
+
 export default function MexicoDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("summary");
@@ -59,7 +67,7 @@ export default function MexicoDashboard() {
       pendingAction?.();
       setPendingAction(null);
     } else {
-      setPasswordError("Incorrect password.");
+      setPasswordError("Contraseña incorrecta.");
     }
   };
 
@@ -107,6 +115,9 @@ export default function MexicoDashboard() {
 
   // ── Goal form
   const [goalForm, setGoalForm] = useState({ goalAmount: "", actualAmount: "" });
+  const [goalError, setGoalError] = useState("");
+  const [goalSaved, setGoalSaved] = useState(false);
+
   useEffect(() => {
     if (goal) {
       setGoalForm({ goalAmount: String(goal.goalAmount), actualAmount: String(goal.actualAmount) });
@@ -117,8 +128,25 @@ export default function MexicoDashboard() {
 
   const saveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    await upsertMexGoal({ year: Number(year), month, goalAmount: Number(goalForm.goalAmount), actualAmount: Number(goalForm.actualAmount) });
-    await load();
+    setGoalError("");
+    const goalAmt = goalForm.goalAmount === "" ? null : Number(goalForm.goalAmount);
+    const actualAmt = goalForm.actualAmount === "" ? null : Number(goalForm.actualAmount);
+    if (goalAmt === null || isNaN(goalAmt) || goalAmt < 0) {
+      setGoalError("Ingresa una meta válida (puede ser 0).");
+      return;
+    }
+    if (actualAmt === null || isNaN(actualAmt) || actualAmt < 0) {
+      setGoalError("Ingresa las ventas reales (puede ser 0).");
+      return;
+    }
+    try {
+      await upsertMexGoal({ year: Number(year), month, goalAmount: goalAmt, actualAmount: actualAmt });
+      await load();
+      setGoalSaved(true);
+      setTimeout(() => setGoalSaved(false), 2000);
+    } catch (err: any) {
+      setGoalError("Error al guardar: " + (err.message ?? "intenta de nuevo"));
+    }
   };
 
   // ── Agent names
@@ -148,7 +176,7 @@ export default function MexicoDashboard() {
         <ul className="nav-links">
           {["summary", "asistencia", "meta", "ventas", "settings"].map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {TAB_LABELS[tab]}
             </li>
           ))}
         </ul>
@@ -159,13 +187,13 @@ export default function MexicoDashboard() {
           <select className="month-selector" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>
-          <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Salir</button>
         </div>
       </nav>
 
       <main className="content-area">
 
-        {/* SUMMARY */}
+        {/* RESUMEN */}
         {activeTab === "summary" && (
           <section>
             <header className="section-header"><h2>Resumen de Bonos — {MONTHS[month - 1]} {year}</h2></header>
@@ -242,7 +270,7 @@ export default function MexicoDashboard() {
                   <h3>Bono Meta</h3>
                   <div className="amount" style={{ color: "#16a34a" }}>MXN ${goalBonus.toFixed(2)}</div>
                 </div>
-                <div className="stat-card" style={{ borderTopColor: "#6366f1", fontSize: "0.8rem" }}>
+                <div className="stat-card" style={{ borderTopColor: "#6366f1" }}>
                   <h3>Tabla de Bonos</h3>
                   <div style={{ fontSize: "0.8rem", textAlign: "left", marginTop: "0.5rem" }}>
                     <div>≥ 140% → MXN $1,500</div>
@@ -255,14 +283,33 @@ export default function MexicoDashboard() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Meta (MXN $)</label>
-                    <input type="number" className="form-control" placeholder="ej. 500000" value={goalForm.goalAmount} onChange={(e) => setGoalForm({ ...goalForm, goalAmount: e.target.value })} required min="0" />
+                    <input
+                      type="number"
+                      className="form-control"
+                      placeholder="ej. 500000"
+                      value={goalForm.goalAmount}
+                      min="0"
+                      onChange={(e) => setGoalForm({ ...goalForm, goalAmount: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label>Ventas Reales (MXN $)</label>
-                    <input type="number" className="form-control" placeholder="ej. 550000" value={goalForm.actualAmount} onChange={(e) => setGoalForm({ ...goalForm, actualAmount: e.target.value })} required min="0" />
+                    <input
+                      type="number"
+                      className="form-control"
+                      placeholder="ej. 550000"
+                      value={goalForm.actualAmount}
+                      min="0"
+                      onChange={(e) => setGoalForm({ ...goalForm, actualAmount: e.target.value })}
+                    />
                   </div>
-                  <div className="form-group"><button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>Guardar Meta</button></div>
+                  <div className="form-group">
+                    <button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>
+                      {goalSaved ? "¡Guardado! ✓" : "Guardar Meta"}
+                    </button>
+                  </div>
                 </div>
+                {goalError && <p className="error-msg" style={{ marginTop: "0.5rem" }}>{goalError}</p>}
               </form>
             </div>
           </section>
@@ -272,6 +319,8 @@ export default function MexicoDashboard() {
         {activeTab === "ventas" && (
           <section>
             <header className="section-header"><h2>Ventas en Live</h2></header>
+
+            {/* Formulario de registro */}
             <div className="card">
               <p style={{ marginBottom: "1rem", color: "var(--text-muted)" }}>
                 Registra las ventas de cada live. El bono se calcula automáticamente por tier.
@@ -292,63 +341,74 @@ export default function MexicoDashboard() {
                   <label>Total Vendido (MXN $)</label>
                   <input type="number" min="0" className="form-control" placeholder="ej. 12500" value={saleForm.salesAmount} onChange={(e) => setSaleForm({ ...saleForm, salesAmount: e.target.value })} required />
                 </div>
-                <div className="form-group"><button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>Agregar Live</button></div>
+                <div className="form-group">
+                  <button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>Agregar Live</button>
+                </div>
               </form>
             </div>
 
-            {/* Tier reference card */}
-            <div className="card" style={{ background: "#f9fafb" }}>
-              <h3 style={{ marginBottom: "0.75rem" }}>Tabla de Bonos por Live</h3>
-              <table className="data-table">
-                <thead><tr><th>Ventas en el Live</th><th>Bono</th></tr></thead>
-                <tbody>
-                  {[
-                    ["< $3,000", "$0"],
-                    ["$3,000 – $4,999", "$50"],
-                    ["$5,000 – $9,999", "$100"],
-                    ["$10,000 – $19,999", "$220"],
-                    ["$20,000 – $34,999", "$450"],
-                    ["$35,000+", "$750"],
-                  ].map(([range, bonus]) => (
-                    <tr key={range}><td>{range} MXN</td><td>MXN {bonus}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Layout de dos columnas: agentes a la izquierda, tabla de tiers a la derecha */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: "1.5rem", alignItems: "start" }}>
 
-            {/* Sales per agent */}
-            {agents.map((ag) => {
-              const agSales = agentSales(ag.id);
-              const totalBonus = agSales.reduce((s, sale) => s + calcLiveSaleBonus(sale.salesAmount), 0);
-              return (
-                <div key={ag.id} className="card" style={{ overflowX: "auto" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                    <h3>{ag.name}</h3>
-                    <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
-                      Total Lives: MXN ${totalBonus.toFixed(2)}
+              {/* Columna izquierda: bonificaciones por agente */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {agents.map((ag) => {
+                  const agSales = agentSales(ag.id);
+                  const totalBonus = agSales.reduce((s, sale) => s + calcLiveSaleBonus(sale.salesAmount), 0);
+                  return (
+                    <div key={ag.id} className="card" style={{ overflowX: "auto" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                        <h3>{ag.name}</h3>
+                        <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
+                          Total Lives: MXN ${totalBonus.toFixed(2)}
+                        </div>
+                      </div>
+                      <table className="data-table">
+                        <thead><tr><th>Fecha</th><th>Ventas</th><th>Bono</th><th>Acciones</th></tr></thead>
+                        <tbody>
+                          {agSales.map((s) => (
+                            <tr key={s.id}>
+                              <td>{s.date}</td>
+                              <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
+                              <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
+                              <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>
+                            </tr>
+                          ))}
+                          {agSales.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+
+              {/* Columna derecha: tabla de tiers (fija al hacer scroll) */}
+              <div style={{ position: "sticky", top: "1rem" }}>
+                <div className="card" style={{ background: "#f9fafb" }}>
+                  <h3 style={{ marginBottom: "0.75rem" }}>Tabla de Bonos por Live</h3>
                   <table className="data-table">
-                    <thead><tr><th>Fecha</th><th>Ventas</th><th>Bono</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Ventas en el Live</th><th>Bono</th></tr></thead>
                     <tbody>
-                      {agSales.map((s) => (
-                        <tr key={s.id}>
-                          <td>{s.date}</td>
-                          <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
-                          <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
-                          <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>
-                        </tr>
+                      {[
+                        ["< $3,000", "$0"],
+                        ["$3,000 – $4,999", "$50"],
+                        ["$5,000 – $9,999", "$100"],
+                        ["$10,000 – $19,999", "$220"],
+                        ["$20,000 – $34,999", "$450"],
+                        ["$35,000+", "$750"],
+                      ].map(([range, bonus]) => (
+                        <tr key={range}><td>{range} MXN</td><td>MXN {bonus}</td></tr>
                       ))}
-                      {agSales.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}
                     </tbody>
                   </table>
                 </div>
-              );
-            })}
+              </div>
+
+            </div>
           </section>
         )}
 
-        {/* SETTINGS */}
+        {/* CONFIGURACIÓN */}
         {activeTab === "settings" && (
           <section>
             <header className="section-header"><h2>Configuración</h2></header>
@@ -368,7 +428,7 @@ export default function MexicoDashboard() {
         )}
       </main>
 
-      {/* Admin Password Modal */}
+      {/* Modal de contraseña */}
       {showPassword && (
         <div className="modal-overlay active">
           <div className="modal">
