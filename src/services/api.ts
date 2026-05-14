@@ -195,7 +195,15 @@ export async function getMexSales(year: number, month: number): Promise<MexLiveS
 export async function addMexSale(sale: Omit<MexLiveSale, "id" | "agent">): Promise<MexLiveSale> {
   const { data, error } = await supabase
     .from("mex_live_sales")
-    .insert({ agent_id: sale.agentId, date: sale.date, sales_amount: sale.salesAmount, year: sale.year, month: sale.month })
+    .insert({
+      agent_id: sale.agentId,
+      date: sale.date,
+      sales_amount: sale.salesAmount,
+      quantity: sale.quantity,
+      skus: sale.skus,
+      year: sale.year,
+      month: sale.month,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -267,7 +275,17 @@ function mapMexAttendance(r: any): MexAttendance {
 }
 
 function mapMexSale(r: any): MexLiveSale {
-  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, salesAmount: r.sales_amount, year: r.year, month: r.month };
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    agent: r.agent ?? undefined,
+    date: r.date,
+    salesAmount: r.sales_amount,
+    quantity: r.quantity ?? 0,
+    skus: r.skus ?? "",
+    year: r.year,
+    month: r.month,
+  };
 }
 
 function mapMexGoal(r: any): MexMonthlyGoal {

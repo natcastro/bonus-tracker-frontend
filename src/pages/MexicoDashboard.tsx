@@ -91,7 +91,7 @@ export default function MexicoDashboard() {
   });
 
   // ── Sale form
-  const [saleForm, setSaleForm] = useState({ agentId: 0, date: "", salesAmount: "" });
+  const [saleForm, setSaleForm] = useState({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: "" });
 
   const submitSale = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,11 +102,13 @@ export default function MexicoDashboard() {
       agentId: Number(saleForm.agentId),
       date: saleForm.date,
       salesAmount: Number(saleForm.salesAmount),
+      quantity: Number(saleForm.quantity),
+      skus: saleForm.skus,
       year: saleYear,
       month: saleMonth,
     });
     await load();
-    setSaleForm({ agentId: 0, date: "", salesAmount: "" });
+    setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: "" });
   };
 
   const handleDeleteSale = (id: number) => {
@@ -325,24 +327,41 @@ export default function MexicoDashboard() {
               <p style={{ marginBottom: "1rem", color: "var(--text-muted)" }}>
                 Registra las ventas de cada live. El bono se calcula automáticamente por tier.
               </p>
-              <form onSubmit={submitSale} className="form-row">
-                <div className="form-group">
-                  <label>Agente</label>
-                  <select className="form-control" value={saleForm.agentId} onChange={(e) => setSaleForm({ ...saleForm, agentId: Number(e.target.value) })} required>
-                    <option value={0} disabled>Seleccionar agente</option>
-                    {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
+              <form onSubmit={submitSale}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Agente</label>
+                    <select className="form-control" value={saleForm.agentId} onChange={(e) => setSaleForm({ ...saleForm, agentId: Number(e.target.value) })} required>
+                      <option value={0} disabled>Seleccionar agente</option>
+                      {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Fecha</label>
+                    <input type="date" className="form-control" value={saleForm.date} onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Total Vendido (MXN $)</label>
+                    <input type="number" min="0" className="form-control" placeholder="ej. 12500" value={saleForm.salesAmount} onChange={(e) => setSaleForm({ ...saleForm, salesAmount: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Cantidad de Artículos</label>
+                    <input type="number" min="0" className="form-control" placeholder="ej. 35" value={saleForm.quantity} onChange={(e) => setSaleForm({ ...saleForm, quantity: e.target.value })} required />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>Fecha</label>
-                  <input type="date" className="form-control" value={saleForm.date} onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })} required />
+                <div className="form-group" style={{ marginTop: "0.5rem" }}>
+                  <label>SKUs / Referencias</label>
+                  <textarea
+                    className="form-control"
+                    placeholder="ej. SKU-001, SKU-042, SKU-108..."
+                    rows={2}
+                    value={saleForm.skus}
+                    onChange={(e) => setSaleForm({ ...saleForm, skus: e.target.value })}
+                    style={{ resize: "vertical", fontFamily: "monospace", fontSize: "0.875rem" }}
+                  />
                 </div>
-                <div className="form-group">
-                  <label>Total Vendido (MXN $)</label>
-                  <input type="number" min="0" className="form-control" placeholder="ej. 12500" value={saleForm.salesAmount} onChange={(e) => setSaleForm({ ...saleForm, salesAmount: e.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>Agregar Live</button>
+                <div style={{ marginTop: "0.75rem" }}>
+                  <button type="submit" className="btn btn-primary">Agregar Live</button>
                 </div>
               </form>
             </div>
@@ -364,17 +383,30 @@ export default function MexicoDashboard() {
                         </div>
                       </div>
                       <table className="data-table">
-                        <thead><tr><th>Fecha</th><th>Ventas</th><th>Bono</th><th>Acciones</th></tr></thead>
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Total Vendido</th>
+                            <th>Artículos</th>
+                            <th>SKUs / Referencias</th>
+                            <th>Bono</th>
+                            <th>Acciones</th>
+                          </tr>
+                        </thead>
                         <tbody>
                           {agSales.map((s) => (
                             <tr key={s.id}>
                               <td>{s.date}</td>
                               <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
+                              <td style={{ textAlign: "center" }}>{s.quantity}</td>
+                              <td style={{ fontSize: "0.8rem", color: "var(--text-muted)", maxWidth: "200px", wordBreak: "break-word" }}>
+                                {s.skus || "—"}
+                              </td>
                               <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
                               <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>
                             </tr>
                           ))}
-                          {agSales.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}
+                          {agSales.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}
                         </tbody>
                       </table>
                     </div>

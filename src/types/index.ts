@@ -59,6 +59,8 @@ export interface MexLiveSale {
   agent?: Agent;
   date: string;
   salesAmount: number;
+  quantity: number;
+  skus: string;
   year: number;
   month: number;
 }
