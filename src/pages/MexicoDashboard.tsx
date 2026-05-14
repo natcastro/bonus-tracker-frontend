@@ -12,7 +12,7 @@ import {
 } from "../services/mexBonus";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
-const ADMIN_PASSWORD = "mex2026";
+const ADMIN_PASSWORD = "mex2026!";
 
 const TAB_LABELS: Record<string, string> = {
   summary: "Resumen",
