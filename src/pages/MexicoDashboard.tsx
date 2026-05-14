@@ -83,6 +83,9 @@ export default function MexicoDashboard() {
     setAttendanceDraft(draft);
   }, [agents, attendance]);
 
+  const getAttendance = (agentId: number) =>
+    attendance.find((a) => a.agentId === agentId)?.status ?? "multiple";
+
   const saveAttendance = async (agentId: number) => {
     const status = attendanceDraft[agentId] ?? "multiple";
     await upsertMexAttendance({ agentId, year: Number(year), month, status: status as any });
