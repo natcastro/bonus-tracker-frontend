@@ -268,7 +268,7 @@ export default function MexicoDashboard() {
                       value={attendanceDraft[ag.id] ?? "absent"}
                       onChange={(e) => setAttendanceDraft((prev) => ({ ...prev, [ag.id]: e.target.value }))}
                     >
-                      <option value="full">Asistencia completa (MXN $1,500)</option>
+                      <option value="full">Asistencia completa (MXN $1,000)</option>
                       <option value="absent">Falta o incumplimiento de horario (MXN $0)</option>
                     </select>
                   </div>

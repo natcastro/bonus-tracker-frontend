@@ -4,7 +4,7 @@ export const MONTHS = [
 ];
 
 export const ATTENDANCE_BONUS: Record<string, number> = {
-  full: 1500,
+  full: 1000,
   absent: 0,
   // legacy keys (kept for existing DB records)
   none: 1500,
