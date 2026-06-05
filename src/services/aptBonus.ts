@@ -33,7 +33,7 @@ export const APT_ACCOUNT_HEALTH_BONUS_MAP: Record<string, number> = {
 
 export const APT_TIKTOK_HEALTH_BONUS: Record<string, number> = {
   non_buyer_fault: 2.00,
-  defective_item: 2.00,
+  lost:            0.00,
 };
 
 export const APT_PERFORMANCE_BONUS: Record<string, number> = {
@@ -77,7 +77,6 @@ export const CLAIM_SUB_TYPES: Record<string, { value: string; label: string }[]>
   ],
   tiktok_health: [
     { value: "non_buyer_fault", label: "Non-Buyer Fault Rate ($2.00)" },
-    { value: "defective_item",  label: "Defective Item Rate ($2.00)" },
     { value: "lost",            label: "Lost ($0.00)" },
   ],
 };
