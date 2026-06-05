@@ -106,6 +106,18 @@ export interface OpsTikTokScore {
 
 // ── Account Protection Team (Juan) ────────────────────────────────────────────
 
+export interface AptClaim {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  referenceNumber: string;
+  claimType: "a2z" | "safety" | "feedback" | "account_health" | "tiktok_health";
+  subType: string;
+  year: number;
+  cycleId: string;
+}
+
 export interface AptA2zClaim {
   id: number;
   agentId: number;

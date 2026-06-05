@@ -3,6 +3,7 @@ import type {
   Agent, Appeal, UsaPeriodData, TikTokScore,
   MexAttendance, MexLiveSale, MexMonthlyGoal,
   OpsAppeal, OpsHandlingTime, OpsTikTokScore,
+  AptClaim,
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
 } from "../types";
@@ -317,6 +318,31 @@ export async function deleteOpsTikTokScore(id: number): Promise<void> {
   if (error) throw error;
 }
 
+// ── Account Protection: Unified Claims ───────────────────────────────────────
+
+export async function getAptClaims(year: number, cycleId: string): Promise<AptClaim[]> {
+  const { data, error } = await supabase
+    .from("apt_claims")
+    .select("*, agent:agents(id, name, team)")
+    .eq("year", year).eq("cycle_id", cycleId)
+    .order("date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapAptClaim);
+}
+
+export async function addAptClaim(c: Omit<AptClaim, "id" | "agent">): Promise<AptClaim> {
+  const { data, error } = await supabase.from("apt_claims")
+    .insert({ agent_id: c.agentId, date: c.date, reference_number: c.referenceNumber, claim_type: c.claimType, sub_type: c.subType, year: c.year, cycle_id: c.cycleId })
+    .select().single();
+  if (error) throw error;
+  return mapAptClaim(data);
+}
+
+export async function deleteAptClaim(id: number): Promise<void> {
+  const { error } = await supabase.from("apt_claims").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ── Account Protection: A2Z Claims ────────────────────────────────────────────
 
 export async function getAptA2zClaims(year: number, cycleId: string): Promise<AptA2zClaim[]> {
@@ -511,6 +537,10 @@ function mapOpsHandlingTime(r: any): OpsHandlingTime {
 
 function mapOpsTikTokScore(r: any): OpsTikTokScore {
   return { id: r.id, date: r.date, score: r.score, duration: r.duration, year: r.year, cycleId: r.cycle_id };
+}
+
+function mapAptClaim(r: any): AptClaim {
+  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, referenceNumber: r.reference_number, claimType: r.claim_type, subType: r.sub_type, year: r.year, cycleId: r.cycle_id };
 }
 
 function mapAptA2zClaim(r: any): AptA2zClaim {
