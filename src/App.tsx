@@ -3,6 +3,8 @@ import type { ReactElement } from "react";
 import Landing from "./pages/Landing";
 import UsaDashboard from "./pages/UsaDashboard";
 import MexicoDashboard from "./pages/MexicoDashboard";
+import OperationsDashboard from "./pages/OperationsDashboard";
+import AccountProtectionDashboard from "./pages/AccountProtectionDashboard";
 
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
@@ -20,6 +22,12 @@ export default function App() {
         } />
         <Route path="/mexico" element={
           <ProtectedRoute team="MEX"><MexicoDashboard /></ProtectedRoute>
+        } />
+        <Route path="/operations" element={
+          <ProtectedRoute team="OPS"><OperationsDashboard /></ProtectedRoute>
+        } />
+        <Route path="/account-protection" element={
+          <ProtectedRoute team="APT"><AccountProtectionDashboard /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

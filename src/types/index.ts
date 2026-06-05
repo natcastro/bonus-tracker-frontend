@@ -72,3 +72,93 @@ export interface MexMonthlyGoal {
   goalAmount: number;
   actualAmount: number;
 }
+
+// ── Operations Team (Tomás) ────────────────────────────────────────────────────
+
+export interface OpsAppeal {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  orderNumber: string;
+  status: "inProgress" | "completed";
+  outcome: "fullRefund" | "partialRefund" | "fee" | "lost";
+  year: number;
+  cycleId: string;
+}
+
+export interface OpsHandlingTime {
+  id: number;
+  agentId: number;
+  year: number;
+  cycleId: string;
+  hours: number;
+}
+
+export interface OpsTikTokScore {
+  id: number;
+  date: string;
+  score: number;
+  duration: number;
+  year: number;
+  cycleId: string;
+}
+
+// ── Account Protection Team (Juan) ────────────────────────────────────────────
+
+export interface AptA2zClaim {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  year: number;
+  cycleId: string;
+}
+
+export interface AptSafetyClaim {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  outcome: "fullRecovery" | "partialRecovery" | "fees" | "lost";
+  year: number;
+  cycleId: string;
+}
+
+export interface AptFeedback {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  platform: "Amazon" | "TikTok";
+  year: number;
+  cycleId: string;
+}
+
+export interface AptAccountHealth {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  type: "penalty" | "violation" | "health_appeal";
+  year: number;
+  cycleId: string;
+}
+
+export interface AptTikTokHealth {
+  id: number;
+  agentId: number;
+  agent?: Agent;
+  date: string;
+  type: "non_buyer_fault" | "defective_item";
+  year: number;
+  cycleId: string;
+}
+
+export interface AptPerformance {
+  id: number;
+  agentId: number;
+  year: number;
+  cycleId: string;
+  level: "deficient" | "minimum" | "acceptable" | "good" | "very_good" | "excellent";
+}

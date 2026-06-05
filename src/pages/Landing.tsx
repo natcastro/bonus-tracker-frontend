@@ -2,7 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "USA" | "MEX";
+type Team = "USA" | "MEX" | "OPS" | "APT";
+
+const TEAM_CONFIG: Record<Team, { label: string; flag: string; color: string; route: string }> = {
+  USA: { label: "United States",        flag: "🇺🇸", color: "#1e40af", route: "/usa" },
+  MEX: { label: "México",               flag: "🇲🇽", color: "#16a34a", route: "/mexico" },
+  OPS: { label: "Operations Team",      flag: "🇺🇸", color: "#7c3aed", route: "/operations" },
+  APT: { label: "Account Protection",   flag: "🇺🇸", color: "#0891b2", route: "/account-protection" },
+};
 
 export default function Landing() {
   const [selected, setSelected] = useState<Team | null>(null);
@@ -25,7 +32,7 @@ export default function Landing() {
     try {
       await verifyPassword(selected, password);
       sessionStorage.setItem("team", selected);
-      navigate(selected === "USA" ? "/usa" : "/mexico");
+      navigate(TEAM_CONFIG[selected].route);
     } catch {
       setError("Incorrect password.");
     } finally {
@@ -39,26 +46,23 @@ export default function Landing() {
         <div className="landing-logo">Bonus Tracker</div>
         <p className="landing-subtitle">Select your team to continue</p>
 
-        <div className="team-buttons">
-          <button
-            className={`team-btn usa ${selected === "USA" ? "active" : ""}`}
-            onClick={() => handleSelect("USA")}
-          >
-            <span className="flag">🇺🇸</span>
-            <span>United States</span>
-          </button>
-          <button
-            className={`team-btn mex ${selected === "MEX" ? "active" : ""}`}
-            onClick={() => handleSelect("MEX")}
-          >
-            <span className="flag">🇲🇽</span>
-            <span>México</span>
-          </button>
+        <div className="team-buttons" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          {(Object.entries(TEAM_CONFIG) as [Team, typeof TEAM_CONFIG[Team]][]).map(([key, cfg]) => (
+            <button
+              key={key}
+              className={`team-btn ${selected === key ? "active" : ""}`}
+              style={selected === key ? { borderColor: cfg.color, background: cfg.color + "10" } : {}}
+              onClick={() => handleSelect(key)}
+            >
+              <span className="flag">{cfg.flag}</span>
+              <span style={{ fontSize: "0.9rem" }}>{cfg.label}</span>
+            </button>
+          ))}
         </div>
 
         {selected && (
           <form onSubmit={handleSubmit} className="password-form">
-            <label>Password — {selected === "USA" ? "United States" : "México"}</label>
+            <label>Password — {TEAM_CONFIG[selected].label}</label>
             <input
               type="password"
               className="form-control"
@@ -69,7 +73,12 @@ export default function Landing() {
               required
             />
             {error && <p className="error-msg">{error}</p>}
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ background: TEAM_CONFIG[selected].color }}
+              disabled={loading}
+            >
               {loading ? "Verifying..." : "Enter"}
             </button>
           </form>
