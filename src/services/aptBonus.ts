@@ -18,13 +18,17 @@ export const APT_SAFETY_BONUS: Record<string, number> = {
 
 export const APT_FEEDBACK_BONUS = 0.50;
 
+export const APT_FEEDBACK_BONUS_MAP: Record<string, number> = {
+  Amazon:      0.50,
+  TikTok:      0.50,
+  not_removed: 0.00,
+};
+
 export const APT_ACCOUNT_HEALTH_BONUS = 5.00;
 
 export const APT_ACCOUNT_HEALTH_BONUS_MAP: Record<string, number> = {
-  penalty:       5.00,
-  violation:     5.00,
-  health_appeal: 5.00,
-  lost:          0.00,
+  penalty:     5.00,
+  not_removed: 0.00,
 };
 
 export const APT_TIKTOK_HEALTH_BONUS: Record<string, number> = {
@@ -63,14 +67,13 @@ export const CLAIM_SUB_TYPES: Record<string, { value: string; label: string }[]>
     { value: "lost",            label: "Lost ($0.00)" },
   ],
   feedback: [
-    { value: "Amazon", label: "Amazon ($0.50)" },
-    { value: "TikTok", label: "TikTok ($0.50)" },
+    { value: "Amazon",      label: "Amazon ($0.50)" },
+    { value: "TikTok",      label: "TikTok ($0.50)" },
+    { value: "not_removed", label: "Not Removed ($0.00)" },
   ],
   account_health: [
-    { value: "penalty",       label: "Penalty Removed ($5.00)" },
-    { value: "violation",     label: "Violation Removed ($5.00)" },
-    { value: "health_appeal", label: "Health Appeal Won ($5.00)" },
-    { value: "lost",          label: "Lost ($0.00)" },
+    { value: "penalty",     label: "Penalty Removed ($5.00)" },
+    { value: "not_removed", label: "Penalty Not Removed ($0.00)" },
   ],
   tiktok_health: [
     { value: "non_buyer_fault", label: "Non-Buyer Fault Rate ($2.00)" },
@@ -83,7 +86,7 @@ export function calcAptClaimBonus(claimType: string, subType: string): number {
   switch (claimType) {
     case "a2z":            return APT_A2Z_BONUS[subType] ?? 0;
     case "safety":         return APT_SAFETY_BONUS[subType] ?? 0;
-    case "feedback":       return APT_FEEDBACK_BONUS;
+    case "feedback":       return APT_FEEDBACK_BONUS_MAP[subType] ?? 0;
     case "account_health": return APT_ACCOUNT_HEALTH_BONUS_MAP[subType] ?? 0;
     case "tiktok_health":  return APT_TIKTOK_HEALTH_BONUS[subType] ?? 0;
     default:               return 0;
