@@ -38,7 +38,12 @@ export const CLAIM_TYPE_LABELS: Record<string, string> = {
 };
 
 export const CLAIM_SUB_TYPES: Record<string, { value: string; label: string }[]> = {
-  a2z: [],
+  a2z: [
+    { value: "fullRecovery",    label: "Full Recovery ($3.00)" },
+    { value: "partialRecovery", label: "Partial Recovery ($1.50)" },
+    { value: "fees",            label: "Fees Only ($0.25)" },
+    { value: "lost",            label: "Lost ($0.00)" },
+  ],
   safety: [
     { value: "fullRecovery",    label: "Full Recovery ($3.00)" },
     { value: "partialRecovery", label: "Partial Recovery ($1.50)" },
@@ -62,7 +67,7 @@ export const CLAIM_SUB_TYPES: Record<string, { value: string; label: string }[]>
 
 export function calcAptClaimBonus(claimType: string, subType: string): number {
   switch (claimType) {
-    case "a2z":            return APT_A2Z_BONUS;
+    case "a2z":            return APT_SAFETY_BONUS[subType] ?? 0;
     case "safety":         return APT_SAFETY_BONUS[subType] ?? 0;
     case "feedback":       return APT_FEEDBACK_BONUS;
     case "account_health": return APT_ACCOUNT_HEALTH_BONUS;

@@ -23,7 +23,7 @@ const TABS: [string, string][] = [
 ];
 
 const DEFAULT_SUB: Record<string, string> = {
-  a2z: "",
+  a2z: "fullRecovery",
   safety: "fullRecovery",
   feedback: "Amazon",
   account_health: "penalty",
