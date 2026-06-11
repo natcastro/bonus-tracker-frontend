@@ -113,6 +113,7 @@ export default function MexicoDashboard() {
     attendance.find((a) => a.agentId === agentId)?.status ?? "multiple";
 
   // ── Attendance day calendar
+  const [calendarAgent, setCalendarAgent] = useState<Agent | null>(null);
   const [selectedDay, setSelectedDay] = useState<{ agentId: number; date: string } | null>(null);
   const [dayDraft, setDayDraft] = useState<{ status: MexAttendanceDay["status"]; note: string }>({ status: "present", note: "" });
 
@@ -334,110 +335,36 @@ export default function MexicoDashboard() {
           <section>
             <header className="section-header"><h2>Asistencia — {MONTHS[month - 1]} {year}</h2></header>
 
-            {/* Legend */}
-            <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", flexWrap: "wrap", fontSize: "0.8rem" }}>
-              {[["#dcfce7","#16a34a","✓ Presente"],["#d1fae5","#059669","J Justificada"],["#fef3c7","#d97706","⏰ Tarde"],["#fee2e2","#ef4444","✗ Falta"],["#f8fafc","#94a3b8","— Sin registro"]].map(([bg,c,l]) => (
-                <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-                  <span style={{ width: 18, height: 18, background: bg, border: `2px solid ${c}`, borderRadius: 4, display: "inline-block" }} />
-                  <span style={{ color: "var(--text-muted)" }}>{l}</span>
-                </span>
-              ))}
-            </div>
-
-            {/* Per-agent calendars */}
-            {agents.map((ag) => {
-              const agDays = attendanceDays.filter((d) => d.agentId === ag.id);
-              const hasAbsent = agDays.some((d) => d.status === "absent" || d.status === "late");
-              const bonus = agDays.length > 0 ? (hasAbsent ? 0 : 1000) : null;
-              return (
-                <div key={ag.id} className="card" style={{ marginBottom: "1.25rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                    <h3 style={{ margin: 0 }}>{ag.name}</h3>
+            {/* Agent list — click name to open calendar */}
+            <div className="card">
+              {agents.map((ag) => {
+                const agDays = attendanceDays.filter((d) => d.agentId === ag.id);
+                const hasAbsent = agDays.some((d) => d.status === "absent" || d.status === "late");
+                const bonus = agDays.length > 0 ? (hasAbsent ? 0 : 1000) : null;
+                const presentCount = agDays.filter((d) => d.status === "present" || d.status === "justified").length;
+                const absentCount = agDays.filter((d) => d.status === "absent").length;
+                const lateCount = agDays.filter((d) => d.status === "late").length;
+                return (
+                  <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 0", borderBottom: "1px solid #f1f5f9", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <button className="btn btn-secondary" style={{ fontWeight: 600 }} onClick={() => { setCalendarAgent(ag); setSelectedDay(null); }}>
+                        {ag.name}
+                      </button>
+                      <div style={{ display: "flex", gap: "0.4rem", fontSize: "0.78rem" }}>
+                        {presentCount > 0 && <span style={{ background: "#dcfce7", color: "#16a34a", border: "1px solid #16a34a", borderRadius: 4, padding: "1px 6px" }}>✓ {presentCount}</span>}
+                        {lateCount > 0 && <span style={{ background: "#fef3c7", color: "#d97706", border: "1px solid #d97706", borderRadius: 4, padding: "1px 6px" }}>⏰ {lateCount}</span>}
+                        {absentCount > 0 && <span style={{ background: "#fee2e2", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 4, padding: "1px 6px" }}>✗ {absentCount}</span>}
+                      </div>
+                    </div>
                     {bonus !== null && (
-                      <span className={`badge ${hasAbsent ? "" : "badge-success"}`} style={{ fontSize: "0.85rem", padding: "0.35rem 0.8rem", background: hasAbsent ? "#fee2e2" : undefined, color: hasAbsent ? "#ef4444" : undefined, border: "none" }}>
-                        Bono asistencia: MXN ${bonus.toLocaleString()}
+                      <span style={{ fontSize: "0.82rem", fontWeight: 600, color: hasAbsent ? "#ef4444" : "#16a34a" }}>
+                        MXN ${bonus.toLocaleString()}
                       </span>
                     )}
                   </div>
-
-                  {/* Calendar grid */}
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "separate", borderSpacing: "3px", width: "100%", minWidth: 320 }}>
-                      <thead>
-                        <tr>{DOW_LABELS.map((l) => <th key={l} style={{ textAlign: "center", fontSize: "0.72rem", color: "var(--text-muted)", paddingBottom: "0.4rem", fontWeight: 600 }}>{l}</th>)}</tr>
-                      </thead>
-                      <tbody>
-                        {monthGrid.map((week, wi) => (
-                          <tr key={wi}>
-                            {week.map((day, di) => {
-                              if (!day) return <td key={di} />;
-                              const ds = toDateStr(day);
-                              const rec = agDays.find((d) => d.date === ds);
-                              const isSel = selectedDay?.agentId === ag.id && selectedDay?.date === ds;
-                              const [bg, borderColor] = rec
-                                ? rec.status === "present"   ? ["#dcfce7","#16a34a"]
-                                : rec.status === "justified" ? ["#d1fae5","#059669"]
-                                : rec.status === "late"      ? ["#fef3c7","#d97706"]
-                                :                              ["#fee2e2","#ef4444"]
-                                : ["#f8fafc","#e2e8f0"];
-                              return (
-                                <td key={di} style={{ padding: 0 }}>
-                                  <button onClick={() => handleDayClick(ag.id, day)} style={{ width: "100%", minWidth: 36, aspectRatio: "1", background: bg, border: `2px solid ${isSel ? "#0891b2" : borderColor}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, fontSize: "0.78rem", fontWeight: 600, outline: isSel ? "2px solid #bae6fd" : "none" }}>
-                                    {day.getDate()}
-                                    {rec && <span style={{ fontSize: "0.55rem", color: borderColor, lineHeight: 1 }}>{rec.status === "present" ? "✓" : rec.status === "justified" ? "J" : rec.status === "late" ? "⏰" : "✗"}</span>}
-                                  </button>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Inline day editor */}
-                  {selectedDay?.agentId === ag.id && (
-                    <div style={{ marginTop: "0.75rem", padding: "0.85rem 1rem", background: "#f0f9ff", borderRadius: 8, border: "1px solid #bae6fd" }}>
-                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-                        <div style={{ fontWeight: 600, fontSize: "0.82rem", paddingBottom: "0.2rem", minWidth: 90 }}>
-                          {new Date(selectedDay.date + "T12:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: "0.72rem" }}>Estado</label>
-                          <select className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.status} onChange={(e) => setDayDraft({ ...dayDraft, status: e.target.value as MexAttendanceDay["status"] })}>
-                            <option value="present">✓ Presente</option>
-                            <option value="justified">J Justificada</option>
-                            <option value="late">⏰ Tarde</option>
-                            <option value="absent">✗ Falta</option>
-                          </select>
-                        </div>
-                        {(dayDraft.status === "absent" || dayDraft.status === "late") && (
-                          <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
-                            <label style={{ fontSize: "0.72rem" }}>Nota (ej. "5 min tarde", "No asistió")</label>
-                            <input type="text" className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.note} onChange={(e) => setDayDraft({ ...dayDraft, note: e.target.value })} placeholder="Razón..." />
-                          </div>
-                        )}
-                        <button className="btn btn-primary btn-sm" onClick={saveDay}>Guardar</button>
-                        <button className="btn btn-secondary btn-sm" onClick={clearDay}>Limpiar</button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setSelectedDay(null)}>×</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notes summary */}
-                  {agDays.filter((d) => d.note).length > 0 && (
-                    <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                      {agDays.filter((d) => d.note).map((d) => (
-                        <div key={d.id} style={{ fontSize: "0.78rem", display: "flex", gap: "0.4rem" }}>
-                          <span style={{ color: "#ef4444", fontWeight: 600 }}>{new Date(d.date + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}:</span>
-                          <span style={{ color: "var(--text-muted)" }}>{d.note}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             {/* ── Horarios (Google Calendar-style weekly view) ── */}
             <div className="card" style={{ marginTop: "1rem" }}>
@@ -515,6 +442,99 @@ export default function MexicoDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* ── Calendar modal ── */}
+            {calendarAgent && (() => {
+              const ag = calendarAgent;
+              const agDays = attendanceDays.filter((d) => d.agentId === ag.id);
+              return (
+                <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) { setCalendarAgent(null); setSelectedDay(null); } }}>
+                  <div className="modal" style={{ maxWidth: 420, width: "95vw" }}>
+                    <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h3 style={{ margin: 0 }}>Asistencia — {ag.name}</h3>
+                      <button onClick={() => { setCalendarAgent(null); setSelectedDay(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", color: "var(--text-muted)" }}>×</button>
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "0.75rem", fontSize: "0.72rem" }}>
+                      {([["#dcfce7","#16a34a","✓ Presente"],["#fef3c7","#d97706","⏰ Tarde"],["#fee2e2","#ef4444","✗ Falta"],["#d1fae5","#059669","J Justificada"]] as [string,string,string][]).map(([bg,c,l]) => (
+                        <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                          <span style={{ width: 14, height: 14, backgroundColor: bg, border: `2px solid ${c}`, borderRadius: 3, flexShrink: 0 }} />
+                          <span style={{ color: "#64748b" }}>{l}</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Compact calendar */}
+                    <table style={{ borderCollapse: "separate", borderSpacing: "3px", width: "100%" }}>
+                      <thead>
+                        <tr>{DOW_LABELS.map((l) => <th key={l} style={{ textAlign: "center", fontSize: "0.68rem", color: "#94a3b8", paddingBottom: "0.35rem", fontWeight: 600 }}>{l}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {monthGrid.map((week, wi) => (
+                          <tr key={wi}>
+                            {week.map((day, di) => {
+                              if (!day) return <td key={di} />;
+                              const ds = toDateStr(day);
+                              const rec = agDays.find((d) => d.date === ds);
+                              const isSel = selectedDay?.agentId === ag.id && selectedDay?.date === ds;
+                              const bg = rec ? rec.status === "present" ? "#dcfce7" : rec.status === "justified" ? "#d1fae5" : rec.status === "late" ? "#fef3c7" : "#fee2e2" : "#f8fafc";
+                              const bc = rec ? rec.status === "present" ? "#16a34a" : rec.status === "justified" ? "#059669" : rec.status === "late" ? "#d97706" : "#ef4444" : "#e2e8f0";
+                              return (
+                                <td key={di} style={{ padding: 0 }}>
+                                  <div onClick={() => handleDayClick(ag.id, day)} style={{ width: "100%", aspectRatio: "1", minWidth: 34, backgroundColor: isSel ? "#e0f2fe" : bg, border: `2px solid ${isSel ? "#0891b2" : bc}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, fontSize: "0.75rem", fontWeight: 600, userSelect: "none" }}>
+                                    {day.getDate()}
+                                    {rec && <span style={{ fontSize: "0.5rem", color: bc, lineHeight: 1 }}>{rec.status === "present" ? "✓" : rec.status === "justified" ? "J" : rec.status === "late" ? "⏰" : "✗"}</span>}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Day editor */}
+                    {selectedDay?.agentId === ag.id && (
+                      <div style={{ marginTop: "0.75rem", padding: "0.75rem", backgroundColor: "#f0f9ff", borderRadius: 8, border: "1px solid #bae6fd" }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.5rem", color: "#0369a1" }}>
+                          {new Date(selectedDay.date + "T12:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <select className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.status} onChange={(e) => setDayDraft({ ...dayDraft, status: e.target.value as MexAttendanceDay["status"] })}>
+                              <option value="present">✓ Presente</option>
+                              <option value="justified">J Justificada</option>
+                              <option value="late">⏰ Tarde</option>
+                              <option value="absent">✗ Falta</option>
+                            </select>
+                          </div>
+                          {(dayDraft.status === "absent" || dayDraft.status === "late") && (
+                            <div className="form-group" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
+                              <input type="text" className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.note} onChange={(e) => setDayDraft({ ...dayDraft, note: e.target.value })} placeholder="Nota: 5 min tarde, no asistió..." />
+                            </div>
+                          )}
+                          <button className="btn btn-primary btn-sm" onClick={saveDay}>Guardar</button>
+                          <button className="btn btn-secondary btn-sm" onClick={clearDay}>Limpiar</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes list */}
+                    {agDays.filter((d) => d.note).length > 0 && (
+                      <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        {agDays.filter((d) => d.note).map((d) => (
+                          <div key={d.id} style={{ fontSize: "0.76rem", display: "flex", gap: "0.4rem" }}>
+                            <span style={{ color: "#ef4444", fontWeight: 600, whiteSpace: "nowrap" }}>{new Date(d.date + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}:</span>
+                            <span style={{ color: "#64748b" }}>{d.note}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Add shift modal */}
             {showSchedForm && (
