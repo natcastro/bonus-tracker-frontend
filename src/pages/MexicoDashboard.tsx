@@ -123,36 +123,52 @@ export default function MexicoDashboard() {
 
   // ── Attendance day calendar
   const [calendarAgent, setCalendarAgent] = useState<Agent | null>(null);
-  const [selectedDay, setSelectedDay] = useState<{ agentId: number; date: string } | null>(null);
-  const [dayDraft, setDayDraft] = useState<{ status: MexAttendanceDay["status"]; note: string }>({ status: "present", note: "" });
+  // noteDay: day whose note is being edited inline
+  const [noteDay, setNoteDay] = useState<{ agentId: number; date: string; note: string } | null>(null);
 
-  const handleDayClick = (agentId: number, day: Date) => {
+  // Cycle order: unmarked → present → absent → late → justified → (delete)
+  const STATUS_CYCLE: Array<MexAttendanceDay["status"]> = ["present", "absent", "late", "justified"];
+
+  const handleDayClick = async (agentId: number, day: Date) => {
     const ds = toDateStr(day);
     const existing = attendanceDays.find((d) => d.agentId === agentId && d.date === ds);
-    setSelectedDay({ agentId, date: ds });
-    setDayDraft({ status: existing?.status ?? "present", note: existing?.note ?? "" });
-  };
+    const nextIdx = existing ? (STATUS_CYCLE.indexOf(existing.status) + 1) % (STATUS_CYCLE.length + 1) : 0;
 
-  const saveDay = async () => {
-    if (!selectedDay) return;
-    try {
-      await upsertMexAttendanceDay({ agentId: selectedDay.agentId, date: selectedDay.date, status: dayDraft.status, note: dayDraft.note, year: Number(year), month });
-      await load();
-      setSelectedDay(null);
-    } catch (e: any) {
-      alert("Error al guardar asistencia. ¿Creaste la tabla mex_attendance_days en Supabase?\n\n" + (e?.message ?? e));
+    // Optimistically update UI first
+    if (nextIdx === STATUS_CYCLE.length) {
+      // Cycle back to unmarked — delete
+      setAttendanceDays((prev) => prev.filter((d) => !(d.agentId === agentId && d.date === ds)));
+      if (existing) {
+        try { await deleteMexAttendanceDay(existing.id); } catch (e: any) { alert("Error: " + (e?.message ?? e)); await load(); }
+      }
+    } else {
+      const newStatus = STATUS_CYCLE[nextIdx];
+      if (existing) {
+        setAttendanceDays((prev) => prev.map((d) => d.agentId === agentId && d.date === ds ? { ...d, status: newStatus } : d));
+      } else {
+        setAttendanceDays((prev) => [...prev, { id: -1, agentId, date: ds, status: newStatus, note: "", year: Number(year), month }]);
+      }
+      try {
+        await upsertMexAttendanceDay({ agentId, date: ds, status: newStatus, note: existing?.note ?? "", year: Number(year), month });
+        await load();
+      } catch (e: any) {
+        alert("Error al guardar. ¿Creaste la tabla mex_attendance_days en Supabase?\n\n" + (e?.message ?? e));
+        await load();
+      }
     }
   };
 
-  const clearDay = async () => {
-    if (!selectedDay) return;
+  const saveNote = async () => {
+    if (!noteDay) return;
     try {
-      const ex = attendanceDays.find((d) => d.agentId === selectedDay.agentId && d.date === selectedDay.date);
-      if (ex) await deleteMexAttendanceDay(ex.id);
-      await load();
-      setSelectedDay(null);
+      const ex = attendanceDays.find((d) => d.agentId === noteDay.agentId && d.date === noteDay.date);
+      if (ex) {
+        await upsertMexAttendanceDay({ agentId: ex.agentId, date: ex.date, status: ex.status, note: noteDay.note, year: Number(year), month });
+        await load();
+      }
+      setNoteDay(null);
     } catch (e: any) {
-      alert("Error al limpiar día: " + (e?.message ?? e));
+      alert("Error al guardar nota: " + (e?.message ?? e));
     }
   };
 
@@ -468,90 +484,83 @@ export default function MexicoDashboard() {
             {calendarAgent && (() => {
               const ag = calendarAgent;
               const agDays = attendanceDays.filter((d) => d.agentId === ag.id);
+              const STATUS_COLOR: Record<string, { bg: string; border: string; label: string }> = {
+                present:   { bg: "#dcfce7", border: "#16a34a", label: "✓" },
+                absent:    { bg: "#fee2e2", border: "#ef4444", label: "✗" },
+                late:      { bg: "#fef3c7", border: "#d97706", label: "⏰" },
+                justified: { bg: "#d1fae5", border: "#059669", label: "J" },
+              };
               return (
-                <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) { setCalendarAgent(null); setSelectedDay(null); } }}>
-                  <div className="modal" style={{ maxWidth: 420, width: "95vw" }}>
+                <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) { setCalendarAgent(null); setNoteDay(null); } }}>
+                  <div className="modal" style={{ maxWidth: 400, width: "95vw" }}>
                     <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <h3 style={{ margin: 0 }}>Asistencia — {ag.name}</h3>
-                      <button onClick={() => { setCalendarAgent(null); setSelectedDay(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", color: "var(--text-muted)" }}>×</button>
+                      <button onClick={() => { setCalendarAgent(null); setNoteDay(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.4rem", lineHeight: 1, color: "var(--text-muted)" }}>×</button>
                     </div>
 
                     {/* Legend */}
-                    <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "0.75rem", fontSize: "0.72rem" }}>
-                      {([["#dcfce7","#16a34a","✓ Presente"],["#fef3c7","#d97706","⏰ Tarde"],["#fee2e2","#ef4444","✗ Falta"],["#d1fae5","#059669","J Justificada"]] as [string,string,string][]).map(([bg,c,l]) => (
-                        <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                          <span style={{ width: 14, height: 14, backgroundColor: bg, border: `2px solid ${c}`, borderRadius: 3, flexShrink: 0 }} />
-                          <span style={{ color: "#64748b" }}>{l}</span>
+                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.85rem", fontSize: "0.74rem", color: "#64748b" }}>
+                      <span>Clic para cambiar estado:</span>
+                      {Object.entries(STATUS_COLOR).map(([s, c]) => (
+                        <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                          <span style={{ width: 13, height: 13, backgroundColor: c.bg, border: `2px solid ${c.border}`, borderRadius: 3 }} />
+                          {s === "present" ? "Presente" : s === "absent" ? "Falta" : s === "late" ? "Tarde" : "Justificada"}
                         </span>
                       ))}
                     </div>
 
-                    {/* Compact calendar */}
-                    <table style={{ borderCollapse: "separate", borderSpacing: "3px", width: "100%" }}>
-                      <thead>
-                        <tr>{DOW_LABELS.map((l) => <th key={l} style={{ textAlign: "center", fontSize: "0.68rem", color: "#94a3b8", paddingBottom: "0.35rem", fontWeight: 600 }}>{l}</th>)}</tr>
-                      </thead>
-                      <tbody>
-                        {monthGrid.map((week, wi) => (
-                          <tr key={wi}>
-                            {week.map((day, di) => {
-                              if (!day) return <td key={di} />;
-                              const ds = toDateStr(day);
-                              const rec = agDays.find((d) => d.date === ds);
-                              const isSel = selectedDay?.agentId === ag.id && selectedDay?.date === ds;
-                              const bg = rec ? rec.status === "present" ? "#dcfce7" : rec.status === "justified" ? "#d1fae5" : rec.status === "late" ? "#fef3c7" : "#fee2e2" : "#f8fafc";
-                              const bc = rec ? rec.status === "present" ? "#16a34a" : rec.status === "justified" ? "#059669" : rec.status === "late" ? "#d97706" : "#ef4444" : "#e2e8f0";
-                              return (
-                                <td key={di} style={{ padding: 0 }}>
-                                  <div onClick={() => handleDayClick(ag.id, day)} style={{ width: "100%", aspectRatio: "1", minWidth: 34, backgroundColor: isSel ? "#e0f2fe" : bg, border: `2px solid ${isSel ? "#0891b2" : bc}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, fontSize: "0.75rem", fontWeight: 600, userSelect: "none" }}>
-                                    {day.getDate()}
-                                    {rec && <span style={{ fontSize: "0.5rem", color: bc, lineHeight: 1 }}>{rec.status === "present" ? "✓" : rec.status === "justified" ? "J" : rec.status === "late" ? "⏰" : "✗"}</span>}
-                                  </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* Day editor */}
-                    {selectedDay?.agentId === ag.id && (
-                      <div style={{ marginTop: "0.75rem", padding: "0.75rem", backgroundColor: "#f0f9ff", borderRadius: 8, border: "1px solid #bae6fd" }}>
-                        <div style={{ fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.5rem", color: "#0369a1" }}>
-                          {new Date(selectedDay.date + "T12:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
-                        </div>
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <select className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.status} onChange={(e) => setDayDraft({ ...dayDraft, status: e.target.value as MexAttendanceDay["status"] })}>
-                              <option value="present">✓ Presente</option>
-                              <option value="justified">J Justificada</option>
-                              <option value="late">⏰ Tarde</option>
-                              <option value="absent">✗ Falta</option>
-                            </select>
-                          </div>
-                          {(dayDraft.status === "absent" || dayDraft.status === "late") && (
-                            <div className="form-group" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
-                              <input type="text" className="form-control" style={{ fontSize: "0.82rem" }} value={dayDraft.note} onChange={(e) => setDayDraft({ ...dayDraft, note: e.target.value })} placeholder="Nota: 5 min tarde, no asistió..." />
+                    {/* Calendar grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4 }}>
+                      {DOW_LABELS.map((l) => (
+                        <div key={l} style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", paddingBottom: 4 }}>{l}</div>
+                      ))}
+                      {monthGrid.map((week) =>
+                        week.map((day, di) => {
+                          if (!day) return <div key={`e-${di}`} />;
+                          const ds = toDateStr(day);
+                          const rec = agDays.find((d) => d.date === ds);
+                          const sc = rec ? STATUS_COLOR[rec.status] : null;
+                          const bg = sc ? sc.bg : "#f1f5f9";
+                          const bc = sc ? sc.border : "#cbd5e1";
+                          return (
+                            <div
+                              key={ds}
+                              onClick={() => handleDayClick(ag.id, day)}
+                              style={{ aspectRatio: "1", backgroundColor: bg, border: `2px solid ${bc}`, borderRadius: 7, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: sc ? bc : "#64748b", userSelect: "none", transition: "transform 0.07s", lineHeight: 1.1 }}
+                              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
+                              onMouseUp={(e) => (e.currentTarget.style.transform = "")}
+                              onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
+                            >
+                              {day.getDate()}
+                              {sc && <span style={{ fontSize: "0.58rem", marginTop: 1 }}>{sc.label}</span>}
                             </div>
-                          )}
-                          <button className="btn btn-primary btn-sm" onClick={saveDay}>Guardar</button>
-                          <button className="btn btn-secondary btn-sm" onClick={clearDay}>Limpiar</button>
-                        </div>
-                      </div>
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
 
-                    {/* Notes list */}
-                    {agDays.filter((d) => d.note).length > 0 && (
-                      <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                        {agDays.filter((d) => d.note).map((d) => (
-                          <div key={d.id} style={{ fontSize: "0.76rem", display: "flex", gap: "0.4rem" }}>
-                            <span style={{ color: "#ef4444", fontWeight: 600, whiteSpace: "nowrap" }}>{new Date(d.date + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}:</span>
-                            <span style={{ color: "#64748b" }}>{d.note}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {/* Note editor for absent/late days */}
+                    <div style={{ marginTop: "0.85rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      {agDays.filter((d) => d.status === "absent" || d.status === "late").map((d) => (
+                        <div key={d.id} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem" }}>
+                          <span style={{ color: STATUS_COLOR[d.status].border, fontWeight: 700, whiteSpace: "nowrap", minWidth: 50 }}>
+                            {new Date(d.date + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                          </span>
+                          {noteDay?.date === d.date ? (
+                            <>
+                              <input autoFocus className="form-control" style={{ fontSize: "0.78rem", padding: "0.2rem 0.4rem", flex: 1 }} value={noteDay.note} onChange={(e) => setNoteDay({ ...noteDay, note: e.target.value })} placeholder="Nota..." />
+                              <button className="btn btn-primary btn-sm" onClick={saveNote}>OK</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setNoteDay(null)}>×</button>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ flex: 1, color: "#64748b" }}>{d.note || <em style={{ color: "#94a3b8" }}>Sin nota</em>}</span>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setNoteDay({ agentId: d.agentId, date: d.date, note: d.note })}>✏️</button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
