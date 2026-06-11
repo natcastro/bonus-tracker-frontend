@@ -278,8 +278,8 @@ export default function AccountProtectionDashboard() {
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.75rem" }}>
-                  <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: "6px", fontWeight: 600, color: "#0891b2" }}>
-                    Bonus: ${bonusPreview.toFixed(2)}
+                  <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: "6px", fontWeight: 600, color: claimForm.status === "pending" ? "var(--text-muted)" : "#0891b2" }}>
+                    Bonus: {claimForm.status === "pending" ? "—" : `$${bonusPreview.toFixed(2)}`}
                   </div>
                   <button type="submit" className="btn btn-primary">Add Entry</button>
                 </div>
@@ -332,7 +332,7 @@ export default function AccountProtectionDashboard() {
                           ? <span className="badge" style={{ background: "#fed7aa", color: "#9a3412", border: "none" }}>Pending</span>
                           : <span className="badge badge-success">Completed</span>}
                       </td>
-                      <td style={{ fontWeight: 600 }}>${c.status === "pending" ? "0.00" : calcAptClaimBonus(c.claimType, c.subType).toFixed(2)}</td>
+                      <td style={{ fontWeight: 600, color: c.status === "pending" ? "var(--text-muted)" : undefined }}>{c.status === "pending" ? "—" : `$${calcAptClaimBonus(c.claimType, c.subType).toFixed(2)}`}</td>
                       <td>
                         <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteAptClaim(c.id); await load(); })}>Delete</button>
                       </td>
