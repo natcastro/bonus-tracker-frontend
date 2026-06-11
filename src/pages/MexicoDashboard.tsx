@@ -66,6 +66,7 @@ export default function MexicoDashboard() {
   const [scheduleEvents, setScheduleEvents] = useState<MexScheduleEvent[]>([]);
   const [sales, setSales] = useState<MexLiveSale[]>([]);
   const [goal, setGoal] = useState<MexMonthlyGoal | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -84,18 +85,22 @@ export default function MexicoDashboard() {
     setSales(sa);
     setGoal(go);
     // These tables may not exist yet — load independently so the rest of the page still works
+    let hasErr = false;
     try {
       const attDays = await getMexAttendanceDays(Number(year), month);
       setAttendanceDays(attDays);
-    } catch (e) {
-      console.warn("mex_attendance_days table missing:", e);
+    } catch (e: any) {
+      hasErr = true;
+      setDbError("Falta crear tabla mex_attendance_days en Supabase: " + (e?.message ?? String(e)));
     }
     try {
       const schEv = await getMexScheduleEvents(Number(year), month);
       setScheduleEvents(schEv);
-    } catch (e) {
-      console.warn("mex_schedule_events table missing:", e);
+    } catch (e: any) {
+      hasErr = true;
+      setDbError((prev) => (prev ?? "") + "\nFalta crear tabla mex_schedule_events en Supabase: " + (e?.message ?? String(e)));
     }
+    if (!hasErr) setDbError(null);
   }, [year, month]);
 
   useEffect(() => { load(); }, [load]);
@@ -139,7 +144,7 @@ export default function MexicoDashboard() {
       // Cycle back to unmarked — delete
       setAttendanceDays((prev) => prev.filter((d) => !(d.agentId === agentId && d.date === ds)));
       if (existing) {
-        try { await deleteMexAttendanceDay(existing.id); } catch (e: any) { alert("Error: " + (e?.message ?? e)); await load(); }
+        try { await deleteMexAttendanceDay(existing.id); } catch (e: any) { setDbError("Error al borrar día: " + (e?.message ?? e)); await load(); }
       }
     } else {
       const newStatus = STATUS_CYCLE[nextIdx];
@@ -152,7 +157,7 @@ export default function MexicoDashboard() {
         await upsertMexAttendanceDay({ agentId, date: ds, status: newStatus, note: existing?.note ?? "", year: Number(year), month });
         await load();
       } catch (e: any) {
-        alert("Error al guardar. ¿Creaste la tabla mex_attendance_days en Supabase?\n\n" + (e?.message ?? e));
+        setDbError("Error al guardar asistencia: " + (e?.message ?? e));
         await load();
       }
     }
@@ -168,7 +173,7 @@ export default function MexicoDashboard() {
       }
       setNoteDay(null);
     } catch (e: any) {
-      alert("Error al guardar nota: " + (e?.message ?? e));
+      setDbError("Error al guardar nota: " + (e?.message ?? e));
     }
   };
 
@@ -190,7 +195,7 @@ export default function MexicoDashboard() {
       setShowSchedForm(false);
       setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
     } catch (e: any) {
-      alert("Error al guardar turno. ¿Creaste la tabla mex_schedule_events en Supabase?\n\n" + (e?.message ?? e));
+      setDbError("Error al guardar turno: " + (e?.message ?? e));
     }
   };
 
@@ -371,6 +376,32 @@ export default function MexicoDashboard() {
         {activeTab === "asistencia" && (
           <section>
             <header className="section-header"><h2>Asistencia — {MONTHS[month - 1]} {year}</h2></header>
+
+            {/* DB error banner */}
+            {dbError && (
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
+                <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: "0.4rem" }}>⚠️ Error de base de datos — corre este SQL en Supabase:</div>
+                <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: "0 0 0.4rem", whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 4 }}>{`CREATE TABLE IF NOT EXISTS mex_attendance_days (
+  id BIGSERIAL PRIMARY KEY,
+  agent_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'present',
+  note TEXT NOT NULL DEFAULT '',
+  year INT NOT NULL, month INT NOT NULL,
+  UNIQUE(agent_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS mex_schedule_events (
+  id BIGSERIAL PRIMARY KEY,
+  agent_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  start_time TEXT NOT NULL, end_time TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  year INT NOT NULL, month INT NOT NULL
+);`}</pre>
+                <div style={{ fontSize: "0.75rem", color: "#991b1b" }}>Error técnico: {dbError}</div>
+              </div>
+            )}
 
             {/* Agent list — click name to open calendar */}
             <div className="card">
