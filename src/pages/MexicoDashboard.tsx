@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, MexAttendance, MexLiveSale, MexMonthlyGoal } from "../types";
 import {
-  getAgents, updateAgentName,
+  getAgents, updateAgentName, createAgent,
   getMexAttendance, upsertMexAttendance,
   getMexSales, addMexSale, deleteMexSale,
   getMexGoal, upsertMexGoal,
@@ -106,7 +106,7 @@ export default function MexicoDashboard() {
   });
 
   // ── Sale form
-  const [saleForm, setSaleForm] = useState({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: "" });
+  const [saleForm, setSaleForm] = useState({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
 
   const submitSale = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,12 +118,12 @@ export default function MexicoDashboard() {
       date: saleForm.date,
       salesAmount: Number(saleForm.salesAmount),
       quantity: Number(saleForm.quantity),
-      skus: saleForm.skus,
+      skus: saleForm.skus.filter((s) => s.trim() !== "").join("|"),
       year: saleYear,
       month: saleMonth,
     });
     await load();
-    setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: "" });
+    setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
   };
 
   const handleDeleteSale = (id: number) => {
@@ -176,6 +176,19 @@ export default function MexicoDashboard() {
 
   const saveAgentName = async (id: number) => {
     await updateAgentName(id, agentNames[id]);
+    await load();
+  };
+
+  // ── Add agent
+  const [newAgentName, setNewAgentName] = useState("");
+  const [agentAdded, setAgentAdded] = useState(false);
+
+  const handleAddAgent = async () => {
+    if (!newAgentName.trim()) return;
+    await createAgent(newAgentName.trim(), "MEX");
+    setNewAgentName("");
+    setAgentAdded(true);
+    setTimeout(() => setAgentAdded(false), 2000);
     await load();
   };
 
@@ -378,14 +391,34 @@ export default function MexicoDashboard() {
                 </div>
                 <div className="form-group" style={{ marginTop: "0.5rem" }}>
                   <label>SKUs / Referencias</label>
-                  <textarea
-                    className="form-control"
-                    placeholder="ej. SKU-001, SKU-042, SKU-108..."
-                    rows={2}
-                    value={saleForm.skus}
-                    onChange={(e) => setSaleForm({ ...saleForm, skus: e.target.value })}
-                    style={{ resize: "vertical", fontFamily: "monospace", fontSize: "0.875rem" }}
-                  />
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    {saleForm.skus.map((sku, i) => (
+                      <div key={i} style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="ej. SKU-001"
+                          value={sku}
+                          onChange={(e) => {
+                            const updated = [...saleForm.skus];
+                            updated[i] = e.target.value;
+                            setSaleForm({ ...saleForm, skus: updated });
+                          }}
+                          style={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                        />
+                        {saleForm.skus.length > 1 && (
+                          <button type="button" onClick={() => setSaleForm({ ...saleForm, skus: saleForm.skus.filter((_, j) => j !== i) })}
+                            style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", cursor: "pointer", color: "var(--text-muted)", padding: "0.3rem 0.6rem", lineHeight: 1 }}>
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setSaleForm({ ...saleForm, skus: [...saleForm.skus, ""] })}
+                      style={{ alignSelf: "flex-start", background: "none", border: "1px dashed var(--border)", borderRadius: "4px", cursor: "pointer", color: "#059669", padding: "0.3rem 0.75rem", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>+</span> Agregar SKU
+                    </button>
+                  </div>
                 </div>
                 <div style={{ marginTop: "0.75rem" }}>
                   <button type="submit" className="btn btn-primary">Agregar Live</button>
@@ -446,8 +479,12 @@ export default function MexicoDashboard() {
                               <td>{s.date}</td>
                               <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
                               <td style={{ textAlign: "center" }}>{s.quantity}</td>
-                              <td style={{ fontSize: "0.8rem", color: "var(--text-muted)", maxWidth: "200px", wordBreak: "break-word" }}>
-                                {s.skus || "—"}
+                              <td style={{ maxWidth: "220px" }}>
+                                {s.skus
+                                  ? s.skus.split("|").map((sku, i) => (
+                                      <span key={i} style={{ display: "inline-block", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "4px", padding: "0.1rem 0.45rem", fontSize: "0.78rem", fontFamily: "monospace", marginRight: "0.3rem", marginBottom: "0.2rem" }}>{sku.trim()}</span>
+                                    ))
+                                  : "—"}
                               </td>
                               <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
                               <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>
@@ -491,6 +528,19 @@ export default function MexicoDashboard() {
         {activeTab === "settings" && (
           <section>
             <header className="section-header"><h2>Configuración</h2></header>
+            <div className="card">
+              <h3>Agregar Agente</h3>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginTop: "0.5rem" }}>
+                <div style={{ flex: 1 }}>
+                  <label>Nombre del nuevo agente</label>
+                  <input type="text" className="form-control" placeholder="ej. María López" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddAgent(); } }} />
+                </div>
+                <button className="btn btn-primary" style={{ background: agentAdded ? "#16a34a" : undefined }} onClick={handleAddAgent}>
+                  {agentAdded ? "¡Agregado! ✓" : "+ Agregar"}
+                </button>
+              </div>
+            </div>
             <div className="card">
               <h3>Nombres de Agentes</h3>
               {agents.map((ag) => (
