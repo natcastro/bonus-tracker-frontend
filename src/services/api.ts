@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type {
   Agent, Appeal, UsaPeriodData, TikTokScore,
-  MexAttendance, MexLiveSale, MexMonthlyGoal,
+  MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent,
   OpsAppeal, OpsHandlingTime, OpsTikTokScore,
   AptClaim,
   AptA2zClaim, AptSafetyClaim, AptFeedback,
@@ -244,6 +244,52 @@ export async function upsertMexGoal(g: Omit<MexMonthlyGoal, "id">): Promise<void
       { year: g.year, month: g.month, goal_amount: g.goalAmount, actual_amount: g.actualAmount },
       { onConflict: "year,month" }
     );
+  if (error) throw error;
+}
+
+// ── Mexico: Attendance Days ───────────────────────────────────────────────────
+
+export async function getMexAttendanceDays(year: number, month: number): Promise<MexAttendanceDay[]> {
+  const { data, error } = await supabase
+    .from("mex_attendance_days")
+    .select("*")
+    .eq("year", year).eq("month", month)
+    .order("date");
+  if (error) throw error;
+  return (data ?? []).map(mapMexAttendanceDay);
+}
+
+export async function upsertMexAttendanceDay(d: Omit<MexAttendanceDay, "id">): Promise<void> {
+  const { error } = await supabase.from("mex_attendance_days")
+    .upsert({ agent_id: d.agentId, date: d.date, status: d.status, note: d.note, year: d.year, month: d.month }, { onConflict: "agent_id,date" });
+  if (error) throw error;
+}
+
+export async function deleteMexAttendanceDay(id: number): Promise<void> {
+  const { error } = await supabase.from("mex_attendance_days").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ── Mexico: Schedule Events ───────────────────────────────────────────────────
+
+export async function getMexScheduleEvents(year: number, month: number): Promise<MexScheduleEvent[]> {
+  const { data, error } = await supabase
+    .from("mex_schedule_events")
+    .select("*")
+    .eq("year", year).eq("month", month)
+    .order("date");
+  if (error) throw error;
+  return (data ?? []).map(mapMexScheduleEvent);
+}
+
+export async function addMexScheduleEvent(e: Omit<MexScheduleEvent, "id">): Promise<void> {
+  const { error } = await supabase.from("mex_schedule_events")
+    .insert({ agent_id: e.agentId, date: e.date, start_time: e.startTime, end_time: e.endTime, note: e.note, year: e.year, month: e.month });
+  if (error) throw error;
+}
+
+export async function deleteMexScheduleEvent(id: number): Promise<void> {
+  const { error } = await supabase.from("mex_schedule_events").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -533,6 +579,14 @@ function mapMexSale(r: any): MexLiveSale {
 
 function mapMexGoal(r: any): MexMonthlyGoal {
   return { id: r.id, year: r.year, month: r.month, goalAmount: r.goal_amount, actualAmount: r.actual_amount };
+}
+
+function mapMexAttendanceDay(r: any): MexAttendanceDay {
+  return { id: r.id, agentId: r.agent_id, date: r.date, status: r.status, note: r.note ?? "", year: r.year, month: r.month };
+}
+
+function mapMexScheduleEvent(r: any): MexScheduleEvent {
+  return { id: r.id, agentId: r.agent_id, date: r.date, startTime: r.start_time, endTime: r.end_time, note: r.note ?? "", year: r.year, month: r.month };
 }
 
 function mapOpsAppeal(r: any): OpsAppeal {

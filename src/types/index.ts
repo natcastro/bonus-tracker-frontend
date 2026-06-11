@@ -65,6 +65,27 @@ export interface MexLiveSale {
   month: number;
 }
 
+export interface MexAttendanceDay {
+  id: number;
+  agentId: number;
+  date: string;
+  status: "present" | "late" | "absent" | "justified";
+  note: string;
+  year: number;
+  month: number;
+}
+
+export interface MexScheduleEvent {
+  id: number;
+  agentId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  note: string;
+  year: number;
+  month: number;
+}
+
 export interface MexMonthlyGoal {
   id: number;
   year: number;
