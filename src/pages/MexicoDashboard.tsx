@@ -73,20 +73,29 @@ export default function MexicoDashboard() {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   const load = useCallback(async () => {
-    const [ag, att, sa, go, attDays, schEv] = await Promise.all([
+    const [ag, att, sa, go] = await Promise.all([
       getAgents("MEX"),
       getMexAttendance(Number(year), month),
       getMexSales(Number(year), month),
       getMexGoal(Number(year), month),
-      getMexAttendanceDays(Number(year), month),
-      getMexScheduleEvents(Number(year), month),
     ]);
     setAgents(ag);
     setAttendance(att);
     setSales(sa);
     setGoal(go);
-    setAttendanceDays(attDays);
-    setScheduleEvents(schEv);
+    // These tables may not exist yet — load independently so the rest of the page still works
+    try {
+      const attDays = await getMexAttendanceDays(Number(year), month);
+      setAttendanceDays(attDays);
+    } catch (e) {
+      console.warn("mex_attendance_days table missing:", e);
+    }
+    try {
+      const schEv = await getMexScheduleEvents(Number(year), month);
+      setScheduleEvents(schEv);
+    } catch (e) {
+      console.warn("mex_schedule_events table missing:", e);
+    }
   }, [year, month]);
 
   useEffect(() => { load(); }, [load]);
@@ -126,17 +135,25 @@ export default function MexicoDashboard() {
 
   const saveDay = async () => {
     if (!selectedDay) return;
-    await upsertMexAttendanceDay({ agentId: selectedDay.agentId, date: selectedDay.date, status: dayDraft.status, note: dayDraft.note, year: Number(year), month });
-    await load();
-    setSelectedDay(null);
+    try {
+      await upsertMexAttendanceDay({ agentId: selectedDay.agentId, date: selectedDay.date, status: dayDraft.status, note: dayDraft.note, year: Number(year), month });
+      await load();
+      setSelectedDay(null);
+    } catch (e: any) {
+      alert("Error al guardar asistencia. ¿Creaste la tabla mex_attendance_days en Supabase?\n\n" + (e?.message ?? e));
+    }
   };
 
   const clearDay = async () => {
     if (!selectedDay) return;
-    const ex = attendanceDays.find((d) => d.agentId === selectedDay.agentId && d.date === selectedDay.date);
-    if (ex) await deleteMexAttendanceDay(ex.id);
-    await load();
-    setSelectedDay(null);
+    try {
+      const ex = attendanceDays.find((d) => d.agentId === selectedDay.agentId && d.date === selectedDay.date);
+      if (ex) await deleteMexAttendanceDay(ex.id);
+      await load();
+      setSelectedDay(null);
+    } catch (e: any) {
+      alert("Error al limpiar día: " + (e?.message ?? e));
+    }
   };
 
   const monthGrid = buildMonthGrid(Number(year), month);
@@ -150,11 +167,15 @@ export default function MexicoDashboard() {
 
   const submitSched = async (e: React.FormEvent) => {
     e.preventDefault();
-    const dt = new Date(schedForm.date);
-    await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: dt.getFullYear(), month: dt.getMonth() + 1 });
-    await load();
-    setShowSchedForm(false);
-    setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
+    try {
+      const dt = new Date(schedForm.date);
+      await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: dt.getFullYear(), month: dt.getMonth() + 1 });
+      await load();
+      setShowSchedForm(false);
+      setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
+    } catch (e: any) {
+      alert("Error al guardar turno. ¿Creaste la tabla mex_schedule_events en Supabase?\n\n" + (e?.message ?? e));
+    }
   };
 
   // ── Totals per agent
