@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { Agent, AptClaim, AptPerformance } from "../types";
 import {
   getAgents, updateAgentName,
-  getAptClaims, addAptClaim, deleteAptClaim,
+  getAptClaims, addAptClaim, updateAptClaim, deleteAptClaim,
   getAptPerformance, upsertAptPerformance,
 } from "../services/api";
 import { getCyclesForYear, getCurrentCycleDefault, getCycleFromDate } from "../services/usaCycles";
@@ -46,6 +46,7 @@ export default function AccountProtectionDashboard() {
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [editingClaim, setEditingClaim] = useState<AptClaim | null>(null);
 
   const load = useCallback(async () => {
     const [ag, cl, perf] = await Promise.all([
@@ -122,6 +123,14 @@ export default function AccountProtectionDashboard() {
     });
     await load();
     setClaimForm({ agentId: 0, date: "", referenceNumber: "", claimType: "a2z", subType: "", status: "pending" });
+  };
+
+  const submitEditClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClaim) return;
+    await updateAptClaim(editingClaim.id, editingClaim);
+    setEditingClaim(null);
+    await load();
   };
 
   // ── Filter
@@ -269,7 +278,7 @@ export default function AccountProtectionDashboard() {
                   {subTypeOptions.length > 0 && (
                     <div className="form-group">
                       <label>Outcome / Detail</label>
-                      <select className="form-control" value={claimForm.subType} onChange={(e) => setClaimForm({ ...claimForm, subType: e.target.value })}>
+                      <select className="form-control" value={claimForm.subType} onChange={(e) => setClaimForm({ ...claimForm, subType: e.target.value })} disabled={claimForm.status === "pending"} style={claimForm.status === "pending" ? { opacity: 0.4, cursor: "not-allowed" } : {}}>
                         {subTypeOptions.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
@@ -334,6 +343,7 @@ export default function AccountProtectionDashboard() {
                       </td>
                       <td style={{ fontWeight: 600, color: c.status === "pending" ? "var(--text-muted)" : undefined }}>{c.status === "pending" ? "—" : `$${calcAptClaimBonus(c.claimType, c.subType).toFixed(2)}`}</td>
                       <td>
+                        <button className="btn btn-sm btn-secondary" onClick={() => setEditingClaim(c)}>Edit</button>{" "}
                         <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteAptClaim(c.id); await load(); })}>Delete</button>
                       </td>
                     </tr>
@@ -409,6 +419,54 @@ export default function AccountProtectionDashboard() {
           </section>
         )}
       </main>
+
+      {/* Edit Claim Modal */}
+      {editingClaim && (
+        <div className="modal-overlay active">
+          <div className="modal">
+            <div className="modal-header"><h3>Edit Entry</h3></div>
+            <form onSubmit={submitEditClaim}>
+              <div className="form-group">
+                <label>Agent</label>
+                <select className="form-control" value={editingClaim.agentId} onChange={(e) => setEditingClaim({ ...editingClaim, agentId: Number(e.target.value) })}>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input type="date" className="form-control" value={editingClaim.date} onChange={(e) => setEditingClaim({ ...editingClaim, date: e.target.value })} required />
+              </div>
+              <div className="form-group">
+                <label>Reference #</label>
+                <input type="text" className="form-control" value={editingClaim.referenceNumber} onChange={(e) => setEditingClaim({ ...editingClaim, referenceNumber: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Type</label>
+                <select className="form-control" value={editingClaim.claimType} onChange={(e) => setEditingClaim({ ...editingClaim, claimType: e.target.value as AptClaim["claimType"], subType: DEFAULT_SUB[e.target.value] ?? "" })}>
+                  {Object.entries(CLAIM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select className="form-control" value={editingClaim.status} onChange={(e) => setEditingClaim({ ...editingClaim, status: e.target.value as AptClaim["status"] })}>
+                  <option value="pending">Pending</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Outcome / Detail</label>
+                <select className="form-control" value={editingClaim.subType} onChange={(e) => setEditingClaim({ ...editingClaim, subType: e.target.value })} disabled={editingClaim.status === "pending"} style={editingClaim.status === "pending" ? { opacity: 0.4, cursor: "not-allowed" } : {}}>
+                  {(CLAIM_SUB_TYPES[editingClaim.claimType] ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingClaim(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Password Modal */}
       {showPassword && (

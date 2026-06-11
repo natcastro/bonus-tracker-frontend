@@ -338,6 +338,14 @@ export async function addAptClaim(c: Omit<AptClaim, "id" | "agent">): Promise<Ap
   return mapAptClaim(data);
 }
 
+export async function updateAptClaim(id: number, c: Partial<Omit<AptClaim, "id" | "agent">>): Promise<void> {
+  const { error } = await supabase.from("apt_claims").update({
+    agent_id: c.agentId, date: c.date, reference_number: c.referenceNumber,
+    claim_type: c.claimType, sub_type: c.subType, status: c.status,
+  }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteAptClaim(id: number): Promise<void> {
   const { error } = await supabase.from("apt_claims").delete().eq("id", id);
   if (error) throw error;
