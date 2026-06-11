@@ -99,7 +99,7 @@ export default function OperationsDashboard() {
 
   // ── Appeal form
   const [appealForm, setAppealForm] = useState({
-    agentId: 0, date: "", orderNumber: "", status: "inProgress", outcome: "fullRefund",
+    agentId: 0, date: "", orderNumber: "", status: "pending", outcome: "fullRefund",
   });
 
   const submitAppeal = async (e: React.FormEvent) => {
@@ -112,7 +112,7 @@ export default function OperationsDashboard() {
       year: ay, cycleId: ac,
     });
     await load();
-    setAppealForm({ agentId: 0, date: "", orderNumber: "", status: "inProgress", outcome: "fullRefund" });
+    setAppealForm({ agentId: 0, date: "", orderNumber: "", status: "pending", outcome: "fullRefund" });
   };
 
   const submitEditAppeal = async (e: React.FormEvent) => {
@@ -263,13 +263,14 @@ export default function OperationsDashboard() {
                 <div className="form-group">
                   <label>Status</label>
                   <select className="form-control" value={appealForm.status} onChange={(e) => setAppealForm({ ...appealForm, status: e.target.value })}>
+                    <option value="pending">Pending</option>
                     <option value="inProgress">In Progress</option>
                     <option value="completed">Completed</option>
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Outcome</label>
-                  <select className="form-control" value={appealForm.outcome} onChange={(e) => setAppealForm({ ...appealForm, outcome: e.target.value })} disabled={appealForm.status === "inProgress"}>
+                  <select className="form-control" value={appealForm.outcome} onChange={(e) => setAppealForm({ ...appealForm, outcome: e.target.value })} disabled={appealForm.status !== "completed"}>
                     <option value="fullRefund">Full Refund ($3.00)</option>
                     <option value="partialRefund">Partial Refund ($1.50)</option>
                     <option value="fee">Fee Only ($0.25)</option>
@@ -297,7 +298,7 @@ export default function OperationsDashboard() {
                       <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
                       <td>{a.date}</td>
                       <td>{a.orderNumber}</td>
-                      <td><span className={`badge ${a.status === "inProgress" ? "badge-warning" : "badge-success"}`}>{a.status === "inProgress" ? "In Progress" : "Completed"}</span></td>
+                      <td><span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span></td>
                       <td>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
                       <td>${a.status === "completed" ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                       <td>
@@ -472,13 +473,14 @@ export default function OperationsDashboard() {
               <div className="form-group">
                 <label>Status</label>
                 <select className="form-control" value={editingAppeal.status} onChange={(e) => setEditingAppeal({ ...editingAppeal, status: e.target.value as any })}>
+                  <option value="pending">Pending</option>
                   <option value="inProgress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
               </div>
               <div className="form-group">
                 <label>Outcome</label>
-                <select className="form-control" value={editingAppeal.outcome} onChange={(e) => setEditingAppeal({ ...editingAppeal, outcome: e.target.value as any })} disabled={editingAppeal.status === "inProgress"}>
+                <select className="form-control" value={editingAppeal.outcome} onChange={(e) => setEditingAppeal({ ...editingAppeal, outcome: e.target.value as any })} disabled={editingAppeal.status !== "completed"}>
                   <option value="fullRefund">Full Refund ($3.00)</option>
                   <option value="partialRefund">Partial Refund ($1.50)</option>
                   <option value="fee">Fee Only ($0.25)</option>

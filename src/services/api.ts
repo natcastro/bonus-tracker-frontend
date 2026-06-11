@@ -332,7 +332,7 @@ export async function getAptClaims(year: number, cycleId: string): Promise<AptCl
 
 export async function addAptClaim(c: Omit<AptClaim, "id" | "agent">): Promise<AptClaim> {
   const { data, error } = await supabase.from("apt_claims")
-    .insert({ agent_id: c.agentId, date: c.date, reference_number: c.referenceNumber, claim_type: c.claimType, sub_type: c.subType, year: c.year, cycle_id: c.cycleId })
+    .insert({ agent_id: c.agentId, date: c.date, reference_number: c.referenceNumber, claim_type: c.claimType, sub_type: c.subType, status: c.status ?? "completed", year: c.year, cycle_id: c.cycleId })
     .select().single();
   if (error) throw error;
   return mapAptClaim(data);
@@ -540,7 +540,7 @@ function mapOpsTikTokScore(r: any): OpsTikTokScore {
 }
 
 function mapAptClaim(r: any): AptClaim {
-  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, referenceNumber: r.reference_number, claimType: r.claim_type, subType: r.sub_type, year: r.year, cycleId: r.cycle_id };
+  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, referenceNumber: r.reference_number, claimType: r.claim_type, subType: r.sub_type, status: r.status ?? "completed", year: r.year, cycleId: r.cycle_id };
 }
 
 function mapAptA2zClaim(r: any): AptA2zClaim {

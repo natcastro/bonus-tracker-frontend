@@ -78,10 +78,10 @@ export default function AccountProtectionDashboard() {
     }
   };
 
-  // ── Per-agent totals (no cap)
+  // ── Per-agent totals (no cap) — pending claims count $0
   const agentTotals = agents.map((ag) => {
     const claimsBonus = claims
-      .filter((c) => c.agentId === ag.id)
+      .filter((c) => c.agentId === ag.id && c.status !== "pending")
       .reduce((s, c) => s + calcAptClaimBonus(c.claimType, c.subType), 0);
     const perf = APT_PERFORMANCE_BONUS[performance.find((p) => p.agentId === ag.id)?.level ?? "deficient"] ?? 0;
     const total = claimsBonus + perf;
@@ -93,6 +93,7 @@ export default function AccountProtectionDashboard() {
     agentId: 0, date: "", referenceNumber: "",
     claimType: "a2z" as AptClaim["claimType"],
     subType: "",
+    status: "pending" as AptClaim["status"],
   });
 
   const subTypeOptions = CLAIM_SUB_TYPES[claimForm.claimType] ?? [];
@@ -115,11 +116,12 @@ export default function AccountProtectionDashboard() {
       referenceNumber: claimForm.referenceNumber,
       claimType: claimForm.claimType,
       subType: claimForm.subType,
+      status: claimForm.status,
       year: y,
       cycleId: c,
     });
     await load();
-    setClaimForm({ agentId: 0, date: "", referenceNumber: "", claimType: "a2z", subType: "" });
+    setClaimForm({ agentId: 0, date: "", referenceNumber: "", claimType: "a2z", subType: "", status: "pending" });
   };
 
   // ── Filter
@@ -132,7 +134,7 @@ export default function AccountProtectionDashboard() {
     return typeMatch && agentMatch;
   });
 
-  const filteredTotal = filteredClaims.reduce((s, c) => s + calcAptClaimBonus(c.claimType, c.subType), 0);
+  const filteredTotal = filteredClaims.filter((c) => c.status !== "pending").reduce((s, c) => s + calcAptClaimBonus(c.claimType, c.subType), 0);
 
   // ── Performance
   const [perfDraft, setPerfDraft] = useState<Record<number, string>>({});
@@ -257,6 +259,13 @@ export default function AccountProtectionDashboard() {
                       ))}
                     </select>
                   </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select className="form-control" value={claimForm.status} onChange={(e) => setClaimForm({ ...claimForm, status: e.target.value as AptClaim["status"] })}>
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
                   {subTypeOptions.length > 0 && (
                     <div className="form-group">
                       <label>Outcome / Detail</label>
@@ -305,6 +314,7 @@ export default function AccountProtectionDashboard() {
                     <th>Reference #</th>
                     <th>Type</th>
                     <th>Detail</th>
+                    <th>Status</th>
                     <th>Bonus</th>
                     <th>Actions</th>
                   </tr>
@@ -317,14 +327,19 @@ export default function AccountProtectionDashboard() {
                       <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>{c.referenceNumber || "—"}</td>
                       <td><span className="badge badge-warning" style={{ background: "#e0f2fe", color: "#0891b2", border: "none" }}>{CLAIM_TYPE_LABELS[c.claimType]}</span></td>
                       <td>{subTypeLabel(c)}</td>
-                      <td style={{ fontWeight: 600 }}>${calcAptClaimBonus(c.claimType, c.subType).toFixed(2)}</td>
+                      <td>
+                        {c.status === "pending"
+                          ? <span className="badge" style={{ background: "#fed7aa", color: "#9a3412", border: "none" }}>Pending</span>
+                          : <span className="badge badge-success">Completed</span>}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>${c.status === "pending" ? "0.00" : calcAptClaimBonus(c.claimType, c.subType).toFixed(2)}</td>
                       <td>
                         <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteAptClaim(c.id); await load(); })}>Delete</button>
                       </td>
                     </tr>
                   ))}
                   {filteredClaims.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)" }}>No entries for this cycle</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>No entries for this cycle</td></tr>
                   )}
                 </tbody>
               </table>

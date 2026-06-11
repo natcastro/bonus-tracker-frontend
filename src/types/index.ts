@@ -81,7 +81,7 @@ export interface OpsAppeal {
   agent?: Agent;
   date: string;
   orderNumber: string;
-  status: "inProgress" | "completed";
+  status: "pending" | "inProgress" | "completed";
   outcome: "fullRefund" | "partialRefund" | "fee" | "lost";
   year: number;
   cycleId: string;
@@ -114,6 +114,7 @@ export interface AptClaim {
   referenceNumber: string;
   claimType: "a2z" | "safety" | "feedback" | "account_health" | "tiktok_health";
   subType: string;
+  status: "pending" | "completed";
   year: number;
   cycleId: string;
 }
