@@ -5,7 +5,7 @@ import {
   getAgents, updateAgentName, createAgent,
   getMexAttendance,
   getMexSales, addMexSale, deleteMexSale,
-  getMexGoal, upsertMexGoal,
+  getMexGoal,
   getMexAgentGoals, upsertMexAgentGoal,
   getMexAttendanceDays, upsertMexAttendanceDay, deleteMexAttendanceDay,
   getMexScheduleEvents, addMexScheduleEvent, deleteMexScheduleEvent,
@@ -320,41 +320,6 @@ export default function MexicoDashboard() {
     requireAdmin(async () => { await deleteMexSale(id); await load(); });
   };
 
-  // ── Goal form
-  const [goalForm, setGoalForm] = useState({ goalAmount: "", actualAmount: "" });
-  const [goalError, setGoalError] = useState("");
-  const [goalSaved, setGoalSaved] = useState(false);
-
-  useEffect(() => {
-    if (goal) {
-      setGoalForm({ goalAmount: String(goal.goalAmount), actualAmount: String(goal.actualAmount) });
-    } else {
-      setGoalForm({ goalAmount: "", actualAmount: "" });
-    }
-  }, [goal]);
-
-  const saveGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGoalError("");
-    const goalAmt = goalForm.goalAmount === "" ? null : Number(goalForm.goalAmount);
-    const actualAmt = goalForm.actualAmount === "" ? null : Number(goalForm.actualAmount);
-    if (goalAmt === null || isNaN(goalAmt) || goalAmt < 0) {
-      setGoalError("Ingresa una meta válida (puede ser 0).");
-      return;
-    }
-    if (actualAmt === null || isNaN(actualAmt) || actualAmt < 0) {
-      setGoalError("Ingresa las ventas reales (puede ser 0).");
-      return;
-    }
-    try {
-      await upsertMexGoal({ year: Number(year), month, goalAmount: goalAmt, actualAmount: actualAmt });
-      await load();
-      setGoalSaved(true);
-      setTimeout(() => setGoalSaved(false), 2000);
-    } catch (err: any) {
-      setGoalError("Error al guardar: " + (err.message ?? "intenta de nuevo"));
-    }
-  };
 
   // ── Agent names
   const [agentNames, setAgentNames] = useState<Record<number, string>>({});
