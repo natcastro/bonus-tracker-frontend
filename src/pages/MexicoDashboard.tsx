@@ -504,7 +504,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
-                                <button onClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }} style={{ position: "absolute", top: 1, right: 2, background: "none", border: "none", cursor: "pointer", color, fontSize: "0.75rem", padding: 0, lineHeight: 1, fontWeight: 700 }}>×</button>
+                                <button onClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }} style={{ position: "absolute", top: 2, right: 2, background: "rgba(255,255,255,0.85)", border: `1px solid ${color}`, borderRadius: 4, cursor: "pointer", color, fontSize: "0.8rem", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontWeight: 700, padding: 0 }}>×</button>
                               </div>
                             );
                           })}
@@ -617,10 +617,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     </div>
                     <div className="form-group">
                       <label>Día</label>
-                      <select className="form-control" value={schedForm.date} onChange={(e) => setSchedForm({ ...schedForm, date: e.target.value })} required>
-                        <option value="">Seleccionar día</option>
-                        {weekCols.map((day, i) => day ? <option key={i} value={toDateStr(day)}>{DOW_LABELS[i]} {day.getDate()}</option> : null)}
-                      </select>
+                      <input type="date" className="form-control" value={schedForm.date} onChange={(e) => setSchedForm({ ...schedForm, date: e.target.value })} required />
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                       <div className="form-group">
