@@ -500,11 +500,16 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             const agIdx = agents.findIndex((a) => a.id === ev.agentId);
                             const color = AGENT_COLORS[agIdx % AGENT_COLORS.length] ?? "#16a34a";
                             return (
-                              <div key={ev.id} style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1 }}>
+                              <div
+                                key={ev.id}
+                                onDoubleClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }}
+                                title="Doble clic para eliminar"
+                                style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
+                              >
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
-                                <button onClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }} style={{ position: "absolute", top: 2, right: 2, background: "rgba(255,255,255,0.85)", border: `1px solid ${color}`, borderRadius: 4, cursor: "pointer", color, fontSize: "0.8rem", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontWeight: 700, padding: 0 }}>×</button>
+                                <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>
                               </div>
                             );
                           })}
