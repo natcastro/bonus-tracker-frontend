@@ -108,22 +108,26 @@ function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month
   );
 }
 
-// ── Export ventas to CSV (one row per SKU) ────────────────────────────────────
-function exportVentasCSV(sales: MexLiveSale[], agents: Agent[]) {
-  const rows: string[][] = [["Agente", "Fecha", "Total Vendido (MXN)", "Cantidad", "SKU"]];
+// ── Export ventas to .xlsx (one row per SKU) ─────────────────────────────────
+async function exportVentasXLSX(sales: MexLiveSale[], agents: Agent[], monthName: string, year: string) {
+  const XLSX = await import("xlsx");
+  const rows: (string | number)[][] = [];
   for (const s of sales) {
     const agentName = agents.find((a) => a.id === s.agentId)?.name ?? String(s.agentId);
     const skus = s.skus ? s.skus.split("|").filter(Boolean) : [""];
     for (const sku of skus) {
-      rows.push([agentName, s.date, String(s.salesAmount), String(s.quantity), sku]);
+      rows.push([agentName, s.date, s.salesAmount, s.quantity, sku]);
     }
   }
-  const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "ventas_mexico.csv"; a.click();
-  URL.revokeObjectURL(url);
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["Agente", "Fecha", "Total Vendido (MXN)", "Cantidad", "SKU"],
+    ...rows,
+  ]);
+  // Column widths
+  ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+  XLSX.writeFile(wb, `ventas_mexico_${monthName}_${year}.xlsx`);
 }
 
 export default function MexicoDashboard() {
@@ -786,7 +790,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
           <section>
             <header className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ margin: 0 }}>Ventas en Live</h2>
-              <button className="btn btn-secondary btn-sm" onClick={() => exportVentasCSV(sales, agents)}>⬇ Exportar Excel</button>
+              <button className="btn btn-primary btn-sm" onClick={() => exportVentasXLSX(sales, agents, MONTHS[month - 1], year)}>⬇ Exportar Excel (.xlsx)</button>
             </header>
 
             {/* Formulario de registro */}
