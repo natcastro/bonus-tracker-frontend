@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type {
   Agent, Appeal, UsaPeriodData, TikTokScore,
-  MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent,
+  MexAttendance, MexAgentGoal, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent,
   OpsAppeal, OpsHandlingTime, OpsTikTokScore,
   AptClaim,
   AptA2zClaim, AptSafetyClaim, AptFeedback,
@@ -243,6 +243,31 @@ export async function upsertMexGoal(g: Omit<MexMonthlyGoal, "id">): Promise<void
     .upsert(
       { year: g.year, month: g.month, goal_amount: g.goalAmount, actual_amount: g.actualAmount },
       { onConflict: "year,month" }
+    );
+  if (error) throw error;
+}
+
+// ── Mexico: Per-agent Goals ───────────────────────────────────────────────────
+
+function mapMexAgentGoal(r: any): MexAgentGoal {
+  return { id: r.id, agentId: r.agent_id, year: r.year, month: r.month, goalAmount: Number(r.goal_amount) };
+}
+
+export async function getMexAgentGoals(year: number, month: number): Promise<MexAgentGoal[]> {
+  const { data, error } = await supabase
+    .from("mex_agent_goals")
+    .select("*")
+    .eq("year", year).eq("month", month);
+  if (error) throw error;
+  return (data ?? []).map(mapMexAgentGoal);
+}
+
+export async function upsertMexAgentGoal(g: Omit<MexAgentGoal, "id">): Promise<void> {
+  const { error } = await supabase
+    .from("mex_agent_goals")
+    .upsert(
+      { agent_id: g.agentId, year: g.year, month: g.month, goal_amount: g.goalAmount },
+      { onConflict: "agent_id,year,month" }
     );
   if (error) throw error;
 }

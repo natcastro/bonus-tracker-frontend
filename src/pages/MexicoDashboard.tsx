@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Agent, MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent } from "../types";
+import type { Agent, MexAgentGoal, MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent } from "../types";
 import {
   getAgents, updateAgentName, createAgent,
   getMexAttendance,
   getMexSales, addMexSale, deleteMexSale,
   getMexGoal, upsertMexGoal,
+  getMexAgentGoals, upsertMexAgentGoal,
   getMexAttendanceDays, upsertMexAttendanceDay, deleteMexAttendanceDay,
   getMexScheduleEvents, addMexScheduleEvent, deleteMexScheduleEvent,
 } from "../services/api";
@@ -54,6 +55,77 @@ function timeMins(t: string): number {
   return h * 60 + m;
 }
 
+// ── AgentGoalRow (separate component to own its draft state) ─────────────────
+function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month, onSaved }: {
+  agent: Agent; agGoal: MexAgentGoal | null; actual: number;
+  pct: number | null; bonus: number; pctColor: string;
+  year: number; month: number; onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState(String(agGoal?.goalAmount ?? ""));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    if (!draft || isNaN(Number(draft))) return;
+    setSaving(true);
+    try {
+      await upsertMexAgentGoal({ agentId: agent.id, year, month, goalAmount: Number(draft) });
+      await onSaved();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      alert("Error al guardar meta: " + (e?.message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+      <td style={{ padding: "0.6rem 0.75rem", fontWeight: 600 }}>{agent.name}</td>
+      <td style={{ padding: "0.6rem 0.75rem" }}>
+        <input
+          type="number" min="0" placeholder="ej. 50000"
+          className="form-control" style={{ width: 130, fontSize: "0.85rem" }}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setSaved(false); }}
+          onBlur={save}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+        />
+      </td>
+      <td style={{ padding: "0.6rem 0.75rem" }}>MXN ${actual.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
+      <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: pctColor }}>
+        {pct !== null ? `${pct.toFixed(1)}%` : "—"}
+      </td>
+      <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: bonus > 0 ? "#16a34a" : "#64748b" }}>
+        {pct !== null ? `MXN $${bonus.toLocaleString("es-MX")}` : "—"}
+      </td>
+      <td style={{ padding: "0.6rem 0.75rem" }}>
+        {saved && <span style={{ color: "#16a34a", fontSize: "0.8rem" }}>✓ Guardado</span>}
+        {saving && <span style={{ color: "#64748b", fontSize: "0.8rem" }}>Guardando...</span>}
+      </td>
+    </tr>
+  );
+}
+
+// ── Export ventas to CSV (one row per SKU) ────────────────────────────────────
+function exportVentasCSV(sales: MexLiveSale[], agents: Agent[]) {
+  const rows: string[][] = [["Agente", "Fecha", "Total Vendido (MXN)", "Cantidad", "SKU"]];
+  for (const s of sales) {
+    const agentName = agents.find((a) => a.id === s.agentId)?.name ?? String(s.agentId);
+    const skus = s.skus ? s.skus.split("|").filter(Boolean) : [""];
+    for (const sku of skus) {
+      rows.push([agentName, s.date, String(s.salesAmount), String(s.quantity), sku]);
+    }
+  }
+  const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "ventas_mexico.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function MexicoDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("summary");
@@ -66,6 +138,7 @@ export default function MexicoDashboard() {
   const [scheduleEvents, setScheduleEvents] = useState<MexScheduleEvent[]>([]);
   const [sales, setSales] = useState<MexLiveSale[]>([]);
   const [goal, setGoal] = useState<MexMonthlyGoal | null>(null);
+  const [agentGoals, setAgentGoals] = useState<MexAgentGoal[]>([]);
   const [dbError, setDbError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -101,6 +174,10 @@ export default function MexicoDashboard() {
       setDbError((prev) => (prev ?? "") + "\nFalta crear tabla mex_schedule_events en Supabase: " + (e?.message ?? String(e)));
     }
     if (!hasErr) setDbError(null);
+    try {
+      const ag2 = await getMexAgentGoals(Number(year), month);
+      setAgentGoals(ag2);
+    } catch { /* table may not exist yet */ }
   }, [year, month]);
 
   useEffect(() => { load(); }, [load]);
@@ -200,13 +277,14 @@ export default function MexicoDashboard() {
   };
 
   // ── Totals per agent
-  const goalBonus = goal ? calcGoalBonus(goal.goalAmount, goal.actualAmount) : 0;
-
   const agentTotals = agents.map((ag) => {
     const agDays = attendanceDays.filter((d) => d.agentId === ag.id);
     const att = agDays.length > 0
       ? (agDays.some((d) => d.status === "absent" || d.status === "late") ? 0 : 1000)
       : (ATTENDANCE_BONUS[getAttendance(ag.id)] ?? 0);
+    const agGoal = agentGoals.find((g) => g.agentId === ag.id);
+    const agSalesTotal = sales.filter((s) => s.agentId === ag.id).reduce((sum, s) => sum + s.salesAmount, 0);
+    const goalBonus = agGoal ? calcGoalBonus(agGoal.goalAmount, agSalesTotal) : 0;
     const livesBonus = sales
       .filter((s) => s.agentId === ag.id)
       .reduce((sum, s) => sum + calcLiveSaleBonus(s.salesAmount), 0);
@@ -652,58 +730,53 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
         {/* META */}
         {activeTab === "meta" && (
           <section>
-            <header className="section-header"><h2>Meta del Mes</h2></header>
-            <div className="card">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-                <div className="stat-card" style={{ borderTopColor: goalPct && Number(goalPct) >= 140 ? "#f59e0b" : goalPct && Number(goalPct) >= 100 ? "#16a34a" : "#ef4444" }}>
-                  <h3>Cumplimiento</h3>
-                  <div className="amount">{goalPct ? `${goalPct}%` : "—"}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Bono Meta</h3>
-                  <div className="amount" style={{ color: "#16a34a" }}>MXN ${goalBonus.toFixed(2)}</div>
-                </div>
-                <div className="stat-card" style={{ borderTopColor: "#6366f1" }}>
-                  <h3>Tabla de Bonos</h3>
-                  <div style={{ fontSize: "0.8rem", textAlign: "left", marginTop: "0.5rem" }}>
-                    <div>≥ 140% → MXN $1,500</div>
-                    <div>≥ 100% → MXN $1,000</div>
-                    <div>&lt; 100% → MXN $0</div>
-                  </div>
-                </div>
-              </div>
-              <form onSubmit={saveGoal}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Meta (MXN $)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      placeholder="ej. 500000"
-                      value={goalForm.goalAmount}
-                      min="0"
-                      onChange={(e) => setGoalForm({ ...goalForm, goalAmount: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Ventas Reales (MXN $)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      placeholder="ej. 550000"
-                      value={goalForm.actualAmount}
-                      min="0"
-                      onChange={(e) => setGoalForm({ ...goalForm, actualAmount: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <button type="submit" className="btn btn-primary" style={{ marginBottom: 3 }}>
-                      {goalSaved ? "¡Guardado! ✓" : "Guardar Meta"}
-                    </button>
-                  </div>
-                </div>
-                {goalError && <p className="error-msg" style={{ marginTop: "0.5rem" }}>{goalError}</p>}
-              </form>
+            <header className="section-header"><h2>Meta del Mes — {MONTHS[month - 1]} {year}</h2></header>
+
+            {/* Bonus reference card */}
+            <div className="card" style={{ marginBottom: "1rem", display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.85rem" }}>
+              <strong>Tabla de bonos:</strong>
+              <span style={{ color: "#f59e0b" }}>≥ 140% → MXN $1,500</span>
+              <span style={{ color: "#16a34a" }}>≥ 100% → MXN $1,000</span>
+              <span style={{ color: "#ef4444" }}>&lt; 100% → MXN $0</span>
+            </div>
+
+            {/* Per-agent goals table */}
+            <div className="card" style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "0.5rem 0.75rem" }}>Agente</th>
+                    <th style={{ padding: "0.5rem 0.75rem" }}>Meta (MXN $)</th>
+                    <th style={{ padding: "0.5rem 0.75rem" }}>Ventas Reales</th>
+                    <th style={{ padding: "0.5rem 0.75rem" }}>Cumplimiento</th>
+                    <th style={{ padding: "0.5rem 0.75rem" }}>Bono</th>
+                    <th style={{ padding: "0.5rem 0.75rem" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agents.map((ag) => {
+                    const agGoal = agentGoals.find((g) => g.agentId === ag.id);
+                    const actual = sales.filter((s) => s.agentId === ag.id).reduce((sum, s) => sum + s.salesAmount, 0);
+                    const pct = agGoal && agGoal.goalAmount > 0 ? (actual / agGoal.goalAmount) * 100 : null;
+                    const bonus = pct !== null ? calcGoalBonus(agGoal!.goalAmount, actual) : 0;
+                    const pctColor = pct === null ? "#64748b" : pct >= 140 ? "#f59e0b" : pct >= 100 ? "#16a34a" : "#ef4444";
+                    return (
+                      <AgentGoalRow
+                        key={ag.id}
+                        agent={ag}
+                        agGoal={agGoal ?? null}
+                        actual={actual}
+                        pct={pct}
+                        bonus={bonus}
+                        pctColor={pctColor}
+                        year={Number(year)}
+                        month={month}
+                        onSaved={load}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
@@ -711,7 +784,10 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
         {/* VENTAS */}
         {activeTab === "ventas" && (
           <section>
-            <header className="section-header"><h2>Ventas en Live</h2></header>
+            <header className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0 }}>Ventas en Live</h2>
+              <button className="btn btn-secondary btn-sm" onClick={() => exportVentasCSV(sales, agents)}>⬇ Exportar Excel</button>
+            </header>
 
             {/* Formulario de registro */}
             <div className="card">

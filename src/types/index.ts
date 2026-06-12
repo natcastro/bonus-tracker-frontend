@@ -94,6 +94,14 @@ export interface MexMonthlyGoal {
   actualAmount: number;
 }
 
+export interface MexAgentGoal {
+  id: number;
+  agentId: number;
+  year: number;
+  month: number;
+  goalAmount: number;
+}
+
 // ── Operations Team (Tomás) ────────────────────────────────────────────────────
 
 export interface OpsAppeal {
