@@ -415,7 +415,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 return (
                   <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 0", borderBottom: "1px solid #f1f5f9", flexWrap: "wrap", gap: "0.5rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                      <button className="btn btn-secondary" style={{ fontWeight: 600 }} onClick={() => { setCalendarAgent(ag); setSelectedDay(null); }}>
+                      <button className="btn btn-secondary" style={{ fontWeight: 600 }} onClick={() => { setCalendarAgent(ag); setNoteDay(null); }}>
                         {ag.name}
                       </button>
                       <div style={{ display: "flex", gap: "0.4rem", fontSize: "0.78rem" }}>
@@ -435,6 +435,11 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
             </div>
 
             {/* ── Horarios (Google Calendar-style weekly view) ── */}
+            {dbError && (
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.6rem 0.9rem", marginTop: "0.75rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                ⚠️ {dbError} — <strong>corre en Supabase:</strong> <code>ALTER TABLE mex_schedule_events DISABLE ROW LEVEL SECURITY;</code>
+              </div>
+            )}
             <div className="card" style={{ marginTop: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
@@ -499,7 +504,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
-                                <button onClick={() => requireAdmin(async () => { await deleteMexScheduleEvent(ev.id); await load(); })} style={{ position: "absolute", top: 1, right: 2, background: "none", border: "none", cursor: "pointer", color, fontSize: "0.75rem", padding: 0, lineHeight: 1, fontWeight: 700 }}>×</button>
+                                <button onClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }} style={{ position: "absolute", top: 1, right: 2, background: "none", border: "none", cursor: "pointer", color, fontSize: "0.75rem", padding: 0, lineHeight: 1, fontWeight: 700 }}>×</button>
                               </div>
                             );
                           })}
