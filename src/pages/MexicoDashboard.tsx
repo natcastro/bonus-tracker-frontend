@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, MexAgentGoal, MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent } from "../types";
 import {
-  getAgents, updateAgentName, createAgent,
+  getAgents, updateAgentName, createAgent, deleteAgent,
   getMexAttendance,
   getMexSales, addMexSale, deleteMexSale,
   getMexGoal,
@@ -946,6 +946,12 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     <input type="text" className="form-control" value={agentNames[ag.id] ?? ""} onChange={(e) => setAgentNames({ ...agentNames, [ag.id]: e.target.value })} />
                   </div>
                   <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar</button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                    onClick={() => requireAdmin(async () => { await deleteAgent(ag.id); await load(); })}
+                    title="Eliminar agente (requiere contraseña)"
+                  >🗑 Eliminar</button>
                 </div>
               ))}
             </div>
