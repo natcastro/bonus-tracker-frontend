@@ -1,5 +1,5 @@
 [build]
-  command = "find . -name '*.tsbuildinfo' -delete && npm run build"
+  command = "npx vite build"
   publish = "dist"
 
 [build.environment]
