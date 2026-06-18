@@ -312,9 +312,12 @@ export default function MexicoDashboard() {
       return;
     }
     try {
-      const d = new Date(saleForm.date);
+      const d = new Date(saleForm.date + "T12:00");
       const saleYear = d.getFullYear();
       const saleMonth = d.getMonth() + 1;
+      if (saleYear !== Number(year) || saleMonth !== month) {
+        setSaleError(`La fecha es de ${MONTHS[saleMonth - 1]} ${saleYear}, pero estás viendo ${MONTHS[month - 1]} ${year}. Cambia el mes/año arriba para ver esta venta después de guardar.`);
+      }
       await addMexSale({
         agentId: Number(saleForm.agentId),
         date: saleForm.date,
