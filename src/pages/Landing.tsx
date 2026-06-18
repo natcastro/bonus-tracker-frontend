@@ -30,8 +30,9 @@ export default function Landing() {
     setLoading(true);
     setError("");
     try {
-      await verifyPassword(selected, password);
+      const role = await verifyPassword(selected, password);
       sessionStorage.setItem("team", selected);
+      sessionStorage.setItem("role", role);
       navigate(TEAM_CONFIG[selected].route);
     } catch {
       setError("Incorrect password.");

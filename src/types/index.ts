@@ -63,6 +63,7 @@ export interface MexLiveSale {
   skus: string;
   year: number;
   month: number;
+  status: "pending" | "approved";
 }
 
 export interface MexAttendanceDay {

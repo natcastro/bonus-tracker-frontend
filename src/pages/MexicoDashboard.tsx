@@ -4,7 +4,7 @@ import type { Agent, MexAgentGoal, MexAttendance, MexAttendanceDay, MexLiveSale,
 import {
   getAgents, updateAgentName, createAgent, deleteAgent,
   getMexAttendance,
-  getMexSales, addMexSale, deleteMexSale,
+  getMexSales, addMexSale, deleteMexSale, approveMexSale, rejectMexSale,
   getMexGoal,
   getMexAgentGoals, upsertMexAgentGoal,
   getMexAttendanceDays, upsertMexAttendanceDay, deleteMexAttendanceDay,
@@ -56,10 +56,10 @@ function timeMins(t: string): number {
 }
 
 // ── AgentGoalRow (separate component to own its draft state) ─────────────────
-function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month, onSaved }: {
+function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month, onSaved, isAdmin }: {
   agent: Agent; agGoal: MexAgentGoal | null; actual: number;
   pct: number | null; bonus: number; pctColor: string;
-  year: number; month: number; onSaved: () => void;
+  year: number; month: number; onSaved: () => void; isAdmin: boolean;
 }) {
   const [draft, setDraft] = useState(String(agGoal?.goalAmount ?? ""));
   const [saving, setSaving] = useState(false);
@@ -84,14 +84,20 @@ function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month
     <tr style={{ borderBottom: "1px solid var(--border)" }}>
       <td style={{ padding: "0.6rem 0.75rem", fontWeight: 600 }}>{agent.name}</td>
       <td style={{ padding: "0.6rem 0.75rem" }}>
-        <input
-          type="number" min="0" placeholder="ej. 50000"
-          className="form-control" style={{ width: 130, fontSize: "0.85rem" }}
-          value={draft}
-          onChange={(e) => { setDraft(e.target.value); setSaved(false); }}
-          onBlur={save}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-        />
+        {isAdmin ? (
+          <input
+            type="number" min="0" placeholder="ej. 50000"
+            className="form-control" style={{ width: 130, fontSize: "0.85rem" }}
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); setSaved(false); }}
+            onBlur={save}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+          />
+        ) : (
+          <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+            {agGoal ? `MXN $${agGoal.goalAmount.toLocaleString("es-MX")}` : "—"}
+          </span>
+        )}
       </td>
       <td style={{ padding: "0.6rem 0.75rem" }}>MXN ${actual.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
       <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: pctColor }}>
@@ -132,6 +138,7 @@ async function exportVentasXLSX(sales: MexLiveSale[], agents: Agent[], monthName
 
 export default function MexicoDashboard() {
   const navigate = useNavigate();
+  const isAdmin = sessionStorage.getItem("role") !== "staff";
   const [activeTab, setActiveTab] = useState("summary");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -216,6 +223,7 @@ export default function MexicoDashboard() {
   const STATUS_CYCLE: Array<MexAttendanceDay["status"]> = ["present", "absent", "late", "justified"];
 
   const handleDayClick = async (agentId: number, day: Date) => {
+    if (!isAdmin) return;
     const ds = toDateStr(day);
     const existing = attendanceDays.find((d) => d.agentId === agentId && d.date === ds);
     const nextIdx = existing ? (STATUS_CYCLE.indexOf(existing.status) + 1) % (STATUS_CYCLE.length + 1) : 0;
@@ -325,6 +333,7 @@ export default function MexicoDashboard() {
         skus: saleForm.skus.filter((s) => s.trim() !== "").join("|"),
         year: saleYear,
         month: saleMonth,
+        status: isAdmin ? "approved" : "pending",
       });
       await load();
       setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
@@ -337,6 +346,16 @@ export default function MexicoDashboard() {
 
   const handleDeleteSale = (id: number) => {
     requireAdmin(async () => { await deleteMexSale(id); await load(); });
+  };
+
+  const handleApproveSale = async (id: number) => {
+    await approveMexSale(id);
+    await load();
+  };
+
+  const handleRejectSale = async (id: number) => {
+    await rejectMexSale(id);
+    await load();
   };
 
 
@@ -367,7 +386,8 @@ export default function MexicoDashboard() {
   };
 
   const agentSales = (agentId: number) =>
-    [...sales].filter((s) => s.agentId === agentId).sort((a, b) => b.date.localeCompare(a.date));
+    [...sales].filter((s) => s.agentId === agentId && s.status === "approved").sort((a, b) => b.date.localeCompare(a.date));
+  const pendingSales = [...sales].filter((s) => s.status === "pending").sort((a, b) => b.date.localeCompare(a.date));
 
   const goalPct = goal && goal.goalAmount > 0
     ? ((goal.actualAmount / goal.goalAmount) * 100).toFixed(1)
@@ -378,7 +398,7 @@ export default function MexicoDashboard() {
       <nav className="top-nav">
         <div className="logo">Bonus Tracker — <span style={{ color: "#16a34a" }}>México</span></div>
         <ul className="nav-links">
-          {["summary", "asistencia", "meta", "ventas", "settings"].map((tab) => (
+          {["summary", "asistencia", "meta", "ventas", ...(isAdmin ? ["settings"] : [])].map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>
               {TAB_LABELS[tab]}
             </li>
@@ -513,7 +533,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                   <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
-                  <button className="btn btn-sm btn-primary" onClick={() => setShowSchedForm(true)}>+ Agregar Turno</button>
+                  {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => setShowSchedForm(true)}>+ Agregar Turno</button>}
                 </div>
               </div>
 
@@ -568,14 +588,14 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             return (
                               <div
                                 key={ev.id}
-                                onDoubleClick={async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } }}
-                                title="Doble clic para eliminar"
+                                onDoubleClick={isAdmin ? async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
+                                title={isAdmin ? "Doble clic para eliminar" : undefined}
                                 style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                               >
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
-                                <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>
+                                {isAdmin && <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>}
                               </div>
                             );
                           })}
@@ -662,7 +682,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                           ) : (
                             <>
                               <span style={{ flex: 1, color: "#64748b" }}>{d.note || <em style={{ color: "#94a3b8" }}>Sin nota</em>}</span>
-                              <button className="btn btn-secondary btn-sm" onClick={() => setNoteDay({ agentId: d.agentId, date: d.date, note: d.note })}>✏️</button>
+                              {isAdmin && <button className="btn btn-secondary btn-sm" onClick={() => setNoteDay({ agentId: d.agentId, date: d.date, note: d.note })}>✏️</button>}
                             </>
                           )}
                         </div>
@@ -760,6 +780,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                         year={Number(year)}
                         month={month}
                         onSaved={load}
+                        isAdmin={isAdmin}
                       />
                     );
                   })}
@@ -777,10 +798,52 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
               <button className="btn btn-primary btn-sm" onClick={() => exportVentasXLSX(sales, agents, MONTHS[month - 1], year)}>⬇ Exportar Excel (.xlsx)</button>
             </header>
 
+            {/* Cola de aprobaciones (solo admin) */}
+            {isAdmin && pendingSales.length > 0 && (
+              <div className="card" style={{ borderLeft: "4px solid #d97706", marginBottom: "1.25rem" }}>
+                <h3 style={{ marginBottom: "0.75rem", color: "#d97706" }}>⏳ Ventas Pendientes de Aprobación ({pendingSales.length})</h3>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Agente</th>
+                      <th>Fecha</th>
+                      <th>Total Vendido</th>
+                      <th>Artículos</th>
+                      <th>SKUs</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingSales.map((s) => (
+                      <tr key={s.id}>
+                        <td style={{ fontWeight: 600 }}>{agents.find((a) => a.id === s.agentId)?.name ?? "—"}</td>
+                        <td>{s.date}</td>
+                        <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
+                        <td style={{ textAlign: "center" }}>{s.quantity}</td>
+                        <td style={{ maxWidth: 180 }}>
+                          {s.skus ? s.skus.split("|").map((sku, i) => (
+                            <span key={i} style={{ display: "inline-block", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.76rem", fontFamily: "monospace", marginRight: "0.25rem", marginBottom: "0.15rem" }}>{sku.trim()}</span>
+                          )) : "—"}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "0.4rem" }}>
+                            <button className="btn btn-sm btn-primary" style={{ background: "#16a34a", borderColor: "#16a34a" }} onClick={() => handleApproveSale(s.id)}>✓ Aprobar</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => handleRejectSale(s.id)}>✗ Rechazar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Formulario de registro */}
             <div className="card">
               <p style={{ marginBottom: "1rem", color: "var(--text-muted)" }}>
-                Registra las ventas de cada live. El bono se calcula automáticamente por tier.
+                {isAdmin
+                  ? "Registra las ventas de cada live. El bono se calcula automáticamente por tier."
+                  : "Registra una venta para que el administrador la revise y apruebe."}
               </p>
               <form onSubmit={submitSale}>
                 <div className="form-row">
@@ -836,7 +899,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   </div>
                 </div>
                 <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <button type="submit" className="btn btn-primary">{saleSaved ? "¡Guardado! ✓" : "Agregar Live"}</button>
+                  <button type="submit" className="btn btn-primary">{saleSaved ? "¡Enviado! ✓" : isAdmin ? "Agregar Live" : "Enviar para aprobación"}</button>
                   {saleError && <span style={{ color: "#ef4444", fontSize: "0.85rem" }}>⚠ {saleError}</span>}
                   {saleSaved && <span style={{ color: "#16a34a", fontSize: "0.85rem" }}>Venta registrada correctamente.</span>}
                 </div>
@@ -904,7 +967,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                   : "—"}
                               </td>
                               <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
-                              <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>
+                              {isAdmin && <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>}
                             </tr>
                           ))}
                           {agSales.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}

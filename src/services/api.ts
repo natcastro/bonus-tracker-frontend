@@ -10,17 +10,25 @@ import type {
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
+const MEX_STAFF_PASSWORD = "FAJA";
 const OPS_PASSWORD = "ops2026";
 const APT_PASSWORD = "apt2026";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function verifyPassword(team: string, password: string): Promise<void> {
+// Returns "admin" | "staff" for MEX, "admin" for others
+export async function verifyPassword(team: string, password: string): Promise<"admin" | "staff"> {
+  if (team.toUpperCase() === "MEX") {
+    if (password === MEX_PASSWORD) return "admin";
+    if (password === MEX_STAFF_PASSWORD) return "staff";
+    throw new Error("Incorrect password.");
+  }
   const map: Record<string, string> = {
-    USA: USA_PASSWORD, MEX: MEX_PASSWORD, OPS: OPS_PASSWORD, APT: APT_PASSWORD,
+    USA: USA_PASSWORD, OPS: OPS_PASSWORD, APT: APT_PASSWORD,
   };
   const expected = map[team.toUpperCase()];
   if (!expected || password !== expected) throw new Error("Incorrect password.");
+  return "admin";
 }
 
 // ── Agents ───────────────────────────────────────────────────────────────────
@@ -212,6 +220,7 @@ export async function addMexSale(sale: Omit<MexLiveSale, "id" | "agent">): Promi
       skus: sale.skus,
       year: sale.year,
       month: sale.month,
+      status: sale.status ?? "approved",
     })
     .select()
     .single();
@@ -220,6 +229,16 @@ export async function addMexSale(sale: Omit<MexLiveSale, "id" | "agent">): Promi
 }
 
 export async function deleteMexSale(id: number): Promise<void> {
+  const { error } = await supabase.from("mex_live_sales").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function approveMexSale(id: number): Promise<void> {
+  const { error } = await supabase.from("mex_live_sales").update({ status: "approved" }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function rejectMexSale(id: number): Promise<void> {
   const { error } = await supabase.from("mex_live_sales").delete().eq("id", id);
   if (error) throw error;
 }
@@ -599,6 +618,7 @@ function mapMexSale(r: any): MexLiveSale {
     skus: r.skus ?? "",
     year: r.year,
     month: r.month,
+    status: r.status ?? "approved",
   };
 }
 
