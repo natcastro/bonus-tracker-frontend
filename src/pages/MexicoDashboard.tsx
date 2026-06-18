@@ -297,23 +297,40 @@ export default function MexicoDashboard() {
 
   // ── Sale form
   const [saleForm, setSaleForm] = useState({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
+  const [saleError, setSaleError] = useState<string | null>(null);
+  const [saleSaved, setSaleSaved] = useState(false);
 
   const submitSale = async (e: React.FormEvent) => {
     e.preventDefault();
-    const d = new Date(saleForm.date);
-    const saleYear = d.getFullYear();
-    const saleMonth = d.getMonth() + 1;
-    await addMexSale({
-      agentId: Number(saleForm.agentId),
-      date: saleForm.date,
-      salesAmount: Number(saleForm.salesAmount),
-      quantity: Number(saleForm.quantity),
-      skus: saleForm.skus.filter((s) => s.trim() !== "").join("|"),
-      year: saleYear,
-      month: saleMonth,
-    });
-    await load();
-    setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
+    setSaleError(null);
+    if (!saleForm.agentId || saleForm.agentId === 0) {
+      setSaleError("Selecciona un agente.");
+      return;
+    }
+    if (!saleForm.date) {
+      setSaleError("Selecciona una fecha.");
+      return;
+    }
+    try {
+      const d = new Date(saleForm.date);
+      const saleYear = d.getFullYear();
+      const saleMonth = d.getMonth() + 1;
+      await addMexSale({
+        agentId: Number(saleForm.agentId),
+        date: saleForm.date,
+        salesAmount: Number(saleForm.salesAmount),
+        quantity: Number(saleForm.quantity),
+        skus: saleForm.skus.filter((s) => s.trim() !== "").join("|"),
+        year: saleYear,
+        month: saleMonth,
+      });
+      await load();
+      setSaleForm({ agentId: 0, date: "", salesAmount: "", quantity: "", skus: [""] });
+      setSaleSaved(true);
+      setTimeout(() => setSaleSaved(false), 2000);
+    } catch (err: any) {
+      setSaleError("Error al guardar venta: " + (err?.message ?? err));
+    }
   };
 
   const handleDeleteSale = (id: number) => {
@@ -816,8 +833,10 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     </button>
                   </div>
                 </div>
-                <div style={{ marginTop: "0.75rem" }}>
-                  <button type="submit" className="btn btn-primary">Agregar Live</button>
+                <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <button type="submit" className="btn btn-primary">{saleSaved ? "¡Guardado! ✓" : "Agregar Live"}</button>
+                  {saleError && <span style={{ color: "#ef4444", fontSize: "0.85rem" }}>⚠ {saleError}</span>}
+                  {saleSaved && <span style={{ color: "#16a34a", fontSize: "0.85rem" }}>Venta registrada correctamente.</span>}
                 </div>
               </form>
             </div>
