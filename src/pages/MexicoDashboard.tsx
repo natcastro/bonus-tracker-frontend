@@ -270,8 +270,8 @@ export default function MexicoDashboard() {
   const submitSched = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const dt = new Date(schedForm.date);
-      await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: dt.getFullYear(), month: dt.getMonth() + 1 });
+      const [schYear, schMonth] = schedForm.date.split("-").map(Number);
+      await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: schYear, month: schMonth });
       await load();
       setShowSchedForm(false);
       setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
@@ -312,9 +312,8 @@ export default function MexicoDashboard() {
       return;
     }
     try {
-      const d = new Date(saleForm.date + "T12:00");
-      const saleYear = d.getFullYear();
-      const saleMonth = d.getMonth() + 1;
+      // Parse date parts directly from "YYYY-MM-DD" string — avoids all timezone issues
+      const [saleYear, saleMonth] = saleForm.date.split("-").map(Number);
       if (saleYear !== Number(year) || saleMonth !== month) {
         setSaleError(`La fecha es de ${MONTHS[saleMonth - 1]} ${saleYear}, pero estás viendo ${MONTHS[month - 1]} ${year}. Cambia el mes/año arriba para ver esta venta después de guardar.`);
       }
