@@ -31,6 +31,12 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Local calendar date (not UTC) — avoids "today" shifting a day in negative-UTC timezones
+function todayLocalStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function timeMins(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
@@ -78,7 +84,7 @@ export default function TikTokLivesDashboard() {
   const [schedules, setSchedules] = useState<UsaLiveSchedule[]>([]);
   const [livesYear, setLivesYear] = useState(String(new Date().getFullYear()));
   const [livesMonth, setLivesMonth] = useState(new Date().getMonth() + 1);
-  const todayStr = toDateStr(new Date());
+  const todayStr = todayLocalStr();
   const [weekIdx, setWeekIdx] = useState(() => {
     const grid = buildMonthGrid(new Date().getFullYear(), new Date().getMonth() + 1);
     const idx = grid.findIndex((week) => week.some((d) => d && toDateStr(d) === todayStr));
