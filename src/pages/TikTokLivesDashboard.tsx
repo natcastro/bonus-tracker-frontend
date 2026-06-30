@@ -55,6 +55,35 @@ function timeMins(t: string): number {
   return h * 60 + m;
 }
 
+// Offset (minutes) of `timeZone` from UTC at the instant `date` represents.
+function getTzOffsetMinutes(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const map: Record<string, string> = {};
+  dtf.formatToParts(date).forEach((p) => { if (p.type !== "literal") map[p.type] = p.value; });
+  const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second);
+  return (asUTC - date.getTime()) / 60000;
+}
+
+// Converts a wall-clock date+time in `fromTz` to the equivalent wall-clock date+time in `toTz`.
+function convertTime(dateStr: string, timeStr: string, fromTz: string, toTz: string): { date: string; time: string } {
+  if (!fromTz || !toTz || fromTz === toTz) return { date: dateStr, time: timeStr };
+  const naiveUTC = new Date(`${dateStr}T${timeStr}:00Z`);
+  const fromOffset = getTzOffsetMinutes(naiveUTC, fromTz);
+  const actualUTC = new Date(naiveUTC.getTime() - fromOffset * 60000);
+  const toOffset = getTzOffsetMinutes(actualUTC, toTz);
+  const target = new Date(actualUTC.getTime() + toOffset * 60000);
+  const y = target.getUTCFullYear();
+  const mo = String(target.getUTCMonth() + 1).padStart(2, "0");
+  const da = String(target.getUTCDate()).padStart(2, "0");
+  const h = String(target.getUTCHours()).padStart(2, "0");
+  const mi = String(target.getUTCMinutes()).padStart(2, "0");
+  return { date: `${y}-${mo}-${da}`, time: `${h}:${mi}` };
+}
+
 // dow index: 0=Lun ... 5=Sáb (matches DOW_LABELS)
 function dowIndex(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -106,9 +135,21 @@ export default function TikTokLivesDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+  const [viewTimezone, setViewTimezone] = useState("");
 
   const monthGrid = buildMonthGrid(Number(livesYear), livesMonth);
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
+
+  // Schedules adjusted to the selected viewing timezone (converted from each agent's own timezone)
+  const displaySchedules: UsaLiveSchedule[] = !viewTimezone
+    ? schedules
+    : schedules.map((ev) => {
+        const ag = agents.find((a) => a.id === ev.agentId);
+        if (!ag?.timezone) return ev;
+        const start = convertTime(ev.date, ev.startTime, ag.timezone, viewTimezone);
+        const end = convertTime(ev.date, ev.endTime, ag.timezone, viewTimezone);
+        return { ...ev, date: start.date, startTime: start.time, endTime: end.time };
+      });
 
   const load = useCallback(async () => {
     try {
@@ -248,7 +289,13 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
           <section>
             <header className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
               <h2 style={{ margin: 0 }}>Horarios TikTok Lives — {MONTHS[livesMonth - 1]} {livesYear}</h2>
-              <button className="btn btn-primary btn-sm" onClick={() => exportLivesXLSX(schedules, agents, MONTHS[livesMonth - 1], livesYear)}>⬇ Exportar Excel (.xlsx)</button>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <select className="form-control" style={{ width: "auto" }} value={viewTimezone} onChange={(e) => setViewTimezone(e.target.value)}>
+                  <option value="">Hora original de cada agente</option>
+                  {TIMEZONES.filter((tz) => tz.value).map((tz) => <option key={tz.value} value={tz.value}>Ver en: {tz.label}</option>)}
+                </select>
+                <button className="btn btn-primary btn-sm" onClick={() => exportLivesXLSX(displaySchedules, agents, MONTHS[livesMonth - 1], livesYear)}>⬇ Exportar Excel (.xlsx)</button>
+              </div>
             </header>
 
             <div className="card">
@@ -307,7 +354,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
 
                     {weekCols.map((day, colIdx) => {
                       const ds = day ? toDateStr(day) : "";
-                      const colEvs = day ? schedules.filter((e) => e.date === ds) : [];
+                      const colEvs = day ? displaySchedules.filter((e) => e.date === ds) : [];
                       const isToday = ds === todayStr;
                       return (
                         <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#fef2f2" : "transparent" }}>
@@ -327,7 +374,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                                 style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                               >
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
-                                <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
+                                <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}{viewTimezone ? ` ${TZ_ABBR[viewTimezone] ?? ""}` : ""}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
                                 <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>
                               </div>
