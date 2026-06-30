@@ -21,8 +21,8 @@ const TZ_ABBR: Record<string, string> = {
   "America/Chicago": "CT",
   "America/New_York": "ET",
 };
-const SCHED_START = 7;
-const SCHED_END = 22;
+const SCHED_START = 6;
+const SCHED_END = 30; // 6am through 5:59am next day (24h window)
 const PX_HR = 54;
 
 function buildMonthGrid(year: number, month: number): (Date | null)[][] {
@@ -50,9 +50,13 @@ function todayLocalStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Minutes since midnight, rolled forward 24h if before SCHED_START so the
+// 6am–5:59am window plots in order (e.g. 02:00 is treated as continuing after midnight).
 function timeMins(t: string): number {
   const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+  let mins = h * 60 + m;
+  if (mins < SCHED_START * 60) mins += 24 * 60;
+  return mins;
 }
 
 // Offset (minutes) of `timeZone` from UTC at the instant `date` represents.
@@ -347,7 +351,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     <div>
                       {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
                         <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
-                          {String(SCHED_START + i).padStart(2, "0")}:00
+                          {String((SCHED_START + i) % 24).padStart(2, "0")}:00
                         </div>
                       ))}
                     </div>
