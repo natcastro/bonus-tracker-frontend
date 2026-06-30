@@ -78,7 +78,12 @@ export default function TikTokLivesDashboard() {
   const [schedules, setSchedules] = useState<UsaLiveSchedule[]>([]);
   const [livesYear, setLivesYear] = useState(String(new Date().getFullYear()));
   const [livesMonth, setLivesMonth] = useState(new Date().getMonth() + 1);
-  const [weekIdx, setWeekIdx] = useState(0);
+  const todayStr = toDateStr(new Date());
+  const [weekIdx, setWeekIdx] = useState(() => {
+    const grid = buildMonthGrid(new Date().getFullYear(), new Date().getMonth() + 1);
+    const idx = grid.findIndex((week) => week.some((d) => d && toDateStr(d) === todayStr));
+    return idx >= 0 ? idx : 0;
+  });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -248,12 +253,22 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                   {/* Day header */}
                   <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", borderBottom: "2px solid var(--border)" }}>
                     <div />
-                    {weekCols.map((day, i) => (
-                      <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
-                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{DOW_LABELS[i]}</div>
-                        <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{day ? day.getDate() : "—"}</div>
-                      </div>
-                    ))}
+                    {weekCols.map((day, i) => {
+                      const isToday = day ? toDateStr(day) === todayStr : false;
+                      return (
+                        <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
+                          <div style={{ fontSize: "0.7rem", color: isToday ? "#dc2626" : "var(--text-muted)", fontWeight: isToday ? 700 : 400 }}>{DOW_LABELS[i]}</div>
+                          <div style={{
+                            fontSize: "0.9rem", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 24, height: 24, borderRadius: "50%", margin: "0 auto",
+                            background: isToday ? "#dc2626" : "transparent",
+                            color: isToday ? "white" : "inherit",
+                          }}>
+                            {day ? day.getDate() : "—"}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Time grid */}
@@ -269,8 +284,9 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     {weekCols.map((day, colIdx) => {
                       const ds = day ? toDateStr(day) : "";
                       const colEvs = day ? schedules.filter((e) => e.date === ds) : [];
+                      const isToday = ds === todayStr;
                       return (
-                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9" }}>
+                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#fef2f2" : "transparent" }}>
                           {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
                             <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
                           ))}
