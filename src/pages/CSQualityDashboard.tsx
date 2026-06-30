@@ -33,6 +33,35 @@ export default function CSQualityDashboard() {
   const fileRef = useRef<HTMLInputElement>(null);
   const addFileRef = useRef<HTMLInputElement>(null);
 
+  // Lightbox
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Password lock — edit/delete require "123456"
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  const requirePassword = (action: () => void) => {
+    if (isUnlocked) { action(); return; }
+    setPendingAction(() => action);
+    setPasswordInput("");
+    setPasswordError("");
+    setShowPasswordModal(true);
+  };
+
+  const submitPassword = () => {
+    if (passwordInput === "123456") {
+      setIsUnlocked(true);
+      setShowPasswordModal(false);
+      pendingAction?.();
+      setPendingAction(null);
+    } else {
+      setPasswordError("Contraseña incorrecta.");
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       const data = await getCSCases();
@@ -92,13 +121,15 @@ export default function CSQualityDashboard() {
     finally { setSaving(false); }
   };
 
-  const handleDeleteCase = async () => {
-    if (!selected || !confirm("¿Eliminar este caso del diccionario?")) return;
-    try {
-      await deleteCSCase(selected.id);
-      setSelected(null);
-      await load();
-    } catch (ex: any) { setError("Error al eliminar: " + (ex?.message ?? ex)); }
+  const handleDeleteCase = () => {
+    requirePassword(async () => {
+      if (!selected || !confirm("¿Eliminar este caso del diccionario?")) return;
+      try {
+        await deleteCSCase(selected.id);
+        setSelected(null);
+        await load();
+      } catch (ex: any) { setError("Error al eliminar: " + (ex?.message ?? ex)); }
+    });
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,9 +144,11 @@ export default function CSQualityDashboard() {
     finally { setUploading(false); }
   };
 
-  const handleDeletePhoto = async (photoId: number) => {
-    try { await deleteCSPhoto(photoId); await load(); }
-    catch (ex: any) { setError("Error al borrar foto: " + (ex?.message ?? ex)); }
+  const handleDeletePhoto = (photoId: number) => {
+    requirePassword(async () => {
+      try { await deleteCSPhoto(photoId); await load(); }
+      catch (ex: any) { setError("Error al borrar foto: " + (ex?.message ?? ex)); }
+    });
   };
 
   // ─── Card gradient placeholder ───────────────────────────────────────────────
@@ -133,10 +166,15 @@ export default function CSQualityDashboard() {
           <button
             className="btn btn-primary btn-sm"
             style={{ background: "#7c3aed", borderColor: "#7c3aed" }}
-            onClick={() => { setShowAdd(true); setAddForm(EMPTY_FORM); }}
+            onClick={() => requirePassword(() => { setShowAdd(true); setAddForm(EMPTY_FORM); setAddPhotos([]); })}
           >
             + Agregar Caso
           </button>
+          {isUnlocked && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setIsUnlocked(false)} title="Bloquear edición">
+              🔓 Bloquear
+            </button>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Salir</button>
         </div>
       </nav>
@@ -378,7 +416,7 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                 }}>
                   {selected.photos!.slice(0, 4).map((ph, idx) => (
                     <div key={ph.id} style={{ position: "relative", overflow: "hidden", gridColumn: idx === 0 && (selected.photos?.length ?? 0) === 3 ? "span 2" : undefined }}>
-                      <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} onClick={(e) => { e.stopPropagation(); setLightboxUrl(ph.url); }} />
                       {ph.caption && (
                         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.55))", color: "white", fontSize: "0.66rem", padding: "1rem 0.5rem 0.35rem", lineHeight: 1.2 }}>{ph.caption}</div>
                       )}
@@ -437,7 +475,7 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
                         {selected.photos!.slice(4).map((ph) => (
                           <div key={ph.id} style={{ position: "relative", borderRadius: 10, overflow: "hidden", aspectRatio: "1" }}>
-                            <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} onClick={(e) => { e.stopPropagation(); setLightboxUrl(ph.url); }} />
                             <button onClick={(e) => { e.stopPropagation(); handleDeletePhoto(ph.id); }} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.45)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: "0.72rem", cursor: "pointer" }}>×</button>
                           </div>
                         ))}
@@ -474,9 +512,9 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                     <button
                       className="btn btn-primary btn-sm"
                       style={{ background: "#7c3aed", borderColor: "#7c3aed" }}
-                      onClick={() => { setEditMode(true); setEditForm({ title: selected.title, description: selected.description, category: selected.category, warrantyApplies: selected.warrantyApplies }); }}
-                    >✏️ Editar</button>
-                    <button className="btn btn-secondary btn-sm" style={{ color: "#dc2626", borderColor: "#dc2626" }} onClick={handleDeleteCase}>🗑 Eliminar caso</button>
+                      onClick={() => requirePassword(() => { setEditMode(true); setEditForm({ title: selected.title, description: selected.description, category: selected.category, warrantyApplies: selected.warrantyApplies }); })}
+                    >🔒 Editar</button>
+                    <button className="btn btn-secondary btn-sm" style={{ color: "#dc2626", borderColor: "#dc2626" }} onClick={handleDeleteCase}>🔒 Eliminar caso</button>
                   </div>
                 </>
               ) : (
@@ -590,6 +628,50 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ────────────────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}
+        >
+          <img
+            src={lightboxUrl}
+            alt=""
+            style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 10, boxShadow: "0 8px 60px rgba(0,0,0,0.6)" }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{ position: "absolute", top: 18, right: 20, background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)", color: "white", border: "none", borderRadius: "50%", width: 40, height: 40, fontSize: "1.3rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >×</button>
+        </div>
+      )}
+
+      {/* ── Password modal ──────────────────────────────────────────────────── */}
+      {showPasswordModal && (
+        <div className="modal-overlay active" style={{ zIndex: 3000 }}>
+          <div className="modal" style={{ maxWidth: 340 }}>
+            <div className="modal-header"><h3>🔒 Acceso de edición</h3></div>
+            <p style={{ margin: "0 0 1rem", fontSize: "0.88rem", color: "#64748b" }}>Ingresa la contraseña para continuar.</p>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Contraseña"
+              autoFocus
+              value={passwordInput}
+              onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter") submitPassword(); }}
+              style={{ marginBottom: "0.5rem" }}
+            />
+            {passwordError && <p style={{ color: "#dc2626", fontSize: "0.82rem", margin: "0 0 0.5rem" }}>{passwordError}</p>}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => { setShowPasswordModal(false); setPendingAction(null); }}>Cancelar</button>
+              <button className="btn btn-primary" style={{ background: "#7c3aed", borderColor: "#7c3aed" }} onClick={submitPassword}>Entrar</button>
+            </div>
           </div>
         </div>
       )}
