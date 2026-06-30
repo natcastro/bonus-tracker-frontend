@@ -20,6 +20,12 @@ export default function Landing() {
   const navigate = useNavigate();
 
   const handleSelect = (team: Team) => {
+    if (team === "TKLIVES") {
+      sessionStorage.setItem("team", "TKLIVES");
+      sessionStorage.setItem("role", "admin");
+      navigate(TEAM_CONFIG.TKLIVES.route);
+      return;
+    }
     setSelected(team);
     setPassword("");
     setError("");
