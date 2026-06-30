@@ -115,6 +115,23 @@ export interface UsaLiveSchedule {
   month: number;
 }
 
+export interface CSQualityPhoto {
+  id: number;
+  caseId: number;
+  url: string;
+  caption: string;
+}
+
+export interface CSQualityCase {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  warrantyApplies: boolean;
+  createdAt: string;
+  photos?: CSQualityPhoto[];
+}
+
 // ── Operations Team (Tomás) ────────────────────────────────────────────────────
 
 export interface OpsAppeal {

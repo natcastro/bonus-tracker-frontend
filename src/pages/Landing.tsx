@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "USA" | "MEX" | "OPS" | "APT" | "TKLIVES";
+type Team = "USA" | "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY";
 
 const TEAM_CONFIG: Record<Team, { label: string; flag: string; color: string; route: string }> = {
-  USA:     { label: "United States",     flag: "🇺🇸", color: "#1e40af", route: "/usa" },
-  MEX:     { label: "México",            flag: "🇲🇽", color: "#16a34a", route: "/mexico" },
-  OPS:     { label: "Operations Team",   flag: "🇺🇸", color: "#7c3aed", route: "/operations" },
-  APT:     { label: "Account Protection",flag: "🇺🇸", color: "#0891b2", route: "/account-protection" },
-  TKLIVES: { label: "TikTok Lives USA",  flag: "🎵", color: "#e91e8c", route: "/tiktok-lives" },
+  USA:       { label: "United States",         flag: "🇺🇸", color: "#1e40af", route: "/usa" },
+  MEX:       { label: "México",                flag: "🇲🇽", color: "#16a34a", route: "/mexico" },
+  OPS:       { label: "Operations Team",       flag: "🇺🇸", color: "#7c3aed", route: "/operations" },
+  APT:       { label: "Account Protection",    flag: "🇺🇸", color: "#0891b2", route: "/account-protection" },
+  TKLIVES:   { label: "TikTok Lives USA",      flag: "🎵", color: "#e91e8c", route: "/tiktok-lives" },
+  CSQUALITY: { label: "CS Quality Dictionary", flag: "📖", color: "#7c3aed", route: "/cs-quality" },
 };
 
 export default function Landing() {
@@ -20,10 +21,10 @@ export default function Landing() {
   const navigate = useNavigate();
 
   const handleSelect = (team: Team) => {
-    if (team === "TKLIVES") {
-      sessionStorage.setItem("team", "TKLIVES");
+    if (team === "TKLIVES" || team === "CSQUALITY") {
+      sessionStorage.setItem("team", team);
       sessionStorage.setItem("role", "admin");
-      navigate(TEAM_CONFIG.TKLIVES.route);
+      navigate(TEAM_CONFIG[team].route);
       return;
     }
     setSelected(team);

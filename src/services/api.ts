@@ -6,6 +6,7 @@ import type {
   AptClaim,
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
+  CSQualityCase, CSQualityPhoto,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -707,5 +708,74 @@ export async function addUsaLiveSchedule(s: Omit<UsaLiveSchedule, "id">): Promis
 
 export async function deleteUsaLiveSchedule(id: number): Promise<void> {
   const { error } = await supabase.from("usa_live_schedules").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ── CS Quality Dictionary ─────────────────────────────────────────────────────
+
+function mapCSPhoto(r: any): CSQualityPhoto {
+  return { id: r.id, caseId: r.case_id, url: r.url, caption: r.caption ?? "" };
+}
+
+function mapCSCase(r: any): CSQualityCase {
+  return {
+    id: r.id, title: r.title, description: r.description ?? "",
+    category: r.category ?? "", warrantyApplies: !!r.warranty_applies,
+    createdAt: r.created_at ?? "",
+    photos: (r.cs_quality_photos ?? []).map(mapCSPhoto),
+  };
+}
+
+export async function getCSCases(): Promise<CSQualityCase[]> {
+  const { data, error } = await supabase
+    .from("cs_quality_cases")
+    .select("*, cs_quality_photos(*)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map(mapCSCase);
+}
+
+export async function createCSCase(c: Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies">): Promise<CSQualityCase> {
+  const { data, error } = await supabase
+    .from("cs_quality_cases")
+    .insert({ title: c.title, description: c.description, category: c.category, warranty_applies: c.warrantyApplies })
+    .select()
+    .single();
+  if (error) throw error;
+  return { ...mapCSCase(data), photos: [] };
+}
+
+export async function updateCSCase(id: number, c: Partial<Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies">>): Promise<void> {
+  const upd: any = {};
+  if (c.title !== undefined) upd.title = c.title;
+  if (c.description !== undefined) upd.description = c.description;
+  if (c.category !== undefined) upd.category = c.category;
+  if (c.warrantyApplies !== undefined) upd.warranty_applies = c.warrantyApplies;
+  const { error } = await supabase.from("cs_quality_cases").update(upd).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCSCase(id: number): Promise<void> {
+  const { error } = await supabase.from("cs_quality_cases").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function addCSPhoto(caseId: number, file: File, caption: string): Promise<CSQualityPhoto> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${caseId}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("cs-quality-photos").upload(path, file);
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("cs-quality-photos").getPublicUrl(path);
+  const { data, error } = await supabase
+    .from("cs_quality_photos")
+    .insert({ case_id: caseId, url: urlData.publicUrl, caption })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCSPhoto(data);
+}
+
+export async function deleteCSPhoto(id: number): Promise<void> {
+  const { error } = await supabase.from("cs_quality_photos").delete().eq("id", id);
   if (error) throw error;
 }

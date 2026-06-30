@@ -6,6 +6,7 @@ import MexicoDashboard from "./pages/MexicoDashboard";
 import OperationsDashboard from "./pages/OperationsDashboard";
 import AccountProtectionDashboard from "./pages/AccountProtectionDashboard";
 import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
+import CSQualityDashboard from "./pages/CSQualityDashboard";
 
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
@@ -32,6 +33,9 @@ export default function App() {
         } />
         <Route path="/tiktok-lives" element={
           <ProtectedRoute team="TKLIVES"><TikTokLivesDashboard /></ProtectedRoute>
+        } />
+        <Route path="/cs-quality" element={
+          <ProtectedRoute team="CSQUALITY"><CSQualityDashboard /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
