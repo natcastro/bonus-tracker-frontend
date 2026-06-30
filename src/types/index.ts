@@ -103,6 +103,17 @@ export interface MexAgentGoal {
   goalAmount: number;
 }
 
+export interface UsaLiveSchedule {
+  id: number;
+  agentId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  note: string;
+  year: number;
+  month: number;
+}
+
 // ── Operations Team (Tomás) ────────────────────────────────────────────────────
 
 export interface OpsAppeal {

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import type {
-  Agent, Appeal, UsaPeriodData, TikTokScore,
+  Agent, Appeal, UsaPeriodData, TikTokScore, UsaLiveSchedule,
   MexAttendance, MexAgentGoal, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent,
   OpsAppeal, OpsHandlingTime, OpsTikTokScore,
   AptClaim,
@@ -672,4 +672,28 @@ function mapAptTikTokHealth(r: any): AptTikTokHealth {
 
 function mapAptPerformance(r: any): AptPerformance {
   return { id: r.id, agentId: r.agent_id, year: r.year, cycleId: r.cycle_id, level: r.level };
+}
+
+// ── USA Live Schedules ────────────────────────────────────────────────────────
+
+function mapUsaLiveSchedule(r: any): UsaLiveSchedule {
+  return { id: r.id, agentId: r.agent_id, date: r.date, startTime: r.start_time, endTime: r.end_time, note: r.note ?? "", year: r.year, month: r.month };
+}
+
+export async function getUsaLiveSchedules(year: number, month: number): Promise<UsaLiveSchedule[]> {
+  const { data, error } = await supabase.from("usa_live_schedules").select("*").eq("year", year).eq("month", month).order("date");
+  if (error) throw error;
+  return (data ?? []).map(mapUsaLiveSchedule);
+}
+
+export async function addUsaLiveSchedule(s: Omit<UsaLiveSchedule, "id">): Promise<void> {
+  const { error } = await supabase.from("usa_live_schedules").insert({
+    agent_id: s.agentId, date: s.date, start_time: s.startTime, end_time: s.endTime, note: s.note, year: s.year, month: s.month,
+  });
+  if (error) throw error;
+}
+
+export async function deleteUsaLiveSchedule(id: number): Promise<void> {
+  const { error } = await supabase.from("usa_live_schedules").delete().eq("id", id);
+  if (error) throw error;
 }
