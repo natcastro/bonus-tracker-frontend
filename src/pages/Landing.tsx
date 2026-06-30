@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "USA" | "MEX" | "OPS" | "APT";
+type Team = "USA" | "MEX" | "OPS" | "APT" | "TKLIVES";
 
 const TEAM_CONFIG: Record<Team, { label: string; flag: string; color: string; route: string }> = {
-  USA: { label: "United States",        flag: "🇺🇸", color: "#1e40af", route: "/usa" },
-  MEX: { label: "México",               flag: "🇲🇽", color: "#16a34a", route: "/mexico" },
-  OPS: { label: "Operations Team",      flag: "🇺🇸", color: "#7c3aed", route: "/operations" },
-  APT: { label: "Account Protection",   flag: "🇺🇸", color: "#0891b2", route: "/account-protection" },
+  USA:     { label: "United States",     flag: "🇺🇸", color: "#1e40af", route: "/usa" },
+  MEX:     { label: "México",            flag: "🇲🇽", color: "#16a34a", route: "/mexico" },
+  OPS:     { label: "Operations Team",   flag: "🇺🇸", color: "#7c3aed", route: "/operations" },
+  APT:     { label: "Account Protection",flag: "🇺🇸", color: "#0891b2", route: "/account-protection" },
+  TKLIVES: { label: "TikTok Lives USA",  flag: "🎵", color: "#e91e8c", route: "/tiktok-lives" },
 };
 
 export default function Landing() {

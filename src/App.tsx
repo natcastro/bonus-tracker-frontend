@@ -5,6 +5,7 @@ import UsaDashboard from "./pages/UsaDashboard";
 import MexicoDashboard from "./pages/MexicoDashboard";
 import OperationsDashboard from "./pages/OperationsDashboard";
 import AccountProtectionDashboard from "./pages/AccountProtectionDashboard";
+import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
 
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
@@ -28,6 +29,9 @@ export default function App() {
         } />
         <Route path="/account-protection" element={
           <ProtectedRoute team="APT"><AccountProtectionDashboard /></ProtectedRoute>
+        } />
+        <Route path="/tiktok-lives" element={
+          <ProtectedRoute team="TKLIVES"><TikTokLivesDashboard /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

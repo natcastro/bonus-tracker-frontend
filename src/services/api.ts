@@ -13,6 +13,7 @@ const MEX_PASSWORD = "mex2026";
 const MEX_STAFF_PASSWORD = "FAJA";
 const OPS_PASSWORD = "ops2026";
 const APT_PASSWORD = "apt2026";
+const TKLIVES_PASSWORD = "usa2026";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export async function verifyPassword(team: string, password: string): Promise<"a
     throw new Error("Incorrect password.");
   }
   const map: Record<string, string> = {
-    USA: USA_PASSWORD, OPS: OPS_PASSWORD, APT: APT_PASSWORD,
+    USA: USA_PASSWORD, OPS: OPS_PASSWORD, APT: APT_PASSWORD, TKLIVES: TKLIVES_PASSWORD,
   };
   const expected = map[team.toUpperCase()];
   if (!expected || password !== expected) throw new Error("Incorrect password.");
