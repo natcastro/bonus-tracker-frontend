@@ -23,6 +23,7 @@ export default function CSQualityDashboard() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
+  const [addPhotos, setAddPhotos] = useState<File[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [photoCaption, setPhotoCaption] = useState("");
@@ -30,6 +31,7 @@ export default function CSQualityDashboard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const addFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -61,12 +63,22 @@ export default function CSQualityDashboard() {
     e.preventDefault();
     setSaving(true);
     try {
-      await createCSCase(addForm);
+      const newCase = await createCSCase(addForm);
+      for (const file of addPhotos) {
+        await addCSPhoto(newCase.id, file, "");
+      }
       setShowAdd(false);
       setAddForm(EMPTY_FORM);
+      setAddPhotos([]);
       await load();
     } catch (ex: any) { setError("Error al crear: " + (ex?.message ?? ex)); }
     finally { setSaving(false); }
+  };
+
+  const handleAddPhotoPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    setAddPhotos((prev) => [...prev, ...Array.from(e.target.files!)]);
+    if (addFileRef.current) addFileRef.current.value = "";
   };
 
   const handleEditSave = async () => {
@@ -433,6 +445,30 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                     </div>
                   )}
 
+                  {/* Add photo — prominent, at top of actions */}
+                  <div style={{ marginBottom: "1.25rem", padding: "1rem", background: "#faf5ff", borderRadius: 12, border: "2px dashed #c4b5fd" }}>
+                    <p style={{ margin: "0 0 0.55rem", fontWeight: 700, fontSize: "0.88rem", color: "#7c3aed" }}>📷 Agregar fotos al caso</p>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Pie de foto (opcional)"
+                      value={photoCaption}
+                      onChange={(e) => setPhotoCaption(e.target.value)}
+                      style={{ marginBottom: "0.5rem", background: "white" }}
+                    />
+                    <label
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                        padding: "0.65rem 1rem", borderRadius: 8, border: "1.5px solid #c4b5fd",
+                        cursor: uploading ? "not-allowed" : "pointer", background: "white",
+                        fontSize: "0.88rem", color: "#7c3aed", fontWeight: 700,
+                      }}
+                    >
+                      {uploading ? "⏳ Subiendo..." : "📎 Seleccionar imagen"}
+                      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoUpload} disabled={uploading} />
+                    </label>
+                  </div>
+
                   {/* Actions */}
                   <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.75rem" }}>
                     <button
@@ -441,31 +477,6 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                       onClick={() => { setEditMode(true); setEditForm({ title: selected.title, description: selected.description, category: selected.category, warrantyApplies: selected.warrantyApplies }); }}
                     >✏️ Editar</button>
                     <button className="btn btn-secondary btn-sm" style={{ color: "#dc2626", borderColor: "#dc2626" }} onClick={handleDeleteCase}>🗑 Eliminar caso</button>
-                  </div>
-
-                  {/* Add photo */}
-                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "1.25rem" }}>
-                    <p style={{ margin: "0 0 0.6rem", fontWeight: 700, fontSize: "0.88rem" }}>📷 Agregar foto al caso</p>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Pie de foto (opcional)"
-                      value={photoCaption}
-                      onChange={(e) => setPhotoCaption(e.target.value)}
-                      style={{ marginBottom: "0.5rem" }}
-                    />
-                    <label
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-                        padding: "0.7rem 1rem", borderRadius: 10, border: "2px dashed #c4b5fd",
-                        cursor: uploading ? "not-allowed" : "pointer", background: "#faf5ff",
-                        fontSize: "0.88rem", color: "#7c3aed", fontWeight: 600,
-                        transition: "background 0.12s",
-                      }}
-                    >
-                      {uploading ? "⏳ Subiendo..." : "📎 Seleccionar imagen para subir"}
-                      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoUpload} disabled={uploading} />
-                    </label>
                   </div>
                 </>
               ) : (
@@ -544,10 +555,38 @@ ALTER TABLE cs_quality_photos DISABLE ROW LEVEL SECURITY;`}</pre>
                   </span>
                 </label>
               </div>
+
+              {/* Photo upload in add form */}
+              <div className="form-group">
+                <label>📷 Fotos del caso (opcional)</label>
+                <label style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                  padding: "0.8rem 1rem", borderRadius: 10, border: "2px dashed #c4b5fd",
+                  cursor: "pointer", background: "#faf5ff", fontSize: "0.88rem", color: "#7c3aed", fontWeight: 600,
+                }}>
+                  📎 Seleccionar fotos
+                  <input ref={addFileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleAddPhotoPick} />
+                </label>
+                {addPhotos.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8, marginTop: "0.6rem" }}>
+                    {addPhotos.map((f, idx) => (
+                      <div key={idx} style={{ position: "relative", borderRadius: 8, overflow: "hidden", aspectRatio: "1" }}>
+                        <img src={URL.createObjectURL(f)} alt={f.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <button
+                          type="button"
+                          onClick={() => setAddPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                          style={{ position: "absolute", top: 3, right: 3, background: "rgba(0,0,0,0.55)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: "0.7rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowAdd(false); setAddForm(EMPTY_FORM); }}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowAdd(false); setAddForm(EMPTY_FORM); setAddPhotos([]); }}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" style={{ background: "#7c3aed", borderColor: "#7c3aed" }} disabled={saving}>
-                  {saving ? "Creando..." : "✅ Crear caso"}
+                  {saving ? "Creando..." : `✅ Crear caso${addPhotos.length > 0 ? ` + ${addPhotos.length} foto${addPhotos.length > 1 ? "s" : ""}` : ""}`}
                 </button>
               </div>
             </form>
