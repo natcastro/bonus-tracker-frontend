@@ -2,6 +2,7 @@ export interface Agent {
   id: number;
   name: string;
   team: string;
+  timezone?: string;
 }
 
 // USA types

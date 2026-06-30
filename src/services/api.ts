@@ -65,6 +65,17 @@ export async function createAgent(name: string, team: string): Promise<Agent> {
   return data as Agent;
 }
 
+export async function updateAgentTimezone(id: number, timezone: string): Promise<Agent> {
+  const { data, error } = await supabase
+    .from("agents")
+    .update({ timezone })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Agent;
+}
+
 export async function deleteAgent(id: number): Promise<void> {
   const { error } = await supabase.from("agents").delete().eq("id", id);
   if (error) throw error;

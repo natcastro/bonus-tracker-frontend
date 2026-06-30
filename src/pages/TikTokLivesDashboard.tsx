@@ -1,13 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, UsaLiveSchedule } from "../types";
-import { getAgents, createAgent, updateAgentName, deleteAgent, getUsaLiveSchedules, addUsaLiveSchedule, deleteUsaLiveSchedule } from "../services/api";
+import { getAgents, createAgent, updateAgentName, updateAgentTimezone, deleteAgent, getUsaLiveSchedules, addUsaLiveSchedule, deleteUsaLiveSchedule } from "../services/api";
 import { MONTHS } from "../services/mexBonus";
 
 const TEAM = "TKLIVES";
 const YEARS = ["2025", "2026", "2027", "2028"];
 const DOW_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const AGENT_COLORS = ["#1e40af", "#0891b2", "#7c3aed", "#dc2626", "#d97706", "#db2777"];
+const TIMEZONES = [
+  { value: "", label: "Sin definir" },
+  { value: "America/Los_Angeles", label: "Pacífico (California) — PT" },
+  { value: "America/Denver", label: "Montaña — MT" },
+  { value: "America/Chicago", label: "Central (Houston) — CT" },
+  { value: "America/New_York", label: "Este — ET" },
+];
+const TZ_ABBR: Record<string, string> = {
+  "America/Los_Angeles": "PT",
+  "America/Denver": "MT",
+  "America/Chicago": "CT",
+  "America/New_York": "ET",
+};
 const SCHED_START = 7;
 const SCHED_END = 22;
 const PX_HR = 54;
@@ -165,6 +178,11 @@ export default function TikTokLivesDashboard() {
 
   const saveAgentName = async (id: number) => {
     await updateAgentName(id, agentNames[id]);
+    await load();
+  };
+
+  const saveAgentTimezone = async (id: number, tz: string) => {
+    await updateAgentTimezone(id, tz);
     await load();
   };
 
@@ -423,12 +441,18 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
             <div className="card">
               <h3>Agentes</h3>
               {agents.map((ag) => (
-                <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
-                  <div style={{ flex: 1 }}>
+                <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
                     <label>Agente {ag.id}</label>
                     <input type="text" className="form-control" value={agentNames[ag.id] ?? ""} onChange={(e) => setAgentNames({ ...agentNames, [ag.id]: e.target.value })} />
                   </div>
-                  <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar</button>
+                  <div style={{ minWidth: 220 }}>
+                    <label>Zona horaria</label>
+                    <select className="form-control" value={ag.timezone ?? ""} onChange={(e) => saveAgentTimezone(ag.id, e.target.value)}>
+                      {TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar Nombre</button>
                   <button
                     className="btn btn-secondary"
                     style={{ color: "#ef4444", borderColor: "#ef4444" }}
