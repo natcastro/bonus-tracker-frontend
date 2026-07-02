@@ -8,9 +8,17 @@ import AccountProtectionDashboard from "./pages/AccountProtectionDashboard";
 import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
 import CSQualityDashboard from "./pages/CSQualityDashboard";
 
+const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY"]);
+
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
-  if (saved !== team) return <Navigate to="/" replace />;
+  if (saved !== team) {
+    if (NO_PASSWORD_TEAMS.has(team)) {
+      sessionStorage.setItem("team", team);
+      return children;
+    }
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
