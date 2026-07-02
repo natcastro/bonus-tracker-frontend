@@ -173,6 +173,10 @@ export default function TikTokLivesDashboard() {
 
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.agentId || form.agentId === 0) {
+      setError("Selecciona un agente antes de agregar el turno.");
+      return;
+    }
     try {
       if (form.repeat) {
         if (!form.repeatUntil || form.repeatDays.length === 0) {
