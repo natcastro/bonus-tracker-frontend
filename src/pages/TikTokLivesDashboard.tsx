@@ -312,7 +312,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
-                  <button className="btn btn-sm btn-primary" onClick={() => setShowForm(true)}>+ Agregar Turno</button>
+                  <button className="btn btn-sm btn-primary" onClick={() => { setForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowForm(true); }}>+ Agregar Turno</button>
                 </div>
               </div>
 
