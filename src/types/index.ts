@@ -127,7 +127,9 @@ export interface CSQualityCase {
   title: string;
   description: string;
   category: string;
+  code: string;
   warrantyApplies: boolean;
+  status: "pending" | "approved";
   createdAt: string;
   photos?: CSQualityPhoto[];
 }

@@ -720,43 +720,55 @@ function mapCSPhoto(r: any): CSQualityPhoto {
 function mapCSCase(r: any): CSQualityCase {
   return {
     id: r.id, title: r.title, description: r.description ?? "",
-    category: r.category ?? "", warrantyApplies: !!r.warranty_applies,
+    category: r.category ?? "", code: r.code ?? "",
+    warrantyApplies: !!r.warranty_applies,
+    status: r.status ?? "pending",
     createdAt: r.created_at ?? "",
     photos: (r.cs_quality_photos ?? []).map(mapCSPhoto),
   };
 }
 
-export async function getCSCases(): Promise<CSQualityCase[]> {
+export async function getCSCases(status: "approved" | "pending" = "approved"): Promise<CSQualityCase[]> {
   const { data, error } = await supabase
     .from("cs_quality_cases")
     .select("*, cs_quality_photos(*)")
+    .eq("status", status)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data.map(mapCSCase);
 }
 
-export async function createCSCase(c: Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies">): Promise<CSQualityCase> {
+export async function createCSCase(
+  c: Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies" | "code">,
+  status: "pending" | "approved" = "pending"
+): Promise<CSQualityCase> {
   const { data, error } = await supabase
     .from("cs_quality_cases")
-    .insert({ title: c.title, description: c.description, category: c.category, warranty_applies: c.warrantyApplies })
+    .insert({ title: c.title, description: c.description, category: c.category, warranty_applies: c.warrantyApplies, code: c.code, status })
     .select()
     .single();
   if (error) throw error;
   return { ...mapCSCase(data), photos: [] };
 }
 
-export async function updateCSCase(id: number, c: Partial<Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies">>): Promise<void> {
+export async function approveCSCase(id: number, code: string): Promise<void> {
+  const { error } = await supabase.from("cs_quality_cases").update({ status: "approved", code }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function rejectCSCase(id: number): Promise<void> {
+  const { error } = await supabase.from("cs_quality_cases").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateCSCase(id: number, c: Partial<Pick<CSQualityCase, "title" | "description" | "category" | "warrantyApplies" | "code">>): Promise<void> {
   const upd: any = {};
   if (c.title !== undefined) upd.title = c.title;
   if (c.description !== undefined) upd.description = c.description;
   if (c.category !== undefined) upd.category = c.category;
   if (c.warrantyApplies !== undefined) upd.warranty_applies = c.warrantyApplies;
+  if (c.code !== undefined) upd.code = c.code;
   const { error } = await supabase.from("cs_quality_cases").update(upd).eq("id", id);
-  if (error) throw error;
-}
-
-export async function deleteCSCase(id: number): Promise<void> {
-  const { error } = await supabase.from("cs_quality_cases").delete().eq("id", id);
   if (error) throw error;
 }
 
