@@ -418,13 +418,24 @@ ALTER TABLE cs_quality_cases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAU
                         </label>
                       </div>
 
-                      {/* Edit (only non-warranty) */}
-                      {!selected.warrantyApplies && (
-                        <button className="btn btn-primary btn-sm" style={{ background: "#7c3aed", borderColor: "#7c3aed", alignSelf: "flex-start" }}
-                          onClick={() => { setEditMode(true); setEditForm({ title: selected.title, description: selected.description, category: selected.category, warrantyApplies: selected.warrantyApplies, code: selected.code }); }}>
-                          ✏️ Editar caso
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        {/* Edit (only non-warranty) */}
+                        {!selected.warrantyApplies && (
+                          <button className="btn btn-primary btn-sm" style={{ background: "#7c3aed", borderColor: "#7c3aed" }}
+                            onClick={() => { setEditMode(true); setEditForm({ title: selected.title, description: selected.description, category: selected.category, warrantyApplies: selected.warrantyApplies, code: selected.code }); }}>
+                            ✏️ Editar caso
+                          </button>
+                        )}
+                        {/* Delete (admin always) */}
+                        <button className="btn btn-secondary btn-sm" style={{ color: "#dc2626", borderColor: "#dc2626" }}
+                          onClick={async () => {
+                            if (!confirm("¿Eliminar este caso del diccionario? Esta acción no se puede deshacer.")) return;
+                            try { await rejectCSCase(selected.id); setSelected(null); await load(); }
+                            catch (ex: any) { setError("Error al eliminar: " + (ex?.message ?? ex)); }
+                          }}>
+                          🗑 Eliminar caso
                         </button>
-                      )}
+                      </div>
                     </div>
                   )}
                 </>
