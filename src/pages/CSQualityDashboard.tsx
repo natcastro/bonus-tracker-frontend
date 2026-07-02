@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CSQualityCase } from "../types";
-import { getCSCases, createCSCase, updateCSCase, approveCSCase, rejectCSCase, addCSPhoto } from "../services/api";
+import { getCSCases, createCSCase, updateCSCase, approveCSCase, rejectCSCase, addCSPhoto, deleteCSPhoto } from "../services/api";
 
 const ADMIN_PASSWORD = "Calidad2026!";
 const CATEGORY_COLORS = ["#7c3aed", "#0891b2", "#d97706", "#db2777", "#059669", "#dc2626", "#4f46e5", "#0ea5e9"];
@@ -355,6 +355,12 @@ ALTER TABLE cs_quality_cases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAU
                     <div key={ph.id} style={{ position: "relative", overflow: "hidden", gridColumn: idx === 0 && (selected.photos?.length ?? 0) === 3 ? "span 2" : undefined }}>
                       <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} onClick={(e) => { e.stopPropagation(); setLightboxUrl(ph.url); }} />
                       {ph.caption && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.55))", color: "white", fontSize: "0.66rem", padding: "1rem 0.5rem 0.35rem" }}>{ph.caption}</div>}
+                      {isAdmin && (
+                        <button
+                          onClick={async (e) => { e.stopPropagation(); if (!confirm("¿Eliminar esta foto?")) return; try { await deleteCSPhoto(ph.id); await load(); } catch (ex: any) { setError("Error al eliminar foto: " + (ex?.message ?? ex)); } }}
+                          style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "white", border: "none", borderRadius: "50%", width: 26, height: 26, fontSize: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+                        >×</button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -397,8 +403,14 @@ ALTER TABLE cs_quality_cases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAU
                       <p style={{ margin: "0 0 0.5rem", fontSize: "0.82rem", color: "#94a3b8", fontWeight: 600 }}>Más fotos</p>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
                         {selected.photos!.slice(4).map((ph) => (
-                          <div key={ph.id} style={{ borderRadius: 10, overflow: "hidden", aspectRatio: "1" }}>
+                          <div key={ph.id} style={{ borderRadius: 10, overflow: "hidden", aspectRatio: "1", position: "relative" }}>
                             <img src={ph.url} alt={ph.caption} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} onClick={() => setLightboxUrl(ph.url)} />
+                            {isAdmin && (
+                              <button
+                                onClick={async (e) => { e.stopPropagation(); if (!confirm("¿Eliminar esta foto?")) return; try { await deleteCSPhoto(ph.id); await load(); } catch (ex: any) { setError("Error al eliminar foto: " + (ex?.message ?? ex)); } }}
+                                style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, fontSize: "0.75rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+                              >×</button>
+                            )}
                           </div>
                         ))}
                       </div>
