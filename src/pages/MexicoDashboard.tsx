@@ -65,6 +65,10 @@ function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    if (!saving) setDraft(String(agGoal?.goalAmount ?? ""));
+  }, [agGoal?.goalAmount]);
+
   const save = async () => {
     if (!draft || isNaN(Number(draft))) return;
     setSaving(true);
