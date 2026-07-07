@@ -544,7 +544,32 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 ⚠️ {dbError} — <strong>corre en Supabase:</strong> <code>ALTER TABLE mex_schedule_events DISABLE ROW LEVEL SECURITY;</code>
               </div>
             )}
-            <div className="card" style={{ marginTop: "1rem" }}>
+            <div style={{ marginTop: "1rem", display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+            {/* ── Lives count sidebar ── */}
+            <div className="card" style={{ minWidth: 170, flexShrink: 0 }}>
+              <h4 style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Lives registrados</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {agents.map((ag, i) => {
+                  const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                  const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                  return (
+                    <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.82rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                      </div>
+                      <span style={{ fontSize: "0.88rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 10px", flexShrink: 0 }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: "0.75rem", paddingTop: "0.6rem", borderTop: "1px solid #f1f5f9", fontSize: "0.75rem", color: "#94a3b8" }}>
+                Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong> lives
+              </div>
+            </div>
+
+            {/* ── Calendar ── */}
+            <div className="card" style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
@@ -624,6 +649,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 </div>
               </div>
             </div>
+            </div>{/* end flex row */}
 
             {/* ── Calendar modal ── */}
             {calendarAgent && (() => {
