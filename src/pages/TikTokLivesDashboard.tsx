@@ -102,21 +102,45 @@ function addDaysStr(dateStr: string, days: number): string {
   return toDateStr(dt);
 }
 
-async function exportLivesXLSX(schedules: UsaLiveSchedule[], agents: Agent[], monthName: string, year: string) {
+const ENGLISH_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const TZ_LABEL: Record<string, string> = {
+  "America/Los_Angeles": "Pacific Time (PT)",
+  "America/Denver": "Mountain Time (MT)",
+  "America/Chicago": "Central Time (CT)",
+  "America/New_York": "Eastern Time (ET)",
+};
+
+async function exportLivesXLSX(schedules: UsaLiveSchedule[], agents: Agent[], month: number, year: string, viewTimezone: string) {
   const XLSX = await import("xlsx");
+  const monthName = ENGLISH_MONTHS[month - 1];
+  const tzLabel = viewTimezone ? TZ_LABEL[viewTimezone] ?? viewTimezone : "";
   const rows = schedules.map((s) => {
-    const agentName = agents.find((a) => a.id === s.agentId)?.name ?? String(s.agentId);
-    const dow = new Date(s.date + "T12:00").toLocaleDateString("es-MX", { weekday: "long" });
-    return [agentName, s.date, dow, s.startTime, s.endTime, s.note];
+    const ag = agents.find((a) => a.id === s.agentId);
+    const agentName = ag?.name ?? String(s.agentId);
+    const dow = new Date(s.date + "T12:00").toLocaleDateString("en-US", { weekday: "long" });
+    const agentTz = viewTimezone ? (TZ_LABEL[viewTimezone] ?? viewTimezone) : (TZ_LABEL[ag?.timezone ?? ""] ?? ag?.timezone ?? "");
+    const startTime = s.startTime.slice(0, 5);
+    const endTime = s.endTime.slice(0, 5);
+    return [agentName, s.date, dow, startTime, endTime, agentTz, s.note];
   });
   const ws = XLSX.utils.aoa_to_sheet([
-    ["Agente", "Fecha", "Día", "Inicio", "Fin", "Nota"],
+    ["Agent", "Date", "Day", "Start", "End", "Timezone", "Note"],
     ...rows,
   ]);
-  ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 30 }];
+  ws["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 22 }, { wch: 30 }];
   const wb = XLSX.utils.book_new();
+  const sheetTitle = tzLabel ? `${monthName} ${year} (${tzLabel})` : `${monthName} ${year}`;
   XLSX.utils.book_append_sheet(wb, ws, "TikTok Lives");
-  XLSX.writeFile(wb, `tiktok_lives_usa_${monthName}_${year}.xlsx`);
+  // Add a title row context in cell A1 area via a separate info sheet
+  const infoWs = XLSX.utils.aoa_to_sheet([
+    ["TikTok Lives USA — Schedule"],
+    [`Month: ${monthName} ${year}`],
+    tzLabel ? [`Viewing timezone: ${tzLabel}`] : ["Timezone: each agent's local time"],
+  ]);
+  XLSX.utils.book_append_sheet(wb, infoWs, "Info");
+  XLSX.writeFile(wb, `tiktok_lives_usa_${monthName.toLowerCase()}_${year}${tzLabel ? `_${tzLabel.replace(/[^a-z]/gi, "_")}` : ""}.xlsx`);
+  void sheetTitle;
 }
 
 const EMPTY_FORM = {
@@ -303,7 +327,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                   <option value="">Hora original de cada agente</option>
                   {TIMEZONES.filter((tz) => tz.value).map((tz) => <option key={tz.value} value={tz.value}>Ver en: {tz.label}</option>)}
                 </select>
-                <button className="btn btn-primary btn-sm" onClick={() => exportLivesXLSX(displaySchedules, agents, MONTHS[livesMonth - 1], livesYear)}>⬇ Exportar Excel (.xlsx)</button>
+                <button className="btn btn-primary btn-sm" onClick={() => exportLivesXLSX(displaySchedules, agents, livesMonth, livesYear, viewTimezone)}>⬇ Exportar Excel (.xlsx)</button>
               </div>
             </header>
 
