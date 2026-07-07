@@ -4,7 +4,7 @@ import type { Agent, MexAgentGoal, MexAttendance, MexAttendanceDay, MexLiveSale,
 import {
   getAgents, updateAgentName, createAgent, deleteAgent,
   getMexAttendance,
-  getMexSales, addMexSale, deleteMexSale, approveMexSale, rejectMexSale,
+  getMexSales, addMexSale, deleteMexSale, updateMexSale, approveMexSale, rejectMexSale,
   getMexGoal, upsertMexGoal,
   getMexAgentGoals, upsertMexAgentGoal,
   getMexAttendanceDays, upsertMexAttendanceDay, deleteMexAttendanceDay,
@@ -152,6 +152,12 @@ export default function MexicoDashboard() {
   const [agentGoals, setAgentGoals] = useState<MexAgentGoal[]>([]);
   const [monthlyGoalDraft, setMonthlyGoalDraft] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
+
+  // Edit sale (SKU cancellation)
+  const [editSale, setEditSale] = useState<MexLiveSale | null>(null);
+  const [editSkus, setEditSkus] = useState<string[]>([]);
+  const [editRefunds, setEditRefunds] = useState<Record<number, string>>({});
+  const [savingSale, setSavingSale] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -843,10 +849,21 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             const v = Number(monthlyGoalDraft);
                             if (!v) return;
                             setSavingGoal(true);
-                            try { await upsertMexGoal({ year: Number(year), month, goalAmount: v, actualAmount: totalSales }); await load(); setMonthlyGoalDraft(""); }
+                            try {
+                              await upsertMexGoal({ year: Number(year), month, goalAmount: v, actualAmount: totalSales });
+                              // Auto-sync proportional goals to per-agent table
+                              if (totalLives > 0) {
+                                for (const ag of agents) {
+                                  const agLives = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                                  const propMeta = Math.round((agLives / totalLives) * v);
+                                  await upsertMexAgentGoal({ agentId: ag.id, year: Number(year), month, goalAmount: propMeta });
+                                }
+                              }
+                              await load(); setMonthlyGoalDraft("");
+                            }
                             catch (e: any) { setDbError("Error al guardar meta: " + (e?.message ?? e)); }
                             finally { setSavingGoal(false); }
-                          }}>{savingGoal ? "..." : "Guardar"}</button>
+                          }}>{savingGoal ? "..." : "Guardar y sincronizar"}</button>
                         </div>
                       ) : (
                         <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>
@@ -1154,7 +1171,12 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                   : "—"}
                               </td>
                               <td>MXN ${calcLiveSaleBonus(s.salesAmount).toFixed(2)}</td>
-                              {isAdmin && <td><button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button></td>}
+                              {isAdmin && <td>
+                                <div style={{ display: "flex", gap: "0.3rem" }}>
+                                  <button className="btn btn-sm btn-secondary" onClick={() => { setEditSale(s); setEditSkus(s.skus ? s.skus.split("|").map((x) => x.trim()).filter(Boolean) : []); setEditRefunds({}); }}>✏️ Editar</button>
+                                  <button className="btn btn-sm btn-danger" onClick={() => handleDeleteSale(s.id)}>Eliminar</button>
+                                </div>
+                              </td>}
                             </tr>
                           ))}
                           {agSales.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin registros</td></tr>}
@@ -1189,6 +1211,82 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
               </div>
 
             </div>
+
+            {/* ── Edit sale modal ── */}
+            {editSale && (
+              <div className="modal-overlay active">
+                <div className="modal" style={{ maxWidth: 480 }}>
+                  <div className="modal-header">
+                    <h3>✏️ Editar venta — {editSale.date}</h3>
+                  </div>
+                  <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#64748b" }}>
+                    Quita los SKUs cancelados e ingresa el monto reembolsado de cada uno. El total se ajustará automáticamente.
+                  </p>
+
+                  {/* SKU list */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1rem" }}>
+                    {editSkus.map((sku, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: 8, border: "1.5px solid", borderColor: editRefunds[i] !== undefined ? "#fca5a5" : "#e2e8f0", background: editRefunds[i] !== undefined ? "#fef2f2" : "#f8fafc" }}>
+                        <span style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.88rem", flex: 1 }}>{sku}</span>
+                        {editRefunds[i] !== undefined ? (
+                          <>
+                            <input
+                              type="number" min="0" placeholder="Reembolso MXN $"
+                              value={editRefunds[i]}
+                              onChange={(e) => setEditRefunds((r) => ({ ...r, [i]: e.target.value }))}
+                              style={{ width: 130, padding: "0.25rem 0.5rem", border: "1px solid #fca5a5", borderRadius: 6, fontSize: "0.85rem" }}
+                            />
+                            <button type="button" onClick={() => setEditRefunds((r) => { const n = { ...r }; delete n[i]; return n; })}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "1rem" }}>↩</button>
+                          </>
+                        ) : (
+                          <button type="button" onClick={() => setEditRefunds((r) => ({ ...r, [i]: "" }))}
+                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.65rem", borderRadius: 100, border: "1px solid #fca5a5", background: "white", color: "#dc2626", cursor: "pointer", fontWeight: 600 }}>
+                            Cancelar SKU
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary */}
+                  {Object.keys(editRefunds).length > 0 && (() => {
+                    const totalRefund = Object.values(editRefunds).reduce((s, v) => s + (Number(v) || 0), 0);
+                    const newAmount = Math.max(0, editSale.salesAmount - totalRefund);
+                    const cancelledSkus = Object.keys(editRefunds).length;
+                    const newQty = Math.max(0, editSale.quantity - cancelledSkus);
+                    return (
+                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
+                        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
+                          <div><span style={{ color: "#64748b" }}>Reembolso total: </span><strong style={{ color: "#dc2626" }}>MXN ${totalRefund.toLocaleString("es-MX")}</strong></div>
+                          <div><span style={{ color: "#64748b" }}>Nuevo total: </span><strong style={{ color: "#16a34a" }}>MXN ${newAmount.toLocaleString("es-MX")}</strong></div>
+                          <div><span style={{ color: "#64748b" }}>Artículos: </span><strong>{newQty}</strong></div>
+                          <div><span style={{ color: "#64748b" }}>Bono nuevo: </span><strong style={{ color: "#16a34a" }}>MXN ${calcLiveSaleBonus(newAmount).toFixed(2)}</strong></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="modal-actions">
+                    <button className="btn btn-secondary" onClick={() => { setEditSale(null); setEditRefunds({}); setEditSkus([]); }}>Cancelar</button>
+                    <button className="btn btn-primary" disabled={savingSale || Object.keys(editRefunds).length === 0} onClick={async () => {
+                      setSavingSale(true);
+                      try {
+                        const totalRefund = Object.values(editRefunds).reduce((s, v) => s + (Number(v) || 0), 0);
+                        const cancelledIdxs = new Set(Object.keys(editRefunds).map(Number));
+                        const newSkus = editSkus.filter((_, i) => !cancelledIdxs.has(i));
+                        const newAmount = Math.max(0, editSale.salesAmount - totalRefund);
+                        const newQty = Math.max(0, editSale.quantity - cancelledIdxs.size);
+                        await updateMexSale(editSale.id, { salesAmount: newAmount, quantity: newQty, skus: newSkus.join("|") });
+                        await load();
+                        setEditSale(null); setEditRefunds({}); setEditSkus([]);
+                      } catch (e: any) { setDbError("Error al actualizar: " + (e?.message ?? e)); }
+                      finally { setSavingSale(false); }
+                    }}>{savingSale ? "Guardando..." : "Guardar cambios"}</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 

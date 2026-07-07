@@ -246,6 +246,11 @@ export async function deleteMexSale(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateMexSale(id: number, fields: { salesAmount: number; quantity: number; skus: string }): Promise<void> {
+  const { error } = await supabase.from("mex_live_sales").update({ sales_amount: fields.salesAmount, quantity: fields.quantity, skus: fields.skus }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function approveMexSale(id: number): Promise<void> {
   const { error } = await supabase.from("mex_live_sales").update({ status: "approved" }).eq("id", id);
   if (error) throw error;
