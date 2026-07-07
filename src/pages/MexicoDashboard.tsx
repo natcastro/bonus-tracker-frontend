@@ -271,6 +271,7 @@ export default function MexicoDashboard() {
 
   // ── Schedule events
   const [showSchedForm, setShowSchedForm] = useState(false);
+  const [livesCountOpen, setLivesCountOpen] = useState(false);
   const [schedForm, setSchedForm] = useState({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "", repeat: false, repeatDays: [] as number[], repeatUntil: "" });
 
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
@@ -546,26 +547,33 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
             )}
             <div style={{ marginTop: "1rem", display: "flex", gap: "1rem", alignItems: "flex-start" }}>
             {/* ── Lives count sidebar ── */}
-            <div className="card" style={{ minWidth: 170, flexShrink: 0 }}>
-              <h4 style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Lives registrados</h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {agents.map((ag, i) => {
-                  const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
-                  const color = AGENT_COLORS[i % AGENT_COLORS.length];
-                  return (
-                    <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-                        <span style={{ fontSize: "0.82rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
-                      </div>
-                      <span style={{ fontSize: "0.88rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 10px", flexShrink: 0 }}>{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop: "0.75rem", paddingTop: "0.6rem", borderTop: "1px solid #f1f5f9", fontSize: "0.75rem", color: "#94a3b8" }}>
-                Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong> lives
-              </div>
+            <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 180 : "auto", transition: "width 0.2s" }}>
+              <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Lives</span>
+                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
+              </button>
+              {livesCountOpen && (
+                <div style={{ marginTop: "0.65rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                    {agents.map((ag, i) => {
+                      const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                      const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                      return (
+                        <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                            <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                          </div>
+                          <span style={{ fontSize: "0.82rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
+                    Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── Calendar ── */}
