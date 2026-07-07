@@ -164,7 +164,7 @@ export default function TikTokLivesDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
-  const [viewTimezone, setViewTimezone] = useState("");
+  const [viewTimezone, setViewTimezone] = useState("America/Chicago");
 
   const monthGrid = buildMonthGrid(Number(livesYear), livesMonth);
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
