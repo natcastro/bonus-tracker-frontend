@@ -5,7 +5,7 @@ import {
   getAgents, updateAgentName, createAgent, deleteAgent,
   getMexAttendance,
   getMexSales, addMexSale, deleteMexSale, approveMexSale, rejectMexSale,
-  getMexGoal,
+  getMexGoal, upsertMexGoal,
   getMexAgentGoals, upsertMexAgentGoal,
   getMexAttendanceDays, upsertMexAttendanceDay, deleteMexAttendanceDay,
   getMexScheduleEvents, addMexScheduleEvent, deleteMexScheduleEvent,
@@ -150,6 +150,8 @@ export default function MexicoDashboard() {
   const [sales, setSales] = useState<MexLiveSale[]>([]);
   const [goal, setGoal] = useState<MexMonthlyGoal | null>(null);
   const [agentGoals, setAgentGoals] = useState<MexAgentGoal[]>([]);
+  const [monthlyGoalDraft, setMonthlyGoalDraft] = useState("");
+  const [savingGoal, setSavingGoal] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -816,6 +818,114 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
         {activeTab === "meta" && (
           <section>
             <header className="section-header"><h2>Meta del Mes — {MONTHS[month - 1]} {year}</h2></header>
+
+            {/* ── Monthly goal + live distribution ── */}
+            {(() => {
+              const totalLives = scheduleEvents.length;
+              const totalSales = sales.reduce((s, x) => s + x.salesAmount, 0);
+              const metaAmount = goal?.goalAmount ?? 0;
+              return (
+                <div className="card" style={{ marginBottom: "1.25rem" }}>
+                  {/* Goal input row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginBottom: metaAmount > 0 ? "1.25rem" : 0 }}>
+                    <div>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Meta del mes</div>
+                      {isAdmin ? (
+                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#64748b" }}>MXN $</span>
+                          <input
+                            type="number" min="0" placeholder="ej. 266000"
+                            value={monthlyGoalDraft || (metaAmount > 0 ? String(metaAmount) : "")}
+                            onChange={(e) => setMonthlyGoalDraft(e.target.value)}
+                            style={{ width: 130, padding: "0.3rem 0.6rem", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: "0.9rem" }}
+                          />
+                          <button className="btn btn-primary btn-sm" disabled={savingGoal} onClick={async () => {
+                            const v = Number(monthlyGoalDraft);
+                            if (!v) return;
+                            setSavingGoal(true);
+                            try { await upsertMexGoal({ year: Number(year), month, goalAmount: v, actualAmount: totalSales }); await load(); setMonthlyGoalDraft(""); }
+                            catch (e: any) { setDbError("Error al guardar meta: " + (e?.message ?? e)); }
+                            finally { setSavingGoal(false); }
+                          }}>{savingGoal ? "..." : "Guardar"}</button>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>
+                          {metaAmount > 0 ? `MXN $${metaAmount.toLocaleString("es-MX")}` : "—"}
+                        </div>
+                      )}
+                    </div>
+                    {metaAmount > 0 && (
+                      <>
+                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Total lives</div>
+                          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>{totalLives}</div>
+                        </div>
+                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Ventas totales</div>
+                          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: totalSales >= metaAmount ? "#16a34a" : "#dc2626" }}>MXN ${totalSales.toLocaleString("es-MX")}</div>
+                        </div>
+                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Cumplimiento</div>
+                          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: totalSales >= metaAmount ? "#16a34a" : "#dc2626" }}>{((totalSales / metaAmount) * 100).toFixed(1)}%</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Distribution table */}
+                  {metaAmount > 0 && totalLives > 0 && (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "2px solid var(--border)", textAlign: "left" }}>
+                            <th style={{ padding: "0.45rem 0.75rem" }}>Agente</th>
+                            <th style={{ padding: "0.45rem 0.75rem", textAlign: "center" }}>Lives</th>
+                            <th style={{ padding: "0.45rem 0.75rem", textAlign: "center" }}>% de lives</th>
+                            <th style={{ padding: "0.45rem 0.75rem", textAlign: "right" }}>Meta proporcional</th>
+                            <th style={{ padding: "0.45rem 0.75rem", textAlign: "right" }}>Ventas reales</th>
+                            <th style={{ padding: "0.45rem 0.75rem", textAlign: "center" }}>Cumplimiento</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {agents.map((ag, i) => {
+                            const agLives = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                            const agSales = sales.filter((s) => s.agentId === ag.id).reduce((sum, s) => sum + s.salesAmount, 0);
+                            const pctLives = totalLives > 0 ? (agLives / totalLives) * 100 : 0;
+                            const propMeta = (pctLives / 100) * metaAmount;
+                            const cumplimiento = propMeta > 0 ? (agSales / propMeta) * 100 : null;
+                            const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                            return (
+                              <tr key={ag.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                <td style={{ padding: "0.5rem 0.75rem" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                    <span style={{ width: 9, height: 9, borderRadius: 2, background: color, flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 600 }}>{ag.name}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "center", fontWeight: 700 }}>{agLives}</td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "center" }}>
+                                  <span style={{ background: color + "18", color, fontWeight: 700, borderRadius: 100, padding: "2px 10px", fontSize: "0.78rem" }}>{pctLives.toFixed(1)}%</span>
+                                </td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 700 }}>MXN ${Math.round(propMeta).toLocaleString("es-MX")}</td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", color: cumplimiento !== null && cumplimiento >= 100 ? "#16a34a" : "#64748b" }}>MXN ${agSales.toLocaleString("es-MX")}</td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "center" }}>
+                                  {cumplimiento !== null ? (
+                                    <span style={{ fontWeight: 800, color: cumplimiento >= 100 ? "#16a34a" : cumplimiento >= 70 ? "#d97706" : "#dc2626" }}>{cumplimiento.toFixed(1)}%</span>
+                                  ) : <span style={{ color: "#94a3b8" }}>—</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Bonus reference card */}
             <div className="card" style={{ marginBottom: "1rem", display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.85rem" }}>
