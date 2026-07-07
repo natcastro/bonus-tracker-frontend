@@ -271,18 +271,36 @@ export default function MexicoDashboard() {
 
   // ── Schedule events
   const [showSchedForm, setShowSchedForm] = useState(false);
-  const [schedForm, setSchedForm] = useState({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
+  const [schedForm, setSchedForm] = useState({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "", repeat: false, repeatDays: [] as number[], repeatUntil: "" });
 
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
 
   const submitSched = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!schedForm.agentId) { setDbError("Selecciona un agente."); return; }
     try {
-      const [schYear, schMonth] = schedForm.date.split("-").map(Number);
-      await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: schYear, month: schMonth });
+      if (schedForm.repeat) {
+        if (!schedForm.repeatUntil || schedForm.repeatDays.length === 0) {
+          setDbError("Selecciona al menos un día y una fecha final para repetir.");
+          return;
+        }
+        const addDaysStr = (ds: string, n: number) => { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+        const dowOfStr = (ds: string) => { const d = new Date(ds + "T12:00:00"); return d.getDay() === 0 ? 6 : d.getDay() - 1; };
+        let cursor = schedForm.date;
+        while (cursor <= schedForm.repeatUntil) {
+          if (schedForm.repeatDays.includes(dowOfStr(cursor))) {
+            const [sy, sm] = cursor.split("-").map(Number);
+            await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: cursor, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: sy, month: sm });
+          }
+          cursor = addDaysStr(cursor, 1);
+        }
+      } else {
+        const [schYear, schMonth] = schedForm.date.split("-").map(Number);
+        await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: schedForm.date, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: schYear, month: schMonth });
+      }
       await load();
       setShowSchedForm(false);
-      setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "" });
+      setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "", repeat: false, repeatDays: [], repeatUntil: "" });
     } catch (e: any) {
       setDbError("Error al guardar turno: " + (e?.message ?? e));
     }
@@ -533,7 +551,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                   <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
-                  {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => setShowSchedForm(true)}>+ Agregar Turno</button>}
+                  {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => { setSchedForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowSchedForm(true); }}>+ Agregar Turno</button>}
                 </div>
               </div>
 
@@ -724,8 +742,33 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                       <label>Nota (opcional)</label>
                       <input type="text" className="form-control" value={schedForm.note} onChange={(e) => setSchedForm({ ...schedForm, note: e.target.value })} placeholder="ej. Turno matutino" />
                     </div>
+                    <div className="form-group">
+                      <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                        <input type="checkbox" checked={schedForm.repeat} onChange={(e) => setSchedForm({ ...schedForm, repeat: e.target.checked, repeatDays: [], repeatUntil: "" })} />
+                        Repetir semanalmente
+                      </label>
+                    </div>
+                    {schedForm.repeat && (
+                      <>
+                        <div className="form-group">
+                          <label>Repetir los días:</label>
+                          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.3rem" }}>
+                            {DOW_LABELS.map((d, i) => (
+                              <button key={i} type="button" onClick={() => setSchedForm((f) => ({ ...f, repeatDays: f.repeatDays.includes(i) ? f.repeatDays.filter((x) => x !== i) : [...f.repeatDays, i] }))}
+                                style={{ padding: "0.35rem 0.8rem", borderRadius: 100, fontSize: "0.8rem", cursor: "pointer", fontWeight: schedForm.repeatDays.includes(i) ? 700 : 400, border: "2px solid", borderColor: schedForm.repeatDays.includes(i) ? "#e91e8c" : "var(--border)", background: schedForm.repeatDays.includes(i) ? "#e91e8c15" : "white", color: schedForm.repeatDays.includes(i) ? "#e91e8c" : "var(--text-muted)" }}>
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Repetir hasta</label>
+                          <input type="date" className="form-control" value={schedForm.repeatUntil} onChange={(e) => setSchedForm({ ...schedForm, repeatUntil: e.target.value })} required={schedForm.repeat} />
+                        </div>
+                      </>
+                    )}
                     <div className="modal-actions">
-                      <button type="button" className="btn btn-secondary" onClick={() => setShowSchedForm(false)}>Cancelar</button>
+                      <button type="button" className="btn btn-secondary" onClick={() => { setShowSchedForm(false); setSchedForm({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "", repeat: false, repeatDays: [], repeatUntil: "" }); }}>Cancelar</button>
                       <button type="submit" className="btn btn-primary">Agregar</button>
                     </div>
                   </form>
