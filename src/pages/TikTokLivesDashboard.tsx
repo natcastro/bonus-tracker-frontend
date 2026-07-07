@@ -75,7 +75,8 @@ function getTzOffsetMinutes(date: Date, timeZone: string): number {
 // Converts a wall-clock date+time in `fromTz` to the equivalent wall-clock date+time in `toTz`.
 function convertTime(dateStr: string, timeStr: string, fromTz: string, toTz: string): { date: string; time: string } {
   if (!fromTz || !toTz || fromTz === toTz) return { date: dateStr, time: timeStr };
-  const naiveUTC = new Date(`${dateStr}T${timeStr}:00Z`);
+  const timeOnly = timeStr.slice(0, 5); // "HH:MM" — Supabase may return "HH:MM:SS"
+  const naiveUTC = new Date(`${dateStr}T${timeOnly}:00Z`);
   const fromOffset = getTzOffsetMinutes(naiveUTC, fromTz);
   const actualUTC = new Date(naiveUTC.getTime() - fromOffset * 60000);
   const toOffset = getTzOffsetMinutes(actualUTC, toTz);
