@@ -986,14 +986,15 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     <thead><tr><th>Ventas en el Live</th><th>Bono</th></tr></thead>
                     <tbody>
                       {[
-                        ["< $3,000", "$0"],
+                        ["$0 – $2,999", "$0"],
                         ["$3,000 – $4,999", "$50"],
-                        ["$5,000 – $9,999", "$100"],
-                        ["$10,000 – $19,999", "$220"],
-                        ["$20,000 – $34,999", "$450"],
-                        ["$35,000+", "$600"],
+                        ["$5,000 – $9,999", "$70"],
+                        ["$10,000 – $19,999", "$100"],
+                        ["$20,000 – $34,999", "$200"],
+                        ["$35,000 – $49,900", "$350"],
+                        ["$50,000 o más", "$500"],
                       ].map(([range, bonus]) => (
-                        <tr key={range}><td>{range} MXN</td><td>MXN {bonus}</td></tr>
+                        <tr key={range}><td>{range}</td><td>{bonus}</td></tr>
                       ))}
                     </tbody>
                   </table>

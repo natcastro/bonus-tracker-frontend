@@ -21,10 +21,11 @@ export function calcGoalBonus(goalAmount: number, actualAmount: number): number 
 }
 
 export function calcLiveSaleBonus(salesAmount: number): number {
-  if (salesAmount >= 35000) return 600;
-  if (salesAmount >= 20000) return 450;
-  if (salesAmount >= 10000) return 220;
-  if (salesAmount >= 5000) return 100;
+  if (salesAmount >= 50000) return 500;
+  if (salesAmount >= 35000) return 350;
+  if (salesAmount >= 20000) return 200;
+  if (salesAmount >= 10000) return 100;
+  if (salesAmount >= 5000) return 70;
   if (salesAmount >= 3000) return 50;
   return 0;
 }
