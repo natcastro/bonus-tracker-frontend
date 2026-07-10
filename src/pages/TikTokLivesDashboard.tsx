@@ -173,6 +173,10 @@ export default function TikTokLivesDashboard() {
   });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [contabFilter, setContabFilter] = useState<"month" | "week" | "range">("month");
+  const [contabWeekIdx, setContabWeekIdx] = useState(0);
+  const [contabFrom, setContabFrom] = useState("");
+  const [contabTo, setContabTo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [viewTimezone, setViewTimezone] = useState("America/Chicago");
   const [livesCountOpen, setLivesCountOpen] = useState(false);
@@ -688,10 +692,61 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
         {/* CONTABILIDAD */}
         {activeTab === "contabilidad" && (
           <section>
-            <header className="section-header">
-              <h2>Contabilidad — {MONTHS[livesMonth - 1]} {livesYear}</h2>
+            <header className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <h2 style={{ margin: 0 }}>Contabilidad — {MONTHS[livesMonth - 1]} {livesYear}</h2>
             </header>
+
+            {/* Filter controls */}
+            <div className="card" style={{ marginBottom: "1rem", display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div>
+                <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Filtrar por</label>
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                  {(["month", "week", "range"] as const).map((f) => (
+                    <button key={f} type="button" onClick={() => setContabFilter(f)}
+                      style={{ padding: "0.35rem 0.75rem", borderRadius: 6, fontSize: "0.82rem", cursor: "pointer", fontWeight: contabFilter === f ? 700 : 400,
+                        border: contabFilter === f ? "2px solid #e91e8c" : "1px solid var(--border)",
+                        background: contabFilter === f ? "#e91e8c15" : "white",
+                        color: contabFilter === f ? "#e91e8c" : "var(--text-muted)" }}>
+                      {f === "month" ? "Mes" : f === "week" ? "Semana" : "Fechas"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {contabFilter === "week" && (
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Semana</label>
+                  <select className="form-control" style={{ width: "auto" }} value={contabWeekIdx} onChange={(e) => setContabWeekIdx(Number(e.target.value))}>
+                    {monthGrid.map((week, i) => {
+                      const days = week.filter(Boolean) as Date[];
+                      const first = days[0] ? toDateStr(days[0]).slice(5) : "";
+                      const last = days[days.length - 1] ? toDateStr(days[days.length - 1]).slice(5) : "";
+                      return <option key={i} value={i}>Semana {i + 1} ({first} – {last})</option>;
+                    })}
+                  </select>
+                </div>
+              )}
+              {contabFilter === "range" && (
+                <>
+                  <div>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Desde</label>
+                    <input type="date" className="form-control" value={contabFrom} onChange={(e) => setContabFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Hasta</label>
+                    <input type="date" className="form-control" value={contabTo} onChange={(e) => setContabTo(e.target.value)} />
+                  </div>
+                </>
+              )}
+            </div>
+
             {(() => {
+              const weekDates = contabFilter === "week"
+                ? new Set((monthGrid[contabWeekIdx] ?? []).filter(Boolean).map((d) => toDateStr(d!)))
+                : null;
+              const filtered = contabFilter === "month" ? displaySchedules
+                : contabFilter === "week" ? displaySchedules.filter((s) => weekDates!.has(s.date))
+                : displaySchedules.filter((s) => (!contabFrom || s.date >= contabFrom) && (!contabTo || s.date <= contabTo));
+
               const calcMins = (evs: typeof displaySchedules) => evs.reduce((sum, s) => {
                 const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
                 const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
@@ -700,15 +755,15 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 return sum + mins;
               }, 0);
               const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1);
-              const totalLive = calcMins(displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "live")) / 60;
-              const totalContenido = calcMins(displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "contenido")) / 60;
+              const totalLive = calcMins(filtered.filter((s) => decodeNote(s.note ?? "").type === "live")) / 60;
+              const totalContenido = calcMins(filtered.filter((s) => decodeNote(s.note ?? "").type === "contenido")) / 60;
               const grandTotal = totalLive + totalContenido;
               return (
                 <>
                   {/* Per-agent cards */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
                     {agents.map((ag, i) => {
-                      const agEvs = displaySchedules.filter((s) => s.agentId === ag.id);
+                      const agEvs = filtered.filter((s) => s.agentId === ag.id);
                       const agLive = calcMins(agEvs.filter((s) => decodeNote(s.note ?? "").type === "live")) / 60;
                       const agContenido = calcMins(agEvs.filter((s) => decodeNote(s.note ?? "").type === "contenido")) / 60;
                       const agTotal = agLive + agContenido;
