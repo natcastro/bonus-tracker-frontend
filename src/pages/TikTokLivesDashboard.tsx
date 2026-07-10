@@ -165,6 +165,7 @@ export default function TikTokLivesDashboard() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [viewTimezone, setViewTimezone] = useState("America/Chicago");
+  const [livesCountOpen, setLivesCountOpen] = useState(false);
 
   const monthGrid = buildMonthGrid(Number(livesYear), livesMonth);
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
@@ -331,7 +332,48 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               </div>
             </header>
 
-            <div className="card">
+            <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+
+            {/* ── Agents sidebar ── */}
+            <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 190 : "auto", transition: "width 0.2s" }}>
+              <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Lives</span>
+                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
+              </button>
+              {livesCountOpen && (
+                <div style={{ marginTop: "0.65rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                    {agents.map((ag, i) => {
+                      const agEvs = displaySchedules.filter((s) => s.agentId === ag.id);
+                      const totalMins = agEvs.reduce((sum, s) => {
+                        const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
+                        const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
+                        let mins = eh * 60 + em - (sh * 60 + sm);
+                        if (mins < 0) mins += 24 * 60;
+                        return sum + mins;
+                      }, 0);
+                      const hrs = (totalMins / 60).toFixed(1);
+                      const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                      return (
+                        <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                            <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                          </div>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{hrs}h</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
+                    Turnos: <strong style={{ color: "#0f172a" }}>{displaySchedules.length}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Calendar card ── */}
+            <div className="card" style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ margin: 0 }}>Semana {weekIdx + 1} / {monthGrid.length}</h3>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
@@ -420,6 +462,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 </div>
               </div>
             </div>
+            </div>{/* end flex row */}
 
             {/* Add shift modal */}
             {showForm && (
