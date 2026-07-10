@@ -143,8 +143,18 @@ async function exportLivesXLSX(schedules: UsaLiveSchedule[], agents: Agent[], mo
   void sheetTitle;
 }
 
+const CONTENIDO_PREFIX = "[contenido]";
+function encodeNote(type: "live" | "contenido", note: string) {
+  return type === "contenido" ? CONTENIDO_PREFIX + note : note;
+}
+function decodeNote(raw: string): { type: "live" | "contenido"; note: string } {
+  if (raw.startsWith(CONTENIDO_PREFIX)) return { type: "contenido", note: raw.slice(CONTENIDO_PREFIX.length) };
+  return { type: "live", note: raw };
+}
+
 const EMPTY_FORM = {
   agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "",
+  type: "live" as "live" | "contenido",
   repeat: false, repeatDays: [] as number[], repeatUntil: "",
 };
 
@@ -262,11 +272,11 @@ export default function TikTokLivesDashboard() {
         }
         for (const ds of dates) {
           const [y, m] = ds.split("-").map(Number);
-          await addUsaLiveSchedule({ agentId: Number(form.agentId), date: ds, startTime: form.startTime, endTime: form.endTime, note: form.note, year: y, month: m });
+          await addUsaLiveSchedule({ agentId: Number(form.agentId), date: ds, startTime: form.startTime, endTime: form.endTime, note: encodeNote(form.type, form.note), year: y, month: m });
         }
       } else {
         const [y, m] = form.date.split("-").map(Number);
-        await addUsaLiveSchedule({ agentId: Number(form.agentId), date: form.date, startTime: form.startTime, endTime: form.endTime, note: form.note, year: y, month: m });
+        await addUsaLiveSchedule({ agentId: Number(form.agentId), date: form.date, startTime: form.startTime, endTime: form.endTime, note: encodeNote(form.type, form.note), year: y, month: m });
       }
       await load();
       setShowForm(false);
@@ -511,17 +521,28 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                             const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
                             const h = Math.max(((timeMins(ev.endTime) - timeMins(ev.startTime)) / 60) * PX_HR, 22);
                             const color = agColor(ev.agentId);
+                            const { type: evType, note: evNote } = decodeNote(ev.note ?? "");
+                            const isContenido = evType === "contenido";
                             return (
                               <div
                                 key={ev.id}
                                 data-ev="1"
                                 onDoubleClick={async (e) => { e.stopPropagation(); try { await deleteUsaLiveSchedule(ev.id); await load(); } catch (ex: any) { setError("Error al borrar: " + (ex?.message ?? ex)); } }}
-                                title="Doble clic para eliminar"
-                                style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
+                                title={`${isContenido ? "Contenido" : "Live"} — doble clic para eliminar`}
+                                style={{
+                                  position: "absolute", top: topPx, height: h, left: 2, right: 2,
+                                  background: isContenido ? "transparent" : color + "22",
+                                  backgroundImage: isContenido ? `repeating-linear-gradient(135deg, ${color}18 0px, ${color}18 4px, transparent 4px, transparent 10px)` : "none",
+                                  border: `${isContenido ? "1.5px dashed" : "1.5px solid"} ${color}`,
+                                  borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none",
+                                }}
                               >
-                                <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1.3 }}>
+                                  <span style={{ fontWeight: 700, color }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</span>
+                                  {isContenido && <span style={{ fontSize: "0.6rem", background: color, color: "white", borderRadius: 3, padding: "0 3px", fontWeight: 700, lineHeight: 1.4 }}>C</span>}
+                                </div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime.slice(0,5)}–{ev.endTime.slice(0,5)}{viewTimezone ? ` ${TZ_ABBR[viewTimezone] ?? ""}` : ""}</div>
-                                {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
+                                {evNote && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{evNote}</div>}
                                 <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>
                               </div>
                             );
@@ -560,6 +581,20 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       <div className="form-group">
                         <label>Fin</label>
                         <input type="time" className="form-control" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} required />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Tipo</label>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {(["live", "contenido"] as const).map((t) => (
+                          <button key={t} type="button" onClick={() => setForm((f) => ({ ...f, type: t }))}
+                            style={{ flex: 1, padding: "0.45rem", borderRadius: 6, fontSize: "0.85rem", fontWeight: form.type === t ? 700 : 400, cursor: "pointer",
+                              border: form.type === t ? "2px solid #e91e8c" : "1px solid var(--border)",
+                              background: form.type === t ? "#e91e8c15" : "white",
+                              color: form.type === t ? "#e91e8c" : "var(--text-muted)" }}>
+                            {t === "live" ? "🔴 Live" : "📝 Contenido"}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div className="form-group">
