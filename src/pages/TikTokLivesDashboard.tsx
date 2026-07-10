@@ -387,6 +387,41 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               </div>
             </header>
 
+            {/* ── Hours summary bar ── */}
+            {(() => {
+              const calcMins = (evs: typeof displaySchedules) => evs.reduce((sum, s) => {
+                const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
+                const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
+                let mins = eh * 60 + em - (sh * 60 + sm);
+                if (mins < 0) mins += 24 * 60;
+                return sum + mins;
+              }, 0);
+              const liveEvs = displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "live");
+              const contenidoEvs = displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "contenido");
+              const liveHrs = calcMins(liveEvs) / 60;
+              const contenidoHrs = calcMins(contenidoEvs) / 60;
+              const totalHrs = liveHrs + contenidoHrs;
+              const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1);
+              const statStyle = (val: number, red = false): React.CSSProperties => ({
+                fontSize: "1.35rem", fontWeight: 800,
+                color: red && val > 40 ? "#dc2626" : "var(--text-primary)",
+              });
+              return (
+                <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+                  {[
+                    { label: "🔴 Lives", val: liveHrs, red: false },
+                    { label: "📝 Contenido", val: contenidoHrs, red: false },
+                    { label: "⏱ Total", val: totalHrs, red: true },
+                  ].map(({ label, val, red }) => (
+                    <div key={label} className="card" style={{ flex: "1 1 120px", padding: "0.65rem 1rem", display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+                      <span style={statStyle(val, red)}>{fmt(val)}<span style={{ fontSize: "0.85rem", fontWeight: 600, marginLeft: 2 }}>h</span></span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
 
             {/* ── Agents sidebar ── */}
