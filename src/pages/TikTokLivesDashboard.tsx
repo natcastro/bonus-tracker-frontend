@@ -166,6 +166,51 @@ export default function TikTokLivesDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [viewTimezone, setViewTimezone] = useState("America/Chicago");
   const [livesCountOpen, setLivesCountOpen] = useState(false);
+  const [agentColors, setAgentColors] = useState<Record<number, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("tklives_agent_colors") ?? "{}"); } catch { return {}; }
+  });
+
+  const agColor = (agentId: number) => {
+    if (agentColors[agentId]) return agentColors[agentId];
+    const idx = agents.findIndex((a) => a.id === agentId);
+    return AGENT_COLORS[idx >= 0 ? idx % AGENT_COLORS.length : 0] ?? "#1e40af";
+  };
+
+  const saveAgentColor = (id: number, color: string) => {
+    const next = { ...agentColors, [id]: color };
+    setAgentColors(next);
+    localStorage.setItem("tklives_agent_colors", JSON.stringify(next));
+  };
+
+  const copyLastWeek = async () => {
+    let prevCols: (Date | null)[];
+    let prevScheds = schedules;
+    if (weekIdx > 0) {
+      prevCols = monthGrid[weekIdx - 1];
+    } else {
+      const prevM = livesMonth === 1 ? 12 : livesMonth - 1;
+      const prevY = livesMonth === 1 ? Number(livesYear) - 1 : Number(livesYear);
+      const prevGrid = buildMonthGrid(prevY, prevM);
+      prevCols = prevGrid[prevGrid.length - 1];
+      try { prevScheds = await getUsaLiveSchedules(prevY, prevM); } catch { prevScheds = []; }
+    }
+    const prevDates = new Set(prevCols.filter(Boolean).map((d) => toDateStr(d!)));
+    const toCopy = prevScheds.filter((s) => prevDates.has(s.date));
+    if (toCopy.length === 0) { setError("No hay turnos en la semana anterior para copiar."); return; }
+    if (!confirm(`¿Copiar ${toCopy.length} turno(s) de la semana anterior a esta semana?`)) return;
+    try {
+      for (const s of toCopy) {
+        const prevDayIdx = prevCols.findIndex((d) => d && toDateStr(d) === s.date);
+        if (prevDayIdx === -1) continue;
+        const target = weekCols[prevDayIdx];
+        if (!target) continue;
+        const ds = toDateStr(target);
+        const [y, m] = ds.split("-").map(Number);
+        await addUsaLiveSchedule({ agentId: s.agentId, date: ds, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5), note: s.note, year: y, month: m });
+      }
+      await load();
+    } catch (e: any) { setError("Error al copiar: " + (e?.message ?? e)); }
+  };
 
   const monthGrid = buildMonthGrid(Number(livesYear), livesMonth);
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
@@ -356,7 +401,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                         }, 0);
                         const monthHrs = (calcMins(agEvs) / 60).toFixed(1);
                         const weekHrs = (calcMins(agEvs.filter((s) => weekDateSet.has(s.date))) / 60).toFixed(1);
-                        const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                        const color = agColor(ag.id);
                         return (
                           <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
@@ -386,15 +431,16 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
+                  <button className="btn btn-sm btn-secondary" onClick={copyLastWeek} title="Copia los turnos de la semana anterior a esta semana">⎘ Copiar sem. anterior</button>
                   <button className="btn btn-sm btn-primary" onClick={() => { setForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowForm(true); }}>+ Agregar Turno</button>
                 </div>
               </div>
 
               {/* Agent color legend */}
               <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
-                {agents.map((ag, i) => (
+                {agents.map((ag) => (
                   <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 3, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
+                    <span style={{ width: 12, height: 12, borderRadius: 3, background: agColor(ag.id), display: "inline-block" }} />
                     {ag.name}
                   </span>
                 ))}
@@ -439,24 +485,42 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       const colEvs = day ? displaySchedules.filter((e) => e.date === ds) : [];
                       const isToday = ds === todayStr;
                       return (
-                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#fef2f2" : "transparent" }}>
+                        <div
+                          key={colIdx}
+                          style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#fef2f2" : "transparent", cursor: day ? "crosshair" : "default" }}
+                          onClick={day ? (e) => {
+                            if ((e.target as HTMLElement).closest("[data-ev]")) return;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const clickY = e.clientY - rect.top;
+                            const rawMins = SCHED_START * 60 + (clickY / PX_HR) * 60;
+                            const snapped = Math.round(rawMins / 30) * 30;
+                            const sh = Math.floor(snapped / 60) % 24;
+                            const sm = snapped % 60;
+                            const eh = Math.floor((snapped + 180) / 60) % 24;
+                            const em = (snapped + 180) % 60;
+                            const startTime = `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`;
+                            const endTime = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+                            setForm((f) => ({ ...EMPTY_FORM, agentId: f.agentId || agents[0]?.id || 0, date: ds, startTime, endTime }));
+                            setShowForm(true);
+                          } : undefined}
+                        >
                           {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
                             <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
                           ))}
                           {colEvs.map((ev) => {
                             const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
                             const h = Math.max(((timeMins(ev.endTime) - timeMins(ev.startTime)) / 60) * PX_HR, 22);
-                            const agIdx = agents.findIndex((a) => a.id === ev.agentId);
-                            const color = AGENT_COLORS[agIdx % AGENT_COLORS.length] ?? "#1e40af";
+                            const color = agColor(ev.agentId);
                             return (
                               <div
                                 key={ev.id}
-                                onDoubleClick={async () => { try { await deleteUsaLiveSchedule(ev.id); await load(); } catch (e: any) { setError("Error al borrar: " + (e?.message ?? e)); } }}
+                                data-ev="1"
+                                onDoubleClick={async (e) => { e.stopPropagation(); try { await deleteUsaLiveSchedule(ev.id); await load(); } catch (ex: any) { setError("Error al borrar: " + (ex?.message ?? ex)); } }}
                                 title="Doble clic para eliminar"
                                 style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                               >
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
-                                <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}{viewTimezone ? ` ${TZ_ABBR[viewTimezone] ?? ""}` : ""}</div>
+                                <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime.slice(0,5)}–{ev.endTime.slice(0,5)}{viewTimezone ? ` ${TZ_ABBR[viewTimezone] ?? ""}` : ""}</div>
                                 {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
                                 <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>
                               </div>
@@ -581,6 +645,11 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     <select className="form-control" value={ag.timezone ?? ""} onChange={(e) => saveAgentTimezone(ag.id, e.target.value)}>
                       {TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
                     </select>
+                  </div>
+                  <div>
+                    <label>Color</label>
+                    <input type="color" value={agColor(ag.id)} onChange={(e) => saveAgentColor(ag.id, e.target.value)}
+                      style={{ width: 42, height: 36, padding: 2, border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer" }} />
                   </div>
                   <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar Nombre</button>
                   <button
