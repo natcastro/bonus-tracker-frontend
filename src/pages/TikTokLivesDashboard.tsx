@@ -343,27 +343,34 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               {livesCountOpen && (
                 <div style={{ marginTop: "0.65rem" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                    {agents.map((ag, i) => {
-                      const agEvs = displaySchedules.filter((s) => s.agentId === ag.id);
-                      const totalMins = agEvs.reduce((sum, s) => {
-                        const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
-                        const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
-                        let mins = eh * 60 + em - (sh * 60 + sm);
-                        if (mins < 0) mins += 24 * 60;
-                        return sum + mins;
-                      }, 0);
-                      const hrs = (totalMins / 60).toFixed(1);
-                      const color = AGENT_COLORS[i % AGENT_COLORS.length];
-                      return (
-                        <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                            <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                    {(() => {
+                      const weekDateSet = new Set(weekCols.filter(Boolean).map((d) => toDateStr(d!)));
+                      return agents.map((ag, i) => {
+                        const agEvs = displaySchedules.filter((s) => s.agentId === ag.id);
+                        const calcMins = (evs: typeof agEvs) => evs.reduce((sum, s) => {
+                          const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
+                          const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
+                          let mins = eh * 60 + em - (sh * 60 + sm);
+                          if (mins < 0) mins += 24 * 60;
+                          return sum + mins;
+                        }, 0);
+                        const monthHrs = (calcMins(agEvs) / 60).toFixed(1);
+                        const weekHrs = (calcMins(agEvs.filter((s) => weekDateSet.has(s.date))) / 60).toFixed(1);
+                        const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                        return (
+                          <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                              <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
+                              <span style={{ fontSize: "0.78rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px" }}>{monthHrs}h</span>
+                              <span style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600, paddingRight: 4 }}>sem: {weekHrs}h</span>
+                            </div>
                           </div>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{hrs}h</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                   <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
                     Turnos: <strong style={{ color: "#0f172a" }}>{displaySchedules.length}</strong>
