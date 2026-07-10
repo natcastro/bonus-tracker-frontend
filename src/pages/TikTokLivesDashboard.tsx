@@ -160,7 +160,7 @@ const EMPTY_FORM = {
 
 export default function TikTokLivesDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"calendario" | "settings">("calendario");
+  const [activeTab, setActiveTab] = useState<"calendario" | "contabilidad" | "settings">("calendario");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<UsaLiveSchedule[]>([]);
   const [livesYear, setLivesYear] = useState(String(new Date().getFullYear()));
@@ -334,14 +334,14 @@ export default function TikTokLivesDashboard() {
       <nav className="top-nav">
         <div className="logo">Bonus Tracker — <span style={{ color: "#e91e8c" }}>TikTok Lives USA</span></div>
         <ul className="nav-links">
-          {(["calendario", "settings"] as const).map((tab) => (
+          {(["calendario", "contabilidad", "settings"] as const).map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>
-              {tab === "calendario" ? "Calendario" : "Configuración"}
+              {tab === "calendario" ? "Calendario" : tab === "contabilidad" ? "Contabilidad" : "Configuración"}
             </li>
           ))}
         </ul>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          {activeTab === "calendario" && (
+          {(activeTab === "calendario" || activeTab === "contabilidad") && (
             <>
               <select className="month-selector" value={livesYear} onChange={(e) => { setLivesYear(e.target.value); setWeekIdx(0); }}>
                 {YEARS.map((y) => <option key={y}>{y}</option>)}
@@ -682,6 +682,74 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {/* CONTABILIDAD */}
+        {activeTab === "contabilidad" && (
+          <section>
+            <header className="section-header">
+              <h2>Contabilidad — {MONTHS[livesMonth - 1]} {livesYear}</h2>
+            </header>
+            {(() => {
+              const calcMins = (evs: typeof displaySchedules) => evs.reduce((sum, s) => {
+                const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
+                const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
+                let mins = eh * 60 + em - (sh * 60 + sm);
+                if (mins < 0) mins += 24 * 60;
+                return sum + mins;
+              }, 0);
+              const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1);
+              const totalLive = calcMins(displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "live")) / 60;
+              const totalContenido = calcMins(displaySchedules.filter((s) => decodeNote(s.note ?? "").type === "contenido")) / 60;
+              const grandTotal = totalLive + totalContenido;
+              return (
+                <>
+                  {/* Per-agent cards */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
+                    {agents.map((ag, i) => {
+                      const agEvs = displaySchedules.filter((s) => s.agentId === ag.id);
+                      const agLive = calcMins(agEvs.filter((s) => decodeNote(s.note ?? "").type === "live")) / 60;
+                      const agContenido = calcMins(agEvs.filter((s) => decodeNote(s.note ?? "").type === "contenido")) / 60;
+                      const agTotal = agLive + agContenido;
+                      const color = agColor(ag.id);
+                      return (
+                        <div key={ag.id} className="card" style={{ flex: "1 1 220px", borderTop: `4px solid ${color}` }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
+                            <span style={{ fontWeight: 700, fontSize: "1rem" }}>{ag.name}</span>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>🔴 Lives</span>
+                              <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>{fmt(agLive)}<span style={{ fontSize: "0.8rem", fontWeight: 500 }}>h</span></span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>📝 Contenido</span>
+                              <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>{fmt(agContenido)}<span style={{ fontSize: "0.8rem", fontWeight: 500 }}>h</span></span>
+                            </div>
+                            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>Total</span>
+                              <span style={{ fontWeight: 800, fontSize: "1.25rem", color: agTotal > 40 ? "#dc2626" : color }}>{fmt(agTotal)}<span style={{ fontSize: "0.85rem", fontWeight: 600 }}>h</span></span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Team total row */}
+                  <div className="card" style={{ display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total equipo</span>
+                    <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+                      <div><span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>🔴 Lives </span><strong>{fmt(totalLive)}h</strong></div>
+                      <div><span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>📝 Contenido </span><strong>{fmt(totalContenido)}h</strong></div>
+                      <div><span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>⏱ Total </span><strong style={{ color: grandTotal > 40 ? "#dc2626" : undefined }}>{fmt(grandTotal)}h</strong></div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </section>
         )}
 
