@@ -26,11 +26,11 @@ body {
 /* Navigation */
 .top-nav {
   background: var(--surface);
-  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1);
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -38,19 +38,20 @@ body {
   gap: 0.5rem;
 }
 
-.logo { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+.logo { font-size: 1.1rem; font-weight: 700; color: var(--primary); letter-spacing: -0.01em; }
 
-.nav-links { list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.nav-links { list-style: none; display: flex; gap: 0.25rem; flex-wrap: wrap; }
 .nav-links li {
   cursor: pointer;
   font-weight: 500;
+  font-size: 0.875rem;
   color: var(--text-muted);
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius);
-  transition: all 0.2s;
+  padding: 0.4rem 1rem;
+  border-radius: 9999px;
+  transition: all 0.15s;
 }
 .nav-links li:hover { color: var(--text-main); background: var(--background); }
-.nav-links li.active { color: var(--primary); background: #EAF5ED; }
+.nav-links li.active { color: #fff; background: var(--primary); }
 
 .month-selector {
   padding: 0.5rem 1rem;
