@@ -1,6 +1,6 @@
 :root {
-  --primary: #4F46E5;
-  --primary-hover: #4338CA;
+  --primary: #3E8C54;
+  --primary-hover: #2D7444;
   --background: #F3F4F6;
   --surface: #FFFFFF;
   --text-main: #111827;
@@ -50,7 +50,7 @@ body {
   transition: all 0.2s;
 }
 .nav-links li:hover { color: var(--text-main); background: var(--background); }
-.nav-links li.active { color: var(--primary); background: #EEF2FF; }
+.nav-links li.active { color: var(--primary); background: #EAF5ED; }
 
 .month-selector {
   padding: 0.5rem 1rem;
@@ -113,7 +113,7 @@ body {
   font-size: 0.95rem;
   transition: border-color 0.2s;
 }
-.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(62,140,84,0.12); }
 
 .form-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
 .form-row .form-group { flex: 1; min-width: 140px; }
@@ -194,8 +194,8 @@ body {
   transition: all 0.2s;
   color: var(--text-main);
 }
-.team-btn:hover { border-color: var(--primary); background: #EEF2FF; }
-.team-btn.active { border-color: var(--primary); background: #EEF2FF; color: var(--primary); }
+.team-btn:hover { border-color: var(--primary); background: #EAF5ED; }
+.team-btn.active { border-color: var(--primary); background: #EAF5ED; color: var(--primary); }
 .team-btn.mex.active { border-color: #16a34a; background: #f0fdf4; color: #16a34a; }
 .team-btn .flag { font-size: 2.5rem; }
 
