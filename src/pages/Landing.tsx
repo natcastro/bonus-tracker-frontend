@@ -2,18 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "USA" | "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY";
+type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT";
 type View = "hub" | "ftc-usa" | "ops-tools";
 
 const ROUTES: Record<Team, string> = {
-  USA: "/usa", MEX: "/mexico", OPS: "/operations",
-  APT: "/account-protection", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
+  MEX: "/mexico", OPS: "/operations",
+  APT: "/strategy", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
+  MGMT: "/management",
 };
 
+const MANAGEMENT_PASSWORD = "123456";
+
 const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
-  { key: "USA",  label: "United States",      desc: "Appeals & Bonuses",          color: "#1e40af" },
-  { key: "OPS",  label: "Operations Team",    desc: "Handling Time & TikTok",     color: "#7c3aed" },
-  { key: "APT",  label: "Account Protection", desc: "Claims & Account Appeals",   color: "#0891b2" },
+  { key: "OPS",  label: "Operations Team",  desc: "Handling Time & TikTok",  color: "#7c3aed" },
+  { key: "APT",  label: "Strategy Team",    desc: "Afiliados & CS",          color: "#6366f1" },
 ];
 
 // ── Card component ────────────────────────────────────────────────────────────
@@ -159,11 +161,22 @@ export default function Landing() {
   const navigate = useNavigate();
   const [view, setView] = useState<View>("hub");
   const [csSelected, setCsSelected] = useState<Team | null>(null);
+  const [mgmtPw, setMgmtPw] = useState("");
+  const [mgmtPwError, setMgmtPwError] = useState("");
 
   const directGo = (team: Team) => {
     sessionStorage.setItem("team", team);
     sessionStorage.setItem("role", "admin");
     navigate(ROUTES[team]);
+  };
+
+  const submitMgmt = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mgmtPw === MANAGEMENT_PASSWORD) {
+      directGo("MGMT");
+    } else {
+      setMgmtPwError("Contraseña incorrecta.");
+    }
   };
 
   // ── Hub view ──────────────────────────────────────────────────────────────
@@ -226,6 +239,15 @@ export default function Landing() {
             tags={["CS Quality Dictionary"]}
             onClick={() => setView("ops-tools")}
           />
+          <HubCard
+            icon="📊"
+            title="Management"
+            subtitle="Historial y datos del equipo"
+            color="#64748b"
+            tags={["Historial", "Datos"]}
+            onClick={() => setCsSelected(csSelected === "MGMT" ? null : "MGMT")}
+            active={csSelected === "MGMT"}
+          />
         </div>
 
         {/* México password inline */}
@@ -237,6 +259,46 @@ export default function Landing() {
               color="#15803d"
               onBack={() => setCsSelected(null)}
             />
+          </div>
+        )}
+
+        {/* Management password inline */}
+        {csSelected === "MGMT" && (
+          <div style={{ marginTop: "2rem" }}>
+            <div style={{
+              background: "#fff",
+              border: "1px solid #E5E7EB",
+              borderLeft: "4px solid #64748b",
+              borderRadius: 12,
+              padding: "1.5rem",
+              maxWidth: 380,
+              width: "100%",
+            }}>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "1rem", color: "#111827" }}>
+                🔒 Management
+              </div>
+              <form onSubmit={submitMgmt} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder="Contraseña"
+                  value={mgmtPw}
+                  onChange={(e) => { setMgmtPw(e.target.value); setMgmtPwError(""); }}
+                  autoFocus
+                  required
+                  style={{ borderColor: "#94a3b860" }}
+                />
+                {mgmtPwError && <p className="error-msg">{mgmtPwError}</p>}
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCsSelected(null)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm" style={{ background: "#64748b" }}>
+                    Entrar
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>
@@ -280,11 +342,11 @@ export default function Landing() {
           <HubCard
             icon="🎧"
             title="Customer Service"
-            subtitle="United States · Operations · Account Protection"
+            subtitle="Operations · Strategy"
             color="#1e40af"
-            tags={["United States", "Operations", "Account Protection"]}
+            tags={["Operations", "Strategy"]}
             active={csSelected !== null && csSelected !== "TKLIVES"}
-            onClick={() => setCsSelected(csSelected && csSelected !== "TKLIVES" ? null : "USA")}
+            onClick={() => setCsSelected(csSelected && csSelected !== "TKLIVES" ? null : "OPS")}
           />
           <HubCard
             icon="🎵"

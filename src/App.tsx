@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { ReactElement } from "react";
 import Landing from "./pages/Landing";
-import UsaDashboard from "./pages/UsaDashboard";
 import MexicoDashboard from "./pages/MexicoDashboard";
 import OperationsDashboard from "./pages/OperationsDashboard";
-import AccountProtectionDashboard from "./pages/AccountProtectionDashboard";
+import StrategyDashboard from "./pages/StrategyDashboard";
 import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
 import CSQualityDashboard from "./pages/CSQualityDashboard";
+import ManagementDashboard from "./pages/ManagementDashboard";
 
 const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY"]);
 
@@ -27,23 +27,23 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/usa" element={
-          <ProtectedRoute team="USA"><UsaDashboard /></ProtectedRoute>
-        } />
         <Route path="/mexico" element={
           <ProtectedRoute team="MEX"><MexicoDashboard /></ProtectedRoute>
         } />
         <Route path="/operations" element={
           <ProtectedRoute team="OPS"><OperationsDashboard /></ProtectedRoute>
         } />
-        <Route path="/account-protection" element={
-          <ProtectedRoute team="APT"><AccountProtectionDashboard /></ProtectedRoute>
+        <Route path="/strategy" element={
+          <ProtectedRoute team="APT"><StrategyDashboard /></ProtectedRoute>
         } />
         <Route path="/tiktok-lives" element={
           <ProtectedRoute team="TKLIVES"><TikTokLivesDashboard /></ProtectedRoute>
         } />
         <Route path="/cs-quality" element={
           <ProtectedRoute team="CSQUALITY"><CSQualityDashboard /></ProtectedRoute>
+        } />
+        <Route path="/management" element={
+          <ProtectedRoute team="MGMT"><ManagementDashboard /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
