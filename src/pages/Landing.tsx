@@ -175,7 +175,8 @@ export default function Landing() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "4rem 1.5rem",
+        justifyContent: "center",
+        padding: "2rem 1.5rem",
       }}>
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
