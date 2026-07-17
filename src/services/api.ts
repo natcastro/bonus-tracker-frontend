@@ -378,7 +378,7 @@ export async function getOpsAppeals(year: number, cycleId: string): Promise<OpsA
 
 export async function addOpsAppeal(a: Omit<OpsAppeal, "id" | "agent">): Promise<OpsAppeal> {
   const { data, error } = await supabase.from("ops_appeals")
-    .insert({ agent_id: a.agentId, date: a.date, order_number: a.orderNumber, status: a.status, outcome: a.outcome, year: a.year, cycle_id: a.cycleId })
+    .insert({ agent_id: a.agentId, date: a.date, order_number: a.orderNumber, appeal_type: a.appealType ?? "tiktok", status: a.status, outcome: a.outcome, year: a.year, cycle_id: a.cycleId })
     .select().single();
   if (error) throw error;
   return mapOpsAppeal(data);
@@ -386,7 +386,7 @@ export async function addOpsAppeal(a: Omit<OpsAppeal, "id" | "agent">): Promise<
 
 export async function updateOpsAppeal(id: number, a: Partial<OpsAppeal>): Promise<OpsAppeal> {
   const { data, error } = await supabase.from("ops_appeals")
-    .update({ agent_id: a.agentId, date: a.date, order_number: a.orderNumber, status: a.status, outcome: a.outcome })
+    .update({ agent_id: a.agentId, date: a.date, order_number: a.orderNumber, appeal_type: a.appealType, status: a.status, outcome: a.outcome })
     .eq("id", id).select().single();
   if (error) throw error;
   return mapOpsAppeal(data);
@@ -662,7 +662,7 @@ function mapMexScheduleEvent(r: any): MexScheduleEvent {
 }
 
 function mapOpsAppeal(r: any): OpsAppeal {
-  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, orderNumber: r.order_number, status: r.status, outcome: r.outcome, year: r.year, cycleId: r.cycle_id };
+  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, orderNumber: r.order_number, appealType: r.appeal_type ?? "tiktok", status: r.status, outcome: r.outcome, year: r.year, cycleId: r.cycle_id };
 }
 
 function mapOpsHandlingTime(r: any): OpsHandlingTime {

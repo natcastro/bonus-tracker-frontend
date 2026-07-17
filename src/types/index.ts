@@ -142,6 +142,7 @@ export interface OpsAppeal {
   agent?: Agent;
   date: string;
   orderNumber: string;
+  appealType: "tiktok" | "a2z" | "safety";
   status: "pending" | "inProgress" | "completed";
   outcome: "fullRefund" | "partialRefund" | "fee" | "lost";
   year: number;

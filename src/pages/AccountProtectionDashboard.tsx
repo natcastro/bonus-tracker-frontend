@@ -455,7 +455,7 @@ export default function AccountProtectionDashboard() {
                 <form onSubmit={checkSuperAdmin} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Admin Password</label>
-                    <input type="password" className="form-control" placeholder="apt2026!" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
+                    <input type="password" className="form-control" placeholder="Contraseña admin" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
                     {addAgentPwError && <p className="error-msg">{addAgentPwError}</p>}
                   </div>
                   <button type="submit" className="btn btn-primary btn-sm">Verificar</button>

@@ -22,10 +22,17 @@ const OUTCOME_LABELS: Record<string, string> = {
   lost: "Lost",
 };
 
+const APPEAL_TYPES: { value: string; label: string }[] = [
+  { value: "tiktok", label: "TikTok Appeals" },
+  { value: "a2z", label: "A to Z's" },
+  { value: "safety", label: "Safety Claim" },
+];
+
 const TABS: [string, string][] = [
   ["summary", "Summary"],
   ["appeals", "Appeals"],
   ["handling", "Handling Time"],
+  ["performance", "Performance"],
   ["tiktok", "TikTok Score"],
   ["settings", "Settings"],
 ];
@@ -99,7 +106,7 @@ export default function OperationsDashboard() {
 
   // ── Appeal form
   const [appealForm, setAppealForm] = useState({
-    agentId: 0, date: "", orderNumber: "", status: "pending", outcome: "fullRefund",
+    agentId: 0, date: "", orderNumber: "", appealType: "tiktok", status: "pending", outcome: "fullRefund",
   });
 
   const submitAppeal = async (e: React.FormEvent) => {
@@ -108,11 +115,12 @@ export default function OperationsDashboard() {
     await addOpsAppeal({
       agentId: Number(appealForm.agentId), date: appealForm.date,
       orderNumber: appealForm.orderNumber,
+      appealType: appealForm.appealType as any,
       status: appealForm.status as any, outcome: appealForm.outcome as any,
       year: ay, cycleId: ac,
     });
     await load();
-    setAppealForm({ agentId: 0, date: "", orderNumber: "", status: "pending", outcome: "fullRefund" });
+    setAppealForm({ agentId: 0, date: "", orderNumber: "", appealType: "tiktok", status: "pending", outcome: "fullRefund" });
   };
 
   const submitEditAppeal = async (e: React.FormEvent) => {
@@ -293,6 +301,12 @@ export default function OperationsDashboard() {
                   <input type="text" className="form-control" placeholder="Order #" value={appealForm.orderNumber} onChange={(e) => setAppealForm({ ...appealForm, orderNumber: e.target.value })} required />
                 </div>
                 <div className="form-group">
+                  <label>Type</label>
+                  <select className="form-control" value={appealForm.appealType} onChange={(e) => setAppealForm({ ...appealForm, appealType: e.target.value })}>
+                    {APPEAL_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
                   <label>Status</label>
                   <select className="form-control" value={appealForm.status} onChange={(e) => setAppealForm({ ...appealForm, status: e.target.value })}>
                     <option value="pending">Pending</option>
@@ -323,13 +337,14 @@ export default function OperationsDashboard() {
                 </div>
               </div>
               <table className="data-table">
-                <thead><tr><th>Agent</th><th>Date</th><th>Order No.</th><th>Status</th><th>Outcome</th><th>Bonus</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Agent</th><th>Date</th><th>Order No.</th><th>Type</th><th>Status</th><th>Outcome</th><th>Bonus</th><th>Actions</th></tr></thead>
                 <tbody>
                   {[...appeals].sort((a, b) => b.date.localeCompare(a.date)).map((a) => (
                     <tr key={a.id}>
                       <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
                       <td>{a.date}</td>
                       <td>{a.orderNumber}</td>
+                      <td>{APPEAL_TYPES.find((t) => t.value === a.appealType)?.label ?? "TikTok Appeals"}</td>
                       <td><span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span></td>
                       <td>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
                       <td>${a.status === "completed" ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
@@ -339,7 +354,7 @@ export default function OperationsDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {appeals.length === 0 && <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)" }}>No appeals for this cycle</td></tr>}
+                  {appeals.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>No appeals for this cycle</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -387,6 +402,16 @@ export default function OperationsDashboard() {
                 </div>
               );
             })}
+          </section>
+        )}
+
+        {/* PERFORMANCE */}
+        {activeTab === "performance" && (
+          <section>
+            <header className="section-header"><h2>Performance</h2></header>
+            <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--text-muted)" }}>
+              <p style={{ fontSize: "1rem" }}>Próximamente — en construcción</p>
+            </div>
           </section>
         )}
 
@@ -467,7 +492,7 @@ export default function OperationsDashboard() {
                 <form onSubmit={checkSuperAdmin} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Admin Password</label>
-                    <input type="password" className="form-control" placeholder="ops2026!" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
+                    <input type="password" className="form-control" placeholder="Contraseña admin" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
                     {addAgentPwError && <p className="error-msg">{addAgentPwError}</p>}
                   </div>
                   <button type="submit" className="btn btn-primary btn-sm">Verificar</button>
@@ -524,6 +549,12 @@ export default function OperationsDashboard() {
               <div className="form-group">
                 <label>Order Number</label>
                 <input type="text" className="form-control" value={editingAppeal.orderNumber} onChange={(e) => setEditingAppeal({ ...editingAppeal, orderNumber: e.target.value })} required />
+              </div>
+              <div className="form-group">
+                <label>Type</label>
+                <select className="form-control" value={editingAppeal.appealType ?? "tiktok"} onChange={(e) => setEditingAppeal({ ...editingAppeal, appealType: e.target.value as any })}>
+                  {APPEAL_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label>Status</label>

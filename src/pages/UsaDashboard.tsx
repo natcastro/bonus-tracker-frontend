@@ -773,7 +773,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     <input
                       type="password"
                       className="form-control"
-                      placeholder="usa2026!"
+                      placeholder="Contraseña admin"
                       value={addAgentPw}
                       onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }}
                     />
