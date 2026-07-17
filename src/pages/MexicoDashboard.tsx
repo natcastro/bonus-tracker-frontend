@@ -142,8 +142,9 @@ async function exportVentasXLSX(sales: MexLiveSale[], agents: Agent[], monthName
   for (const s of sales) {
     const agentName = agents.find((a) => a.id === s.agentId)?.name ?? String(s.agentId);
     const skus = s.skus ? s.skus.split("|").filter(Boolean) : [""];
+    const amountPerSku = skus.length > 1 ? s.salesAmount / skus.length : s.salesAmount;
     for (const sku of skus) {
-      rows.push([agentName, s.date, s.salesAmount, s.quantity, sku]);
+      rows.push([agentName, s.date, amountPerSku, s.quantity, sku]);
     }
   }
   const ws = XLSX.utils.aoa_to_sheet([
@@ -510,31 +511,33 @@ export default function MexicoDashboard() {
                 </div>
               ))}
             </div>
-            <div className="card">
+            <div className="card" style={{ overflowX: "auto" }}>
               <h3>Desglose por Categoría</h3>
-              <table className="data-table">
-                <thead>
-                  <tr><th>Categoría</th>{agents.map((a) => <th key={a.id}>{a.name}</th>)}</tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Asistencia</td>
-                    {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.attendance.toFixed(2)}</td>)}
-                  </tr>
-                  <tr>
-                    <td>Meta del Mes {goalPct ? `(${goalPct}%)` : ""}</td>
-                    {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.goal.toFixed(2)}</td>)}
-                  </tr>
-                  <tr>
-                    <td>Ventas en Live</td>
-                    {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.lives.toFixed(2)}</td>)}
-                  </tr>
-                  <tr style={{ fontWeight: 600 }}>
-                    <td>Total</td>
-                    {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.total.toFixed(2)}</td>)}
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table" style={{ minWidth: 400 }}>
+                  <thead>
+                    <tr><th>Categoría</th>{agents.map((a) => <th key={a.id} style={{ whiteSpace: "nowrap" }}>{a.name}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ whiteSpace: "nowrap" }}>Asistencia</td>
+                      {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.attendance.toFixed(2)}</td>)}
+                    </tr>
+                    <tr>
+                      <td style={{ whiteSpace: "nowrap" }}>Meta del Mes {goalPct ? `(${goalPct}%)` : ""}</td>
+                      {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.goal.toFixed(2)}</td>)}
+                    </tr>
+                    <tr>
+                      <td style={{ whiteSpace: "nowrap" }}>Ventas en Live</td>
+                      {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.lives.toFixed(2)}</td>)}
+                    </tr>
+                    <tr style={{ fontWeight: 600 }}>
+                      <td style={{ whiteSpace: "nowrap" }}>Total</td>
+                      {agentTotals.map((t) => <td key={t.agent.id}>MXN ${t.total.toFixed(2)}</td>)}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         )}
