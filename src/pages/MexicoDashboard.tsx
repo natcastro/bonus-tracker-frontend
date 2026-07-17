@@ -20,6 +20,7 @@ const ADMIN_PASSWORD = "mex2026!";
 const TAB_LABELS: Record<string, string> = {
   summary: "Resumen",
   asistencia: "Asistencia",
+  horarios: "Horarios",
   meta: "Meta",
   ventas: "Ventas",
   settings: "Configuración",
@@ -429,7 +430,7 @@ export default function MexicoDashboard() {
       <nav className="top-nav">
         <div className="logo">Bonus Tracker — <span style={{ color: "#16a34a" }}>México</span></div>
         <ul className="nav-links">
-          {["summary", "asistencia", "meta", "ventas", ...(isAdmin ? ["settings"] : [])].map((tab) => (
+          {["summary", "asistencia", "horarios", "meta", "ventas", ...(isAdmin ? ["settings"] : [])].map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>
               {TAB_LABELS[tab]}
             </li>
@@ -551,126 +552,6 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
               })}
             </div>
 
-            {/* ── Horarios (Google Calendar-style weekly view) ── */}
-            {dbError && (
-              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.6rem 0.9rem", marginTop: "0.75rem", fontSize: "0.8rem", color: "#dc2626" }}>
-                ⚠️ {dbError} — <strong>corre en Supabase:</strong> <code>ALTER TABLE mex_schedule_events DISABLE ROW LEVEL SECURITY;</code>
-              </div>
-            )}
-            <div style={{ marginTop: "1rem", display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-            {/* ── Lives count sidebar ── */}
-            <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 180 : "auto", transition: "width 0.2s" }}>
-              <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Lives</span>
-                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
-              </button>
-              {livesCountOpen && (
-                <div style={{ marginTop: "0.65rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                    {agents.map((ag, i) => {
-                      const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
-                      const color = AGENT_COLORS[i % AGENT_COLORS.length];
-                      return (
-                        <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                            <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
-                          </div>
-                          <span style={{ fontSize: "0.82rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
-                    Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Calendar ── */}
-            <div className="card" style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                  <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
-                  <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
-                  {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => { setSchedForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowSchedForm(true); }}>+ Agregar Turno</button>}
-                </div>
-              </div>
-
-              {/* Agent color legend */}
-              <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
-                {agents.map((ag, i) => (
-                  <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 3, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
-                    {ag.name}
-                  </span>
-                ))}
-              </div>
-
-              <div style={{ overflowX: "auto" }}>
-                <div style={{ minWidth: 560 }}>
-                  {/* Day header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", borderBottom: "2px solid var(--border)" }}>
-                    <div />
-                    {weekCols.map((day, i) => (
-                      <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
-                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{DOW_LABELS[i]}</div>
-                        <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{day ? day.getDate() : "—"}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Time grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", height: `${(SCHED_END - SCHED_START) * PX_HR}px`, position: "relative" }}>
-                    {/* Hour labels */}
-                    <div>
-                      {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                        <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
-                          {String(SCHED_START + i).padStart(2, "0")}:00
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Day columns */}
-                    {weekCols.map((day, colIdx) => {
-                      const ds = day ? toDateStr(day) : "";
-                      const colEvs = day ? scheduleEvents.filter((e) => e.date === ds) : [];
-                      return (
-                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9" }}>
-                          {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                            <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
-                          ))}
-                          {colEvs.map((ev) => {
-                            const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
-                            const h = Math.max(((timeMins(ev.endTime) - timeMins(ev.startTime)) / 60) * PX_HR, 22);
-                            const agIdx = agents.findIndex((a) => a.id === ev.agentId);
-                            const color = AGENT_COLORS[agIdx % AGENT_COLORS.length] ?? "#16a34a";
-                            return (
-                              <div
-                                key={ev.id}
-                                onDoubleClick={isAdmin ? async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
-                                title={isAdmin ? "Doble clic para eliminar" : undefined}
-                                style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
-                              >
-                                <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
-                                <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
-                                {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
-                                {isAdmin && <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>{/* end flex row */}
-
             {/* ── Calendar modal ── */}
             {calendarAgent && (() => {
               const ag = calendarAgent;
@@ -756,6 +637,134 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 </div>
               );
             })()}
+
+          </section>
+        )}
+
+        {/* HORARIOS */}
+        {activeTab === "horarios" && (
+          <section>
+            <header className="section-header"><h2>Horarios — {MONTHS[month - 1]} {year}</h2></header>
+
+            {dbError && (
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.75rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                ⚠️ {dbError} — <strong>corre en Supabase:</strong> <code>ALTER TABLE mex_schedule_events DISABLE ROW LEVEL SECURITY;</code>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+              {/* Lives count sidebar */}
+              <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 180 : "auto", transition: "width 0.2s" }}>
+                <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Lives</span>
+                  <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
+                </button>
+                {livesCountOpen && (
+                  <div style={{ marginTop: "0.65rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                      {agents.map((ag, i) => {
+                        const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                        const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                        return (
+                          <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                              <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                            </div>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
+                      Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Weekly calendar */}
+              <div className="card" style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
+                    <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
+                    {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => { setSchedForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowSchedForm(true); }}>+ Agregar Turno</button>}
+                  </div>
+                </div>
+
+                {/* Agent color legend */}
+                <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                  {agents.map((ag, i) => (
+                    <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
+                      <span style={{ width: 12, height: 12, borderRadius: 3, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
+                      {ag.name}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ overflowX: "auto" }}>
+                  <div style={{ minWidth: 560 }}>
+                    {/* Day header */}
+                    <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", borderBottom: "2px solid var(--border)" }}>
+                      <div />
+                      {weekCols.map((day, i) => (
+                        <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{DOW_LABELS[i]}</div>
+                          <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{day ? day.getDate() : "—"}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Time grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", height: `${(SCHED_END - SCHED_START) * PX_HR}px`, position: "relative" }}>
+                      {/* Hour labels */}
+                      <div>
+                        {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
+                          <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
+                            {String(SCHED_START + i).padStart(2, "0")}:00
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Day columns */}
+                      {weekCols.map((day, colIdx) => {
+                        const ds = day ? toDateStr(day) : "";
+                        const colEvs = day ? scheduleEvents.filter((e) => e.date === ds) : [];
+                        return (
+                          <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9" }}>
+                            {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
+                              <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
+                            ))}
+                            {colEvs.map((ev) => {
+                              const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
+                              const h = Math.max(((timeMins(ev.endTime) - timeMins(ev.startTime)) / 60) * PX_HR, 22);
+                              const agIdx = agents.findIndex((a) => a.id === ev.agentId);
+                              const color = AGENT_COLORS[agIdx % AGENT_COLORS.length] ?? "#16a34a";
+                              return (
+                                <div
+                                  key={ev.id}
+                                  onDoubleClick={isAdmin ? async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
+                                  title={isAdmin ? "Doble clic para eliminar" : undefined}
+                                  style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
+                                >
+                                  <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
+                                  <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
+                                  {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
+                                  {isAdmin && <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Add shift modal */}
             {showSchedForm && (
