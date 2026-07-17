@@ -56,6 +56,22 @@ function timeMins(t: string): number {
   return h * 60 + m;
 }
 
+function todayLocalStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function dowIndex(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const jsDow = new Date(y, m - 1, d).getDay();
+  return jsDow === 0 ? 6 : jsDow - 1;
+}
+
+function addDaysStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return toDateStr(new Date(y, m - 1, d + days));
+}
+
 // ── AgentGoalRow (separate component to own its draft state) ─────────────────
 function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month, onSaved, isAdmin }: {
   agent: Agent; agGoal: MexAgentGoal | null; actual: number;
@@ -280,7 +296,12 @@ export default function MexicoDashboard() {
   };
 
   const monthGrid = buildMonthGrid(Number(year), month);
-  const [weekIdx, setWeekIdx] = useState(0);
+  const todayStr = todayLocalStr();
+  const [weekIdx, setWeekIdx] = useState(() => {
+    const grid = buildMonthGrid(new Date().getFullYear(), new Date().getMonth() + 1);
+    const idx = grid.findIndex((week) => week.some((d) => d && toDateStr(d) === todayLocalStr()));
+    return idx >= 0 ? idx : 0;
+  });
 
   // ── Schedule events
   const [showSchedForm, setShowSchedForm] = useState(false);
@@ -288,6 +309,36 @@ export default function MexicoDashboard() {
   const [schedForm, setSchedForm] = useState({ agentId: 0, date: "", startTime: "09:00", endTime: "18:00", note: "", repeat: false, repeatDays: [] as number[], repeatUntil: "" });
 
   const weekCols = monthGrid[weekIdx] ?? new Array(6).fill(null);
+
+  const copyLastWeek = async () => {
+    let prevCols: (Date | null)[];
+    let prevScheds = scheduleEvents;
+    if (weekIdx > 0) {
+      prevCols = monthGrid[weekIdx - 1];
+    } else {
+      const prevM = month === 1 ? 12 : month - 1;
+      const prevY = month === 1 ? Number(year) - 1 : Number(year);
+      const prevGrid = buildMonthGrid(prevY, prevM);
+      prevCols = prevGrid[prevGrid.length - 1];
+      try { prevScheds = await getMexScheduleEvents(prevY, prevM); } catch { prevScheds = []; }
+    }
+    const prevDates = new Set(prevCols.filter(Boolean).map((d) => toDateStr(d!)));
+    const toCopy = prevScheds.filter((s) => prevDates.has(s.date));
+    if (toCopy.length === 0) { setDbError("No hay turnos en la semana anterior para copiar."); return; }
+    if (!confirm(`¿Copiar ${toCopy.length} turno(s) de la semana anterior a esta semana?`)) return;
+    try {
+      for (const s of toCopy) {
+        const prevDayIdx = prevCols.findIndex((d) => d && toDateStr(d) === s.date);
+        if (prevDayIdx === -1) continue;
+        const target = weekCols[prevDayIdx];
+        if (!target) continue;
+        const ds = toDateStr(target);
+        const [sy, sm] = ds.split("-").map(Number);
+        await addMexScheduleEvent({ agentId: s.agentId, date: ds, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5), note: s.note, year: sy, month: sm });
+      }
+      await load();
+    } catch (e: any) { setDbError("Error al copiar: " + (e?.message ?? e)); }
+  };
 
   const submitSched = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,11 +349,9 @@ export default function MexicoDashboard() {
           setDbError("Selecciona al menos un día y una fecha final para repetir.");
           return;
         }
-        const addDaysStr = (ds: string, n: number) => { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-        const dowOfStr = (ds: string) => { const d = new Date(ds + "T12:00:00"); return d.getDay() === 0 ? 6 : d.getDay() - 1; };
         let cursor = schedForm.date;
         while (cursor <= schedForm.repeatUntil) {
-          if (schedForm.repeatDays.includes(dowOfStr(cursor))) {
+          if (schedForm.repeatDays.includes(dowIndex(cursor))) {
             const [sy, sm] = cursor.split("-").map(Number);
             await addMexScheduleEvent({ agentId: Number(schedForm.agentId), date: cursor, startTime: schedForm.startTime, endTime: schedForm.endTime, note: schedForm.note, year: sy, month: sm });
           }
@@ -691,6 +740,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                     <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
                     <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
+                    {isAdmin && <button className="btn btn-sm btn-secondary" onClick={copyLastWeek} title="Copia los turnos de la semana anterior a esta semana">⎘ Copiar sem. anterior</button>}
                     {isAdmin && <button className="btn btn-sm btn-primary" onClick={() => { setSchedForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0 })); setShowSchedForm(true); }}>+ Agregar Turno</button>}
                   </div>
                 </div>
@@ -710,12 +760,22 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     {/* Day header */}
                     <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", borderBottom: "2px solid var(--border)" }}>
                       <div />
-                      {weekCols.map((day, i) => (
-                        <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
-                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{DOW_LABELS[i]}</div>
-                          <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{day ? day.getDate() : "—"}</div>
-                        </div>
-                      ))}
+                      {weekCols.map((day, i) => {
+                        const isToday = day ? toDateStr(day) === todayStr : false;
+                        return (
+                          <div key={i} style={{ textAlign: "center", padding: "0.4rem 0", borderLeft: "1px solid var(--border)" }}>
+                            <div style={{ fontSize: "0.7rem", color: isToday ? "#15803d" : "var(--text-muted)", fontWeight: isToday ? 700 : 400 }}>{DOW_LABELS[i]}</div>
+                            <div style={{
+                              fontSize: "0.9rem", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: "50%", margin: "0 auto",
+                              background: isToday ? "#15803d" : "transparent",
+                              color: isToday ? "white" : "inherit",
+                            }}>
+                              {day ? day.getDate() : "—"}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Time grid */}
@@ -733,8 +793,27 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                       {weekCols.map((day, colIdx) => {
                         const ds = day ? toDateStr(day) : "";
                         const colEvs = day ? scheduleEvents.filter((e) => e.date === ds) : [];
+                        const isToday = ds === todayStr;
                         return (
-                          <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9" }}>
+                          <div
+                            key={colIdx}
+                            style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#f0fdf4" : "transparent", cursor: day && isAdmin ? "crosshair" : "default" }}
+                            onClick={day && isAdmin ? (e) => {
+                              if ((e.target as HTMLElement).closest("[data-ev]")) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const clickY = e.clientY - rect.top;
+                              const rawMins = SCHED_START * 60 + (clickY / PX_HR) * 60;
+                              const snapped = Math.round(rawMins / 30) * 30;
+                              const sh = Math.floor(snapped / 60) % 24;
+                              const sm = snapped % 60;
+                              const eh = Math.floor((snapped + 180) / 60) % 24;
+                              const em = (snapped + 180) % 60;
+                              const startTime = `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`;
+                              const endTime = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+                              setSchedForm((f) => ({ ...f, agentId: f.agentId || agents[0]?.id || 0, date: ds, startTime, endTime }));
+                              setShowSchedForm(true);
+                            } : undefined}
+                          >
                             {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
                               <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
                             ))}
@@ -746,7 +825,8 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                               return (
                                 <div
                                   key={ev.id}
-                                  onDoubleClick={isAdmin ? async () => { try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
+                                  data-ev="1"
+                                  onDoubleClick={isAdmin ? async (e) => { e.stopPropagation(); try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
                                   title={isAdmin ? "Doble clic para eliminar" : undefined}
                                   style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                                 >
