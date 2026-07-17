@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore } from "../types";
 import {
-  getAgents, updateAgentName,
+  getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getOpsAppeals, addOpsAppeal, updateOpsAppeal, deleteOpsAppeal,
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
@@ -173,6 +173,38 @@ export default function OperationsDashboard() {
   const saveAgentName = async (id: number) => {
     await updateAgentName(id, agentNames[id]);
     await load();
+  };
+
+  // ── Add Agent (super-admin only)
+  const [addAgentPw, setAddAgentPw] = useState("");
+  const [addAgentPwError, setAddAgentPwError] = useState("");
+  const [addAgentVerified, setAddAgentVerified] = useState(false);
+  const [newAgentName, setNewAgentName] = useState("");
+  const [addAgentSaving, setAddAgentSaving] = useState(false);
+
+  const checkSuperAdmin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verifySuperAdmin("OPS", addAgentPw)) {
+      setAddAgentVerified(true);
+      setAddAgentPwError("");
+    } else {
+      setAddAgentPwError("Contraseña incorrecta.");
+    }
+  };
+
+  const submitNewAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAgentName.trim()) return;
+    setAddAgentSaving(true);
+    try {
+      await createAgent(newAgentName.trim(), "OPS");
+      await load();
+      setNewAgentName("");
+      setAddAgentVerified(false);
+      setAddAgentPw("");
+    } finally {
+      setAddAgentSaving(false);
+    }
   };
 
   return (
@@ -417,16 +449,39 @@ export default function OperationsDashboard() {
           <section>
             <header className="section-header"><h2>Settings</h2></header>
             <div className="card">
-              <h3>Agent Names</h3>
+              <h3 style={{ marginBottom: "1rem" }}>Agent Names</h3>
               {agents.map((ag) => (
                 <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}>
-                    <label>Agent {ag.id}</label>
+                    <label>{ag.name}</label>
                     <input type="text" className="form-control" value={agentNames[ag.id] ?? ""} onChange={(e) => setAgentNames({ ...agentNames, [ag.id]: e.target.value })} />
                   </div>
-                  <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Save</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => saveAgentName(ag.id)}>Save</button>
                 </div>
               ))}
+            </div>
+            <div className="card">
+              <h3 style={{ marginBottom: "0.25rem" }}>Add Agent</h3>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>Requires admin password + <code>!</code></p>
+              {!addAgentVerified ? (
+                <form onSubmit={checkSuperAdmin} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Admin Password</label>
+                    <input type="password" className="form-control" placeholder="ops2026!" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
+                    {addAgentPwError && <p className="error-msg">{addAgentPwError}</p>}
+                  </div>
+                  <button type="submit" className="btn btn-primary btn-sm">Verificar</button>
+                </form>
+              ) : (
+                <form onSubmit={submitNewAgent} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Nombre del agente</label>
+                    <input type="text" className="form-control" placeholder="Nombre completo" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} autoFocus required />
+                  </div>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={addAgentSaving}>{addAgentSaving ? "..." : "Agregar"}</button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setAddAgentVerified(false); setAddAgentPw(""); }}>Cancelar</button>
+                </form>
+              )}
             </div>
           </section>
         )}

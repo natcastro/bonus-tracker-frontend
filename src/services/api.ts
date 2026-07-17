@@ -33,6 +33,15 @@ export async function verifyPassword(team: string, password: string): Promise<"a
   return "admin";
 }
 
+// Super-admin check: team password + "!" (e.g. "usa2026!")
+export function verifySuperAdmin(team: string, password: string): boolean {
+  const map: Record<string, string> = {
+    USA: USA_PASSWORD, OPS: OPS_PASSWORD, APT: APT_PASSWORD,
+  };
+  const base = map[team.toUpperCase()];
+  return !!base && password === base + "!";
+}
+
 // ── Agents ───────────────────────────────────────────────────────────────────
 
 export async function getAgents(team: string): Promise<Agent[]> {
