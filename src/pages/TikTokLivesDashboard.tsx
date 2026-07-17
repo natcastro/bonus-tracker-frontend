@@ -426,56 +426,50 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               );
             })()}
 
-            <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+            <div style={{ position: "relative" }}>
 
-            {/* ── Agents sidebar ── */}
-            <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 210 : "auto", transition: "width 0.2s" }}>
-              <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Resumen</span>
-                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
-              </button>
-              {livesCountOpen && (() => {
-                const weekDateSet = new Set(weekCols.filter(Boolean).map((d) => toDateStr(d!)));
-                const calcMins = (evs: typeof displaySchedules) => evs.reduce((sum, s) => {
-                  const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
-                  const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
-                  let mins = eh * 60 + em - (sh * 60 + sm);
-                  if (mins < 0) mins += 24 * 60;
-                  return sum + mins;
-                }, 0);
-                const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1);
-                const label = (txt: string, color: string) => (
-                  <span style={{ fontSize: "0.65rem", fontWeight: 800, color, textTransform: "uppercase", letterSpacing: "0.04em" }}>{txt}</span>
-                );
-                return (
-                  <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {/* ── Floating resumen overlay ── */}
+            {livesCountOpen && (() => {
+              const weekDateSet = new Set(weekCols.filter(Boolean).map((d) => toDateStr(d!)));
+              const calcMins = (evs: typeof displaySchedules) => evs.reduce((sum, s) => {
+                const [sh, sm] = s.startTime.slice(0, 5).split(":").map(Number);
+                const [eh, em] = s.endTime.slice(0, 5).split(":").map(Number);
+                let mins = eh * 60 + em - (sh * 60 + sm);
+                if (mins < 0) mins += 24 * 60;
+                return sum + mins;
+              }, 0);
+              const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1);
+              const lbl = (txt: string, color: string) => (
+                <span style={{ fontSize: "0.65rem", fontWeight: 800, color, textTransform: "uppercase", letterSpacing: "0.04em" }}>{txt}</span>
+              );
+              return (
+                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "0.85rem 1rem", minWidth: 210, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
+                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Resumen del mes</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     {agents.map((ag) => {
                       const color = agColor(ag.id);
                       const allEvs = displaySchedules.filter((s) => s.agentId === ag.id);
                       const liveEvs = allEvs.filter((s) => decodeNote(s.note ?? "").type === "live");
                       const contEvs = allEvs.filter((s) => decodeNote(s.note ?? "").type === "contenido");
                       const liveMonth = calcMins(liveEvs) / 60;
-                      const liveWeek  = calcMins(liveEvs.filter((s) => weekDateSet.has(s.date))) / 60;
+                      const liveWeek = calcMins(liveEvs.filter((s) => weekDateSet.has(s.date))) / 60;
                       const contMonth = calcMins(contEvs) / 60;
-                      const contWeek  = calcMins(contEvs.filter((s) => weekDateSet.has(s.date))) / 60;
+                      const contWeek = calcMins(contEvs.filter((s) => weekDateSet.has(s.date))) / 60;
                       return (
                         <div key={ag.id}>
-                          {/* Agent name */}
                           <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.3rem" }}>
                             <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                            <span style={{ fontSize: "0.8rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
+                            <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>{ag.name}</span>
                           </div>
-                          {/* Lives row */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 13 }}>
-                            {label("🔴 Lives", color)}
+                            {lbl("🔴 Lives", color)}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                               <span style={{ fontSize: "0.78rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 7px" }}>{fmt(liveMonth)}h</span>
                               <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(liveWeek)}h</span>
                             </div>
                           </div>
-                          {/* Contenido row */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 13, marginTop: "0.2rem" }}>
-                            {label("📝 Contenido", "#64748b")}
+                            {lbl("📝 Contenido", "#64748b")}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                               <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#64748b", background: "#64748b18", borderRadius: 100, padding: "1px 7px" }}>{fmt(contMonth)}h</span>
                               <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(contWeek)}h</span>
@@ -488,14 +482,23 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       Turnos: <strong style={{ color: "#0f172a" }}>{displaySchedules.length}</strong>
                     </div>
                   </div>
-                );
-              })()}
-            </div>
+                </div>
+              );
+            })()}
 
-            {/* ── Calendar card ── */}
-            <div className="card" style={{ flex: 1, minWidth: 0 }}>
+            {/* ── Calendar card — full width ── */}
+            <div className="card" style={{ minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3 style={{ margin: 0 }}>Semana {weekIdx + 1} / {monthGrid.length}</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <button
+                    onClick={() => setLivesCountOpen((o) => !o)}
+                    title="Ver resumen de horas por agente"
+                    style={{ background: livesCountOpen ? "#fdf2f8" : "white", border: `1px solid ${livesCountOpen ? "#e91e8c" : "#e2e8f0"}`, borderRadius: 7, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#e91e8c" : "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                  >
+                    📋 {livesCountOpen ? "▲" : "▼"}
+                  </button>
+                  <h3 style={{ margin: 0 }}>Semana {weekIdx + 1} / {monthGrid.length}</h3>
+                </div>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                   <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.min(monthGrid.length - 1, i + 1))} disabled={weekIdx >= monthGrid.length - 1}>Siguiente →</button>
@@ -612,7 +615,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 </div>
               </div>
             </div>
-            </div>{/* end flex row */}
+            </div>{/* end position:relative wrapper */}
 
             {/* Add shift modal */}
             {showForm && (

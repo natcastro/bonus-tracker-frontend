@@ -701,41 +701,45 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
               </div>
             )}
 
-            <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-              {/* Lives count sidebar */}
-              <div className="card" style={{ flexShrink: 0, width: livesCountOpen ? 180 : "auto", transition: "width 0.2s" }}>
-                <button onClick={() => setLivesCountOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>📋 Lives</span>
-                  <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#94a3b8" }}>{livesCountOpen ? "▲" : "▼"}</span>
-                </button>
-                {livesCountOpen && (
-                  <div style={{ marginTop: "0.65rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                      {agents.map((ag, i) => {
-                        const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
-                        const color = AGENT_COLORS[i % AGENT_COLORS.length];
-                        return (
-                          <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                              <span style={{ fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
-                            </div>
-                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{count}</span>
+            <div style={{ position: "relative" }}>
+              {/* Floating lives count overlay */}
+              {livesCountOpen && (
+                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "0.85rem 1rem", minWidth: 180, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
+                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Turnos por agente</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                    {agents.map((ag, i) => {
+                      const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
+                      const color = AGENT_COLORS[i % AGENT_COLORS.length];
+                      return (
+                        <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                            <span style={{ fontSize: "0.82rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ag.name}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
-                      Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
-                    </div>
+                          <span style={{ fontSize: "0.82rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 8px", flexShrink: 0 }}>{count}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
+                    Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
+                  </div>
+                </div>
+              )}
 
-              {/* Weekly calendar */}
-              <div className="card" style={{ flex: 1, minWidth: 0 }}>
+              {/* Weekly calendar — full width */}
+              <div className="card" style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button
+                      onClick={() => setLivesCountOpen((o) => !o)}
+                      title="Ver resumen de turnos por agente"
+                      style={{ background: livesCountOpen ? "#f0fdf4" : "white", border: `1px solid ${livesCountOpen ? "#15803d" : "#e2e8f0"}`, borderRadius: 7, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#15803d" : "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                    >
+                      📋 {livesCountOpen ? "▲" : "▼"}
+                    </button>
+                    <h3 style={{ margin: 0 }}>Horarios Registrados</h3>
+                  </div>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                     <button className="btn btn-sm btn-secondary" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0}>← Anterior</button>
                     <span style={{ fontSize: "0.82rem", fontWeight: 600, minWidth: 90, textAlign: "center" }}>Semana {weekIdx + 1} / {monthGrid.length}</span>
