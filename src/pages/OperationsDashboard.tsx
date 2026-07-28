@@ -104,6 +104,9 @@ export default function OperationsDashboard() {
     return { agent: ag, appealRaw, appealCapped, handling, tiktok: tiktokBonus, raw, total };
   });
 
+  // ── Appeal filter
+  const [filterAgentId, setFilterAgentId] = useState(0);
+
   // ── Appeal form
   const [appealForm, setAppealForm] = useState({
     agentId: 0, date: "", orderNumber: "", appealType: "tiktok", status: "pending", outcome: "fullRefund",
@@ -327,7 +330,7 @@ export default function OperationsDashboard() {
               </form>
             </div>
             <div className="card" style={{ overflowX: "auto" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3>Appeals for Selected Cycle</h3>
                 <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
                   Total Bonus: ${Math.min(
@@ -336,25 +339,48 @@ export default function OperationsDashboard() {
                   ).toFixed(2)} (cap $200)
                 </div>
               </div>
+              {/* Agent filter pills */}
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                <button
+                  onClick={() => setFilterAgentId(0)}
+                  style={{ padding: "0.3rem 0.85rem", borderRadius: 9999, fontSize: "0.8rem", fontWeight: filterAgentId === 0 ? 700 : 500, cursor: "pointer", border: `2px solid ${filterAgentId === 0 ? "#7c3aed" : "#e2e8f0"}`, background: filterAgentId === 0 ? "#7c3aed15" : "white", color: filterAgentId === 0 ? "#7c3aed" : "#64748b" }}
+                >
+                  Todos
+                </button>
+                {agents.map((ag) => (
+                  <button
+                    key={ag.id}
+                    onClick={() => setFilterAgentId(filterAgentId === ag.id ? 0 : ag.id)}
+                    style={{ padding: "0.3rem 0.85rem", borderRadius: 9999, fontSize: "0.8rem", fontWeight: filterAgentId === ag.id ? 700 : 500, cursor: "pointer", border: `2px solid ${filterAgentId === ag.id ? "#7c3aed" : "#e2e8f0"}`, background: filterAgentId === ag.id ? "#7c3aed15" : "white", color: filterAgentId === ag.id ? "#7c3aed" : "#64748b" }}
+                  >
+                    {ag.name}
+                  </button>
+                ))}
+              </div>
               <table className="data-table">
                 <thead><tr><th>Agent</th><th>Date</th><th>Order No.</th><th>Type</th><th>Status</th><th>Outcome</th><th>Bonus</th><th>Actions</th></tr></thead>
                 <tbody>
-                  {[...appeals].sort((a, b) => b.date.localeCompare(a.date)).map((a) => (
-                    <tr key={a.id}>
-                      <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
-                      <td>{a.date}</td>
-                      <td>{a.orderNumber}</td>
-                      <td>{APPEAL_TYPES.find((t) => t.value === a.appealType)?.label ?? "TikTok Appeals"}</td>
-                      <td><span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span></td>
-                      <td>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
-                      <td>${a.status === "completed" ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
-                      <td>
-                        <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
-                        <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {appeals.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>No appeals for this cycle</td></tr>}
+                  {[...appeals]
+                    .filter((a) => filterAgentId === 0 || a.agentId === filterAgentId)
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .map((a) => (
+                      <tr key={a.id}>
+                        <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
+                        <td>{a.date}</td>
+                        <td>{a.orderNumber}</td>
+                        <td>{APPEAL_TYPES.find((t) => t.value === a.appealType)?.label ?? "TikTok Appeals"}</td>
+                        <td><span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span></td>
+                        <td>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
+                        <td>${a.status === "completed" ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
+                        <td>
+                          <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
+                          <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  {appeals.filter((a) => filterAgentId === 0 || a.agentId === filterAgentId).length === 0 && (
+                    <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>No appeals for this cycle</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
