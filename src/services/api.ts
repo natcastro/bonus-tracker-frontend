@@ -831,6 +831,7 @@ export async function upsertStrategyEntry(e: Omit<StrategyEntry, "id">): Promise
       non_buyer_fault_rate: e.nonBuyerFaultRate,
       negative_review_rate: e.negativeReviewRate,
       operative_compliance_pct: e.operativeCompliancePct,
+      operative_qa: e.operativeQa,
     }, { onConflict: "agent_id,year,cycle_id" });
   if (error) throw error;
 }
@@ -846,16 +847,17 @@ function mapStrategyEntry(r: any): StrategyEntry {
     nonBuyerFaultRate: r.non_buyer_fault_rate ?? 0,
     negativeReviewRate: r.negative_review_rate ?? 0,
     operativeCompliancePct: r.operative_compliance_pct ?? 0,
+    operativeQa: r.operative_qa ?? {},
   };
 }
 
 // ── Strategy Samples ───────────────────────────────────────────────────────────
 
-export async function getStrategySamples(year?: string, month?: number): Promise<StrategySample[]> {
-  let q = supabase.from("strategy_samples").select("*").order("sent_date", { ascending: false });
-  if (year) q = q.eq("year", year);
-  if (month != null) q = q.eq("month", month);
-  const { data, error } = await q;
+export async function getStrategySamples(): Promise<StrategySample[]> {
+  const { data, error } = await supabase
+    .from("strategy_samples")
+    .select("*")
+    .order("sent_date", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapStrategySample);
 }

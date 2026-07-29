@@ -250,6 +250,7 @@ export interface StrategyEntry {
   nonBuyerFaultRate: number;
   negativeReviewRate: number;
   operativeCompliancePct: number;
+  operativeQa: Record<string, "si" | "masomenos" | "no">;
 }
 
 export interface StrategySample {
