@@ -65,7 +65,7 @@ function calcBonus(e: StrategyEntry, samplesPct: number) {
   const pA = productScoreScale(e.productScore);
   const pB = nonBuyerScale(e.nonBuyerFaultRate);
   const pC = negReviewScale(e.negativeReviewRate);
-  const ind3 = IND3_MAX * ((pA + pB + pC) / 3);
+  const ind3 = IND3_MAX * (pA * 0.10 + pB * 0.45 + pC * 0.45);
   const ind4  = IND4_MAX * operativeScale(e.operativeCompliancePct);
   const bonoVariable = ind1 + ind2 + ind3 + ind4;
   return { ind1, ind2, ind3, pA, pB, pC, ind4, bonoVariable, total: BONO_BASE + bonoVariable };
@@ -307,7 +307,7 @@ export default function StrategyDashboard() {
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
                       <IndSummaryCard num="1" weight="40%" label="ROI Programa Afiliados" earned={b!.ind1} max={IND1_MAX} color={C.roi} scalePct={roiScale(entry.roiPct)} detail={`ROI del ciclo: ${entry.roiPct}%`} />
                       <IndSummaryCard num="2" weight="30%" label="Samples con Contenido" earned={b!.ind2} max={IND2_MAX} color={C.samples} scalePct={samplesScale(spct)} detail={`${Math.round(spct)}% generaron video · ${cycleSamples.length} samples en el corte`} />
-                      <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health} scalePct={(b!.pA+b!.pB+b!.pC)/3} detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
+                      <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health} scalePct={b!.pA*0.10+b!.pB*0.45+b!.pC*0.45} detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
                       <IndSummaryCard num="4" weight="10%" label="Cumplimiento Operativo" earned={b!.ind4} max={IND4_MAX} color={C.operative} scalePct={operativeScale(entry.operativeCompliancePct)} detail={`${Math.round(entry.operativeCompliancePct)}% cumplimiento`} />
                     </div>
                   )}
@@ -521,14 +521,14 @@ export default function StrategyDashboard() {
           <section>
             <header className="section-header">
               <div><h2>Salud de la Cuenta TikTok</h2>
-                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #3 · 20% del bono variable · Máx $130.000 COP · Promedio de 3 sub-métricas (A+B+C) / 3</p>
+                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #3 · 20% del bono variable · Máx $130.000 COP · Pesos: Neg. Review 45% · Non-Buyer 45% · Product Score 10%</p>
               </div>
             </header>
             {saveErr && <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{saveErr}</div>}
             {agents.map(ag=>{
               const d = drafts[ag.id]; if(!d) return null;
               const pA=productScoreScale(d.productScore), pB=nonBuyerScale(d.nonBuyerFaultRate), pC=negReviewScale(d.negativeReviewRate);
-              const earned=IND3_MAX*((pA+pB+pC)/3);
+              const earned=IND3_MAX*(pA*0.10+pB*0.45+pC*0.45);
               return (
                 <div key={ag.id} className="card" style={{borderTop:`3px solid ${C.health}`,marginBottom:"1rem"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem",flexWrap:"wrap",gap:"0.5rem"}}>
@@ -565,7 +565,7 @@ export default function StrategyDashboard() {
                     </SubMetric>
                   </div>
                   <div style={{marginTop:"1rem",padding:"0.65rem 1rem",background:"#f0fdf4",borderRadius:8,fontSize:"0.78rem",color:"#166534",border:"1px solid #bbf7d0"}}>
-                    Promedio actual: A={pct(pA)} + B={pct(pB)} + C={pct(pC)} → promedio {pct((pA+pB+pC)/3)} · Valores en 0 = sin dato
+                    Score ponderado: Neg.Review {pct(pC)}×45% + Non-Buyer {pct(pB)}×45% + Product {pct(pA)}×10% → {pct(pA*0.10+pB*0.45+pC*0.45)} · Valores en 0 = sin dato
                   </div>
                 </div>
               );
