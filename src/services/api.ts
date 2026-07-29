@@ -14,7 +14,7 @@ const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
 const MEX_STAFF_PASSWORD = "FAJA";
 const OPS_PASSWORD = "ops2026";
-const APT_PASSWORD = "maría2026";
+const APT_PASSWORD = "maria2026";
 const TKLIVES_PASSWORD = "usa2026";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
