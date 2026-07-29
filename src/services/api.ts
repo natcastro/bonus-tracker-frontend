@@ -7,13 +7,14 @@ import type {
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
+  StrategyEntry,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
 const MEX_STAFF_PASSWORD = "FAJA";
 const OPS_PASSWORD = "ops2026";
-const APT_PASSWORD = "apt2026";
+const APT_PASSWORD = "maría2026";
 const TKLIVES_PASSWORD = "usa2026";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -804,4 +805,50 @@ export async function addCSPhoto(caseId: number, file: File, caption: string): P
 export async function deleteCSPhoto(id: number): Promise<void> {
   const { error } = await supabase.from("cs_quality_photos").delete().eq("id", id);
   if (error) throw error;
+}
+
+// ── Strategy Team ──────────────────────────────────────────────────────────────
+
+export async function getStrategyEntries(year: string, cycleId: string): Promise<StrategyEntry[]> {
+  const { data, error } = await supabase
+    .from("strategy_entries")
+    .select("*")
+    .eq("year", year)
+    .eq("cycle_id", cycleId);
+  if (error) throw error;
+  return (data ?? []).map(mapStrategyEntry);
+}
+
+export async function upsertStrategyEntry(e: Omit<StrategyEntry, "id">): Promise<void> {
+  const { error } = await supabase
+    .from("strategy_entries")
+    .upsert({
+      agent_id: e.agentId,
+      year: e.year,
+      cycle_id: e.cycleId,
+      units_sold: e.unitsSold,
+      roi_pct: e.roiPct,
+      samples_content_pct: e.samplesContentPct,
+      product_score: e.productScore,
+      non_buyer_fault_rate: e.nonBuyerFaultRate,
+      negative_review_rate: e.negativeReviewRate,
+      operative_compliance_pct: e.operativeCompliancePct,
+    }, { onConflict: "agent_id,year,cycle_id" });
+  if (error) throw error;
+}
+
+function mapStrategyEntry(r: any): StrategyEntry {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    year: r.year,
+    cycleId: r.cycle_id,
+    unitsSold: r.units_sold ?? 0,
+    roiPct: r.roi_pct ?? 0,
+    samplesContentPct: r.samples_content_pct ?? 0,
+    productScore: r.product_score ?? 0,
+    nonBuyerFaultRate: r.non_buyer_fault_rate ?? 0,
+    negativeReviewRate: r.negative_review_rate ?? 0,
+    operativeCompliancePct: r.operative_compliance_pct ?? 0,
+  };
 }

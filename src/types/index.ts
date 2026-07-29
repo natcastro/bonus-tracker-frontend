@@ -237,3 +237,19 @@ export interface AptPerformance {
   cycleId: string;
   level: "deficient" | "minimum" | "acceptable" | "good" | "very_good" | "excellent";
 }
+
+// ── Strategy Team ──────────────────────────────────────────────────────────────
+
+export interface StrategyEntry {
+  id: number;
+  agentId: number;
+  year: string;
+  cycleId: string;
+  unitsSold: number;
+  roiPct: number;
+  samplesContentPct: number;
+  productScore: number;
+  nonBuyerFaultRate: number;
+  negativeReviewRate: number;
+  operativeCompliancePct: number;
+}
