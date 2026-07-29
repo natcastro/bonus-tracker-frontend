@@ -245,11 +245,21 @@ export interface StrategyEntry {
   agentId: number;
   year: string;
   cycleId: string;
-  unitsSold: number;
   roiPct: number;
-  samplesContentPct: number;
   productScore: number;
   nonBuyerFaultRate: number;
   negativeReviewRate: number;
   operativeCompliancePct: number;
+}
+
+export interface StrategySample {
+  id: number;
+  agentId: number;
+  username: string;
+  sku: string;
+  sentDate: string;
+  videosPublished: number;
+  year: string;
+  month: number;
+  notes: string;
 }

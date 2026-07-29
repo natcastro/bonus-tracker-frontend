@@ -7,7 +7,7 @@ import type {
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
-  StrategyEntry,
+  StrategyEntry, StrategySample,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -826,9 +826,7 @@ export async function upsertStrategyEntry(e: Omit<StrategyEntry, "id">): Promise
       agent_id: e.agentId,
       year: e.year,
       cycle_id: e.cycleId,
-      units_sold: e.unitsSold,
       roi_pct: e.roiPct,
-      samples_content_pct: e.samplesContentPct,
       product_score: e.productScore,
       non_buyer_fault_rate: e.nonBuyerFaultRate,
       negative_review_rate: e.negativeReviewRate,
@@ -843,12 +841,70 @@ function mapStrategyEntry(r: any): StrategyEntry {
     agentId: r.agent_id,
     year: r.year,
     cycleId: r.cycle_id,
-    unitsSold: r.units_sold ?? 0,
     roiPct: r.roi_pct ?? 0,
-    samplesContentPct: r.samples_content_pct ?? 0,
     productScore: r.product_score ?? 0,
     nonBuyerFaultRate: r.non_buyer_fault_rate ?? 0,
     negativeReviewRate: r.negative_review_rate ?? 0,
     operativeCompliancePct: r.operative_compliance_pct ?? 0,
+  };
+}
+
+// ── Strategy Samples ───────────────────────────────────────────────────────────
+
+export async function getStrategySamples(year?: string, month?: number): Promise<StrategySample[]> {
+  let q = supabase.from("strategy_samples").select("*").order("sent_date", { ascending: false });
+  if (year) q = q.eq("year", year);
+  if (month != null) q = q.eq("month", month);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(mapStrategySample);
+}
+
+export async function createStrategySample(s: Omit<StrategySample, "id">): Promise<StrategySample> {
+  const { data, error } = await supabase
+    .from("strategy_samples")
+    .insert({
+      agent_id: s.agentId,
+      username: s.username,
+      sku: s.sku,
+      sent_date: s.sentDate,
+      videos_published: s.videosPublished,
+      year: s.year,
+      month: s.month,
+      notes: s.notes,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapStrategySample(data);
+}
+
+export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate">>): Promise<void> {
+  const patch: any = {};
+  if (fields.videosPublished != null) patch.videos_published = fields.videosPublished;
+  if (fields.notes != null) patch.notes = fields.notes;
+  if (fields.username != null) patch.username = fields.username;
+  if (fields.sku != null) patch.sku = fields.sku;
+  if (fields.sentDate != null) patch.sent_date = fields.sentDate;
+  const { error } = await supabase.from("strategy_samples").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteStrategySample(id: number): Promise<void> {
+  const { error } = await supabase.from("strategy_samples").delete().eq("id", id);
+  if (error) throw error;
+}
+
+function mapStrategySample(r: any): StrategySample {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    username: r.username ?? "",
+    sku: r.sku ?? "",
+    sentDate: r.sent_date ?? "",
+    videosPublished: r.videos_published ?? 0,
+    year: r.year ?? "",
+    month: r.month ?? 0,
+    notes: r.notes ?? "",
   };
 }
