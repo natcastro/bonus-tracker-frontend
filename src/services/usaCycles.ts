@@ -3,6 +3,34 @@ import type { Cycle } from "../types";
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 // Given a date string, return which cycle and year it belongs to
+// Strategy-specific: compute official from/to dates for a selected year+cycleId
+export function getCycleDatesFromId(year: string, cycleId: string): { from: string; to: string } {
+  const y = Number(year);
+  const i = Number(cycleId);
+  const fromMonth = i === 0 ? 12 : i;
+  const fromYear  = i === 0 ? y - 1 : y;
+  const toMonth   = i + 1;
+  return {
+    from: `${fromYear}-${String(fromMonth).padStart(2, "0")}-24`,
+    to:   `${y}-${String(toMonth).padStart(2, "0")}-23`,
+  };
+}
+
+// Returns "year-cycleId" key for the cycle after (year, cycleId)
+export function getNextCycleKey(year: string, cycleId: string): string {
+  const y = Number(year);
+  const i = Number(cycleId);
+  if (i === 11) return `${y + 1}-0`;
+  return `${y}-${i + 1}`;
+}
+
+// Add N calendar days to a YYYY-MM-DD date string
+export function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
 export function getCycleFromDate(dateStr: string): { year: number; cycleId: string } {
   const [yearStr, monthStr, dayStr] = dateStr.split("-");
   const year = parseInt(yearStr);

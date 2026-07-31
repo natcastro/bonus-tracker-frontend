@@ -251,6 +251,9 @@ export interface StrategyEntry {
   negativeReviewRate: number;
   operativeCompliancePct: number;
   operativeQa: Record<string, "si" | "masomenos" | "no">;
+  bonusSamplesLocked: boolean;
+  bonusSamplesLockedAt?: string;
+  bonusSamplesLockedAmount?: number;
 }
 
 export interface StrategySample {
@@ -263,4 +266,6 @@ export interface StrategySample {
   year: string;
   month: number;
   notes: string;
+  deliveryStatus: "delivered" | "pending";
+  bonusCycleKey?: string; // "year-cycleId" override, e.g. "2026-7"
 }

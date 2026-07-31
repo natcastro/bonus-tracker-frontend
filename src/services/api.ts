@@ -848,6 +848,9 @@ function mapStrategyEntry(r: any): StrategyEntry {
     negativeReviewRate: r.negative_review_rate ?? 0,
     operativeCompliancePct: r.operative_compliance_pct ?? 0,
     operativeQa: r.operative_qa ?? {},
+    bonusSamplesLocked: r.bonus_samples_locked ?? false,
+    bonusSamplesLockedAt: r.bonus_samples_locked_at ?? undefined,
+    bonusSamplesLockedAmount: r.bonus_samples_locked_amount ?? undefined,
   };
 }
 
@@ -874,6 +877,8 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
       year: s.year,
       month: s.month,
       notes: s.notes,
+      delivery_status: s.deliveryStatus ?? "delivered",
+      bonus_cycle_key: s.bonusCycleKey ?? null,
     })
     .select()
     .single();
@@ -881,19 +886,45 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
   return mapStrategySample(data);
 }
 
-export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate">>): Promise<void> {
+export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate" | "deliveryStatus" | "bonusCycleKey">>): Promise<void> {
   const patch: any = {};
   if (fields.videosPublished != null) patch.videos_published = fields.videosPublished;
   if (fields.notes != null) patch.notes = fields.notes;
   if (fields.username != null) patch.username = fields.username;
   if (fields.sku != null) patch.sku = fields.sku;
   if (fields.sentDate != null) patch.sent_date = fields.sentDate;
+  if (fields.deliveryStatus != null) patch.delivery_status = fields.deliveryStatus;
+  if (fields.bonusCycleKey !== undefined) patch.bonus_cycle_key = fields.bonusCycleKey;
   const { error } = await supabase.from("strategy_samples").update(patch).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteStrategySample(id: number): Promise<void> {
   const { error } = await supabase.from("strategy_samples").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function lockSampleBonus(agentId: number, year: string, cycleId: string, amount: number): Promise<void> {
+  const { error } = await supabase
+    .from("strategy_entries")
+    .update({
+      bonus_samples_locked: true,
+      bonus_samples_locked_at: new Date().toISOString(),
+      bonus_samples_locked_amount: amount,
+    })
+    .eq("agent_id", agentId).eq("year", year).eq("cycle_id", cycleId);
+  if (error) throw error;
+}
+
+export async function unlockSampleBonus(agentId: number, year: string, cycleId: string): Promise<void> {
+  const { error } = await supabase
+    .from("strategy_entries")
+    .update({
+      bonus_samples_locked: false,
+      bonus_samples_locked_at: null,
+      bonus_samples_locked_amount: null,
+    })
+    .eq("agent_id", agentId).eq("year", year).eq("cycle_id", cycleId);
   if (error) throw error;
 }
 
@@ -908,5 +939,7 @@ function mapStrategySample(r: any): StrategySample {
     year: r.year ?? "",
     month: r.month ?? 0,
     notes: r.notes ?? "",
+    deliveryStatus: r.delivery_status ?? "delivered",
+    bonusCycleKey: r.bonus_cycle_key ?? undefined,
   };
 }

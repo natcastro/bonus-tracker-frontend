@@ -1,25 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, StrategyEntry, StrategySample } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
-  getStrategySamples, createStrategySample, updateStrategySample, deleteStrategySample,
+  getStrategySamples, createStrategySample, updateStrategySample,
+  deleteStrategySample, lockSampleBonus, unlockSampleBonus,
 } from "../services/api";
-import { getCyclesForYear, getCurrentCycleDefault } from "../services/usaCycles";
-
-const YEARS = ["2025", "2026", "2027", "2028"];
-const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
-                 "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-
-const TABS: [string, string][] = [
-  ["resumen",       "Resumen"],
-  ["roi",           "ROI"],
-  ["samples",       "Samples"],
-  ["salud",         "Salud TikTok"],
-  ["cumplimiento",  "Cumplimiento"],
-  ["settings",      "Settings"],
-];
+import {
+  getCyclesForYear, getCurrentCycleDefault,
+  getCycleDatesFromId, getNextCycleKey, addDaysToDateStr, getCycleFromDate,
+} from "../services/usaCycles";
 
 // ── QA items for cumplimiento ──────────────────────────────────────────────────
 const QA_ITEMS = [
@@ -36,12 +27,10 @@ type QaAnswer = "si" | "masomenos" | "no" | "";
 function qaToCompliancePct(qa: Record<string, QaAnswer>): number {
   const scores = QA_ITEMS.map(({ key }) => {
     const a = qa[key];
-    if (a === "si")       return 1;
+    if (a === "si") return 1;
     if (a === "masomenos") return 0.5;
     return 0;
   });
-  const answered = scores.filter((_, i) => qa[QA_ITEMS[i].key] !== "" && qa[QA_ITEMS[i].key] != null);
-  if (!answered.length) return 0;
   return (scores.reduce((s, v) => s + v, 0) / QA_ITEMS.length) * 100;
 }
 
@@ -52,16 +41,16 @@ const IND2_MAX  = 195_000;
 const IND3_MAX  = 130_000;
 const IND4_MAX  =  65_000;
 
-function roiScale(v: number)   { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
-function samplesScale(v: number){ if(v>=100)return 1;if(v>=80)return .80;if(v>=60)return .60;if(v>=40)return .40;if(v>=20)return .20;return 0; }
+function roiScale(v: number) { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
 function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.6)return 1;if(v>=4.5)return .80;if(v>=4.3)return .60;if(v>=4.2)return .30;if(v>=4.1)return .10;return 0; }
 function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2)return 1;if(v<=2.5)return .50;return 0; }
 function negReviewScale(v: number)   { if(v<=0)return 0;if(v<=0.45)return 1;if(v<=0.80)return .50;if(v<=1.20)return .25;return 0; }
 function operativeScale(v: number)   { if(v>=100)return 1;if(v>=80)return .75;if(v>=60)return .50;if(v>=40)return .25;return 0; }
 
-function calcBonus(e: StrategyEntry, samplesPct: number) {
+// finalScore: 0–100 (Coverage 80pts + Additional 20pts)
+function calcBonus(e: StrategyEntry, finalScore: number) {
   const ind1 = IND1_MAX * roiScale(e.roiPct);
-  const ind2 = IND2_MAX * samplesScale(samplesPct);
+  const ind2 = Math.round(finalScore / 100 * IND2_MAX);
   const pA = productScoreScale(e.productScore);
   const pB = nonBuyerScale(e.nonBuyerFaultRate);
   const pC = negReviewScale(e.negativeReviewRate);
@@ -71,9 +60,84 @@ function calcBonus(e: StrategyEntry, samplesPct: number) {
   return { ind1, ind2, ind3, pA, pB, pC, ind4, bonoVariable, total: BONO_BASE + bonoVariable };
 }
 
+// ── Samples bonus calculation (by creator) ─────────────────────────────────────
+interface SamplesStats {
+  officialSamples: StrategySample[];
+  pendingSamples: StrategySample[];
+  countableSamples: StrategySample[];
+  totalCreators: number;
+  coverageCreators: number;   // ≥1 video
+  additionalCreators: number; // ≥2 videos
+  coverageScore: number;      // 0–80
+  additionalScore: number;    // 0–20
+  finalScore: number;         // 0–100
+  bonusEst: number;
+  gracePeriodActive: boolean;
+  graceEnd: string;
+  byCreator: Record<string, number>; // username → total videos
+}
+
+function getSampleCycleKey(s: StrategySample): string {
+  if (s.bonusCycleKey) return s.bonusCycleKey;
+  if (!s.sentDate) return "";
+  const { year, cycleId } = getCycleFromDate(s.sentDate);
+  return `${year}-${cycleId}`;
+}
+
+function computeSamplesStats(
+  allSamples: StrategySample[],
+  year: string,
+  cycleId: string,
+  officialPeriod: { from: string; to: string },
+): SamplesStats {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const graceEnd = addDaysToDateStr(officialPeriod.to, 7);
+  const gracePeriodActive = todayStr <= graceEnd;
+  const currentKey = `${year}-${cycleId}`;
+
+  const officialSamples = allSamples.filter(s => getSampleCycleKey(s) === currentKey);
+  const pendingSamples  = officialSamples.filter(s => s.deliveryStatus === "pending");
+
+  const countableSamples = officialSamples.filter(s =>
+    s.deliveryStatus === "delivered" ||
+    (s.deliveryStatus === "pending" && gracePeriodActive)
+  );
+
+  const byCreator: Record<string, number> = {};
+  countableSamples.forEach(s => {
+    byCreator[s.username] = (byCreator[s.username] ?? 0) + s.videosPublished;
+  });
+
+  const totalCreators     = Object.keys(byCreator).length;
+  const coverageCreators  = Object.values(byCreator).filter(v => v >= 1).length;
+  const additionalCreators= Object.values(byCreator).filter(v => v >= 2).length;
+
+  const coverageScore   = totalCreators > 0 ? (coverageCreators  / totalCreators) * 80 : 0;
+  const additionalScore = totalCreators > 0 ? (additionalCreators / totalCreators) * 20 : 0;
+  const finalScore      = coverageScore + additionalScore;
+
+  return {
+    officialSamples, pendingSamples, countableSamples,
+    totalCreators, coverageCreators, additionalCreators,
+    coverageScore, additionalScore, finalScore,
+    bonusEst: Math.round(finalScore / 100 * IND2_MAX),
+    gracePeriodActive, graceEnd, byCreator,
+  };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const YEARS  = ["2025", "2026", "2027", "2028"];
+const TABS: [string, string][] = [
+  ["resumen","Resumen"],["roi","ROI"],["samples","Samples"],
+  ["salud","Salud TikTok"],["cumplimiento","Cumplimiento"],["settings","Settings"],
+];
+
 const cop = (n: number) => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Math.round(n));
 const pct  = (p: number) => `${Math.round(p * 100)}%`;
-const nv   = (v: number) => (v === 0 ? "" : v); // allow clearing numeric inputs
+const nv   = (v: number) => (v === 0 ? "" : v);
+const C = { roi:"#7c3aed", samples:"#0891b2", health:"#16a34a", operative:"#ea580c" };
+const lbl: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, color:"#64748b", display:"block", marginBottom:"0.3rem", textTransform:"uppercase", letterSpacing:"0.05em" };
+const qBtn: React.CSSProperties = { padding:"0.28rem 0.65rem", borderRadius:6, fontSize:"0.75rem", fontWeight:600, cursor:"pointer", border:"1px solid #e2e8f0", background:"white", color:"#64748b" };
 
 function roiLabel(v: number) {
   if(v>=10) return { text:"Dos dígitos o más",   color:"#15803d" };
@@ -84,40 +148,24 @@ function roiLabel(v: number) {
   return    { text:"Sin bono (< 4%)",             color:"#9ca3af" };
 }
 
-const C = { roi:"#7c3aed", samples:"#0891b2", health:"#16a34a", operative:"#ea580c" };
-
-// ── Cycle date helpers ─────────────────────────────────────────────────────────
-function pad2(n: number) { return String(n).padStart(2, "0"); }
-function getCurrentCycleDates(): { from: string; to: string } {
-  const t = new Date();
-  const d = t.getDate(), m = t.getMonth() + 1, y = t.getFullYear();
-  if (d >= 24) {
-    const tm = m === 12 ? 1 : m + 1;
-    const ty = m === 12 ? y + 1 : y;
-    return { from: `${y}-${pad2(m)}-24`, to: `${ty}-${pad2(tm)}-23` };
-  } else {
-    const fm = m === 1 ? 12 : m - 1;
-    const fy = m === 1 ? y - 1 : y;
-    return { from: `${fy}-${pad2(fm)}-24`, to: `${y}-${pad2(m)}-23` };
-  }
-}
 function parseDateParts(s: string) { const [y, m] = s.split("-"); return { year: y, month: Number(m) }; }
-const cycleDates = getCurrentCycleDates();
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function StrategyDashboard() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("resumen");
+  const [tab, setTab]     = useState("resumen");
   const def = getCurrentCycleDefault();
   const [year, setYear]       = useState(def.year);
   const [cycleId, setCycleId] = useState(def.cycleId);
   const [cycles, setCycles]   = useState(() => getCyclesForYear(Number(def.year)));
 
-  const [agents,  setAgents]  = useState<Agent[]>([]);
-  const [entries, setEntries] = useState<StrategyEntry[]>([]);
+  const officialPeriod = useMemo(() => getCycleDatesFromId(year, cycleId), [year, cycleId]);
+
+  const [agents,  setAgents]     = useState<Agent[]>([]);
+  const [entries, setEntries]    = useState<StrategyEntry[]>([]);
   const [allSamples, setAllSamples] = useState<StrategySample[]>([]);
-  const [saving,  setSaving]  = useState(false);
-  const [saveErr, setSaveErr] = useState("");
+  const [saving,  setSaving]     = useState(false);
+  const [saveErr, setSaveErr]    = useState("");
 
   const load = useCallback(async () => {
     const [ags, ens] = await Promise.all([getAgents("APT"), getStrategyEntries(year, cycleId)]);
@@ -131,10 +179,17 @@ export default function StrategyDashboard() {
   useEffect(() => { load(); },        [load]);
   useEffect(() => { loadSamples(); }, [loadSamples]);
 
-  // ── Entry drafts (includes QA state)
-  type Draft = Omit<StrategyEntry, "id">;
+  // Samples stats (creator-based, official period)
+  const stats = useMemo(
+    () => computeSamplesStats(allSamples, year, cycleId, officialPeriod),
+    [allSamples, year, cycleId, officialPeriod],
+  );
+
+  // ── Entry drafts (QA included)
+  type Draft = Omit<StrategyEntry, "id" | "bonusSamplesLocked" | "bonusSamplesLockedAt" | "bonusSamplesLockedAmount">;
   type QaState = Record<string, QaAnswer>;
-  const [drafts, setDrafts] = useState<Record<number, Draft>>({});
+
+  const [drafts,  setDrafts]  = useState<Record<number, Draft>>({});
   const [qaState, setQaState] = useState<Record<number, QaState>>({});
 
   const emptyDraft = useCallback((agentId: number): Draft =>
@@ -145,18 +200,15 @@ export default function StrategyDashboard() {
   useEffect(() => {
     const d: Record<number, Draft> = {};
     const q: Record<number, QaState> = {};
-    agents.forEach((ag) => {
+    agents.forEach(ag => {
       const ex = entries.find(e => e.agentId === ag.id);
       d[ag.id] = ex
         ? { agentId:ag.id, year, cycleId, roiPct:ex.roiPct, productScore:ex.productScore,
             nonBuyerFaultRate:ex.nonBuyerFaultRate, negativeReviewRate:ex.negativeReviewRate,
             operativeCompliancePct:ex.operativeCompliancePct, operativeQa:ex.operativeQa }
         : emptyDraft(ag.id);
-      // Restore QA answers from saved data
       const savedQa: QaState = {};
-      QA_ITEMS.forEach(({ key }) => {
-        savedQa[key] = (ex?.operativeQa?.[key] as QaAnswer) ?? "";
-      });
+      QA_ITEMS.forEach(({ key }) => { savedQa[key] = (ex?.operativeQa?.[key] as QaAnswer) ?? ""; });
       q[ag.id] = savedQa;
     });
     setDrafts(d); setQaState(q);
@@ -168,41 +220,50 @@ export default function StrategyDashboard() {
   const setQa = (agId: number, key: string, answer: QaAnswer) => {
     const updated = { ...qaState[agId], [key]: answer };
     setQaState(p => ({ ...p, [agId]: updated }));
-    const compliancePct = qaToCompliancePct(updated);
-    setDrafts(p => ({ ...p, [agId]: { ...p[agId], operativeCompliancePct: compliancePct, operativeQa: updated } }));
+    setDrafts(p => ({ ...p, [agId]: { ...p[agId], operativeCompliancePct: qaToCompliancePct(updated), operativeQa: updated } }));
   };
 
   const saveEntry = async (agentId: number) => {
     const d = drafts[agentId]; if (!d) return;
     setSaving(true); setSaveErr("");
-    try { await upsertStrategyEntry(d); await load(); }
+    try { await upsertStrategyEntry(d as any); await load(); }
     catch (err: any) { setSaveErr(err?.message ?? "Error al guardar. Verifica las políticas RLS en Supabase."); }
     finally { setSaving(false); }
   };
 
-  // ── Samples state
-  const [fromDate, setFromDate] = useState(cycleDates.from);
-  const [toDate,   setToDate]   = useState(cycleDates.to);
-  const [filterZero, setFilterZero] = useState(false);
-  const [filterSku,  setFilterSku]  = useState("");
-  const [filterUser, setFilterUser] = useState("");
+  const currentCycleName = cycles.find(c => c.id === cycleId)?.name ?? cycleId;
+
+  // ── Samples local state ────────────────────────────────────────────────────
+  const [filterUser,   setFilterUser]   = useState("");
+  const [filterSku,    setFilterSku]    = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all"|"delivered"|"pending">("all");
+  const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
+
   const [showAdd,  setShowAdd]  = useState(false);
   const [editing,  setEditing]  = useState<StrategySample | null>(null);
   const [sErr,     setSErr]     = useState("");
   const [sSaving,  setSSaving]  = useState(false);
-  const [delPw,    setDelPw]    = useState<{ id: number; pw: string; err: string } | null>(null);
-  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"" });
 
-  // Filter samples by date range + text filters
-  const inRange = (s: StrategySample) => s.sentDate >= fromDate && s.sentDate <= toDate;
-  const cycleSamples = allSamples.filter(inRange);
-  const filtered = cycleSamples
-    .filter(s => !filterZero || s.videosPublished === 0)
-    .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()))
-    .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()));
+  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "delivered"|"pending" });
 
-  const withContent = cycleSamples.filter(s => s.videosPublished > 0).length;
-  const contentRate = cycleSamples.length > 0 ? Math.round((withContent / cycleSamples.length) * 100) : 0;
+  // Password prompts
+  const [delPw,  setDelPw]  = useState<{ id:number; pw:string; err:string } | null>(null);
+  const [movePw, setMovePw] = useState<{ id:number; pw:string; err:string } | null>(null);
+  const [lockPw, setLockPw] = useState<{ agId:number; action:"lock"|"unlock"; pw:string; err:string } | null>(null);
+
+  // Sync local filter from/to are not needed — we filter on officialSamples directly
+  const tableRows = stats.officialSamples
+    .filter(s => filterStatus === "all" || s.deliveryStatus === filterStatus)
+    .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()))
+    .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()));
+
+  // Creator summary for "creators" view
+  const creatorRows = Object.entries(stats.byCreator).map(([username, totalVideos]) => ({
+    username, totalVideos,
+    coverage:   totalVideos >= 1,
+    additional: totalVideos >= 2,
+    samples: stats.countableSamples.filter(s => s.username === username),
+  })).sort((a, b) => b.totalVideos - a.totalVideos);
 
   const submitSample = async (e: React.FormEvent) => {
     e.preventDefault(); setSErr("");
@@ -213,8 +274,9 @@ export default function StrategyDashboard() {
     setSSaving(true);
     try {
       await createStrategySample({ agentId, username:newS.username.trim(), sku:newS.sku.trim(),
-        sentDate:newS.sentDate, videosPublished:newS.videosPublished, year:sy, month:sm, notes:newS.notes });
-      setNewS({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"" });
+        sentDate:newS.sentDate, videosPublished:newS.videosPublished, year:sy, month:sm,
+        notes:newS.notes, deliveryStatus:newS.deliveryStatus });
+      setNewS({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" });
       setShowAdd(false);
       await loadSamples();
     } catch(err: any) { setSErr(err?.message ?? "Error al guardar."); }
@@ -225,37 +287,54 @@ export default function StrategyDashboard() {
     e.preventDefault(); if (!editing) return;
     setSSaving(true);
     try {
-      await updateStrategySample(editing.id, { username:editing.username, sku:editing.sku,
-        sentDate:editing.sentDate, videosPublished:editing.videosPublished, notes:editing.notes });
+      await updateStrategySample(editing.id, {
+        username:editing.username, sku:editing.sku, sentDate:editing.sentDate,
+        videosPublished:editing.videosPublished, notes:editing.notes, deliveryStatus:editing.deliveryStatus,
+      });
       setEditing(null); await loadSamples();
     } catch(err: any) { setSErr(err?.message ?? "Error al guardar."); }
     finally { setSSaving(false); }
   };
 
+  const markDelivered = async (id: number) => {
+    await updateStrategySample(id, { deliveryStatus: "delivered" });
+    await loadSamples();
+  };
+
   const confirmDelete = async (id: number, pw: string) => {
-    if (!verifySuperAdmin("APT", pw)) { setDelPw({ id, pw, err: "Contraseña incorrecta." }); return; }
+    if (!verifySuperAdmin("APT", pw)) { setDelPw({ id, pw, err:"Contraseña incorrecta." }); return; }
     await deleteStrategySample(id);
     setDelPw(null);
     await loadSamples();
   };
 
-  // ── Samples pct for Resumen (use date range)
-  const samplesPctForAgent = (agId: number) => {
-    const rel = cycleSamples.filter(s => s.agentId === agId);
-    if (!rel.length) return 0;
-    return (rel.filter(s => s.videosPublished > 0).length / rel.length) * 100;
+  const confirmMove = async (id: number, pw: string) => {
+    if (!verifySuperAdmin("APT", pw)) { setMovePw({ id, pw, err:"Contraseña incorrecta." }); return; }
+    const nextKey = getNextCycleKey(year, cycleId);
+    await updateStrategySample(id, { bonusCycleKey: nextKey });
+    setMovePw(null);
+    await loadSamples();
   };
 
-  // ── Agent settings
+  const confirmLock = async (agId: number, action: "lock"|"unlock", pw: string) => {
+    if (!verifySuperAdmin("APT", pw)) { setLockPw({ agId, action, pw, err:"Contraseña incorrecta." }); return; }
+    if (action === "lock") {
+      await lockSampleBonus(agId, year, cycleId, stats.bonusEst);
+    } else {
+      await unlockSampleBonus(agId, year, cycleId);
+    }
+    setLockPw(null);
+    await load();
+  };
+
+  // Settings state
   const [agentNames, setAgentNames] = useState<Record<number,string>>({});
   useEffect(() => { const n:Record<number,string>={};agents.forEach(a=>{n[a.id]=a.name;});setAgentNames(n); }, [agents]);
-  const saveAgentName = async (id: number) => { const {updateAgentName} = await import("../services/api"); await updateAgentName(id,agentNames[id]); await load(); };
+  const saveAgentName = async (id: number) => { await updateAgentName(id,agentNames[id]); await load(); };
   const [addPw,setAddPw]=useState(""); const [addPwErr,setAddPwErr]=useState(""); const [addVer,setAddVer]=useState(false);
   const [newName,setNewName]=useState(""); const [addSaving,setAddSaving]=useState(false);
   const checkAdmin=(e:React.FormEvent)=>{e.preventDefault();if(verifySuperAdmin("APT",addPw)){setAddVer(true);setAddPwErr("");}else setAddPwErr("Contraseña incorrecta.");};
   const submitAgent=async(e:React.FormEvent)=>{e.preventDefault();if(!newName.trim())return;setAddSaving(true);try{await createAgent(newName.trim(),"APT");await load();setNewName("");setAddVer(false);setAddPw("");}finally{setAddSaving(false);}};
-
-  const currentCycleName = cycles.find(c=>c.id===cycleId)?.name ?? cycleId;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -263,7 +342,7 @@ export default function StrategyDashboard() {
       <nav className="top-nav">
         <div className="logo">FTC Hub — <span style={{color:"#6366f1"}}>Strategy Team</span></div>
         <ul className="nav-links">
-          {TABS.map(([k,l])=>(
+          {TABS.map(([k,l]) => (
             <li key={k} className={tab===k?"active":""} onClick={()=>setTab(k)}>{l}</li>
           ))}
         </ul>
@@ -284,35 +363,42 @@ export default function StrategyDashboard() {
         {tab==="resumen" && (
           <section>
             <header className="section-header"><h2>Resumen de Bonus — {currentCycleName}</h2></header>
-            {saveErr && <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{saveErr}</div>}
+            {saveErr && <ErrBox msg={saveErr} />}
             {agents.length===0 ? (
-              <div className="card" style={{textAlign:"center",padding:"3rem",color:"var(--text-muted)"}}>No hay agentes. Ve a Settings.</div>
-            ) : agents.map(ag=>{
-              const entry  = entries.find(e=>e.agentId===ag.id);
-              const spct   = samplesPctForAgent(ag.id);
-              const b      = entry ? calcBonus(entry, spct) : null;
+              <EmptyCard msg="No hay agentes. Ve a Settings." />
+            ) : agents.map(ag => {
+              const entry = entries.find(e => e.agentId === ag.id);
+              const b     = entry ? calcBonus(entry, stats.finalScore) : null;
               return (
                 <div key={ag.id} style={{maxWidth:860,margin:"0 auto 2rem"}}>
                   <h3 style={{fontWeight:800,fontSize:"1.1rem",color:"#1e293b",marginBottom:"1rem",textAlign:"center"}}>{ag.name}</h3>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
-                    <SummaryBox label="Bono Base" value={BONO_BASE} color="#15803d" sub="Garantizado" />
-                    <SummaryBox label="Bono Variable" value={b?.bonoVariable??0} color="#6366f1" sub={`de $${cop(650_000)} máx`} />
+                    <SummaryBox label="Bono Base"     value={BONO_BASE}          color="#15803d" sub="Garantizado" />
+                    <SummaryBox label="Bono Variable"  value={b?.bonoVariable??0} color="#6366f1" sub={`de $${cop(650_000)} máx`} />
                     <SummaryBox label="Total Estimado" value={b?.total??BONO_BASE} color="#1d4ed8" sub="Base + Variable" large />
                   </div>
                   {!entry ? (
-                    <div style={{background:"#f8fafc",border:"1px dashed #cbd5e1",borderRadius:10,padding:"1.5rem",textAlign:"center",color:"var(--text-muted)",fontSize:"0.875rem"}}>
-                      Sin datos para este ciclo. Registra los indicadores en los tabs correspondientes.
-                    </div>
+                    <EmptyCard msg="Sin datos para este ciclo. Registra los indicadores en los tabs correspondientes." />
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
-                      <IndSummaryCard num="1" weight="40%" label="ROI Programa Afiliados" earned={b!.ind1} max={IND1_MAX} color={C.roi} scalePct={roiScale(entry.roiPct)} detail={`ROI del ciclo: ${entry.roiPct}%`} />
-                      <IndSummaryCard num="2" weight="30%" label="Samples con Contenido" earned={b!.ind2} max={IND2_MAX} color={C.samples} scalePct={samplesScale(spct)} detail={`${Math.round(spct)}% generaron video · ${cycleSamples.length} samples en el corte`} />
-                      <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health} scalePct={b!.pA*0.10+b!.pB*0.45+b!.pC*0.45} detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
-                      <IndSummaryCard num="4" weight="10%" label="Cumplimiento Operativo" earned={b!.ind4} max={IND4_MAX} color={C.operative} scalePct={operativeScale(entry.operativeCompliancePct)} detail={`${Math.round(entry.operativeCompliancePct)}% cumplimiento`} />
+                      <IndSummaryCard num="1" weight="40%" label="ROI Programa Afiliados" earned={b!.ind1} max={IND1_MAX} color={C.roi}
+                        scalePct={roiScale(entry.roiPct)}
+                        detail={`ROI del ciclo: ${entry.roiPct}%`} />
+                      <IndSummaryCard num="2" weight="30%" label="Samples con Contenido" earned={b!.ind2} max={IND2_MAX} color={C.samples}
+                        scalePct={stats.finalScore/100}
+                        detail={`Score: ${stats.finalScore.toFixed(1)}pts · Coverage: ${stats.coverageCreators}/${stats.totalCreators} creadores`}
+                        locked={entry.bonusSamplesLocked}
+                        lockedAmount={entry.bonusSamplesLockedAmount} />
+                      <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health}
+                        scalePct={b!.pA*0.10+b!.pB*0.45+b!.pC*0.45}
+                        detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
+                      <IndSummaryCard num="4" weight="10%" label="Cumplimiento Operativo" earned={b!.ind4} max={IND4_MAX} color={C.operative}
+                        scalePct={operativeScale(entry.operativeCompliancePct)}
+                        detail={`${Math.round(entry.operativeCompliancePct)}% cumplimiento`} />
                     </div>
                   )}
                   <div style={{marginTop:"0.75rem",padding:"0.55rem 1rem",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,fontSize:"0.75rem",color:"#94a3b8",textAlign:"center"}}>
-                    Samples del corte: {fromDate} → {toDate}
+                    Período oficial: {officialPeriod.from} → {officialPeriod.to}
                   </div>
                 </div>
               );
@@ -343,7 +429,7 @@ export default function StrategyDashboard() {
                 ))}
               </div>
             </div>
-            {saveErr && <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{saveErr}</div>}
+            {saveErr && <ErrBox msg={saveErr} />}
             {agents.map(ag=>{
               const d = drafts[ag.id]; if(!d) return null;
               const rl = roiLabel(d.roiPct);
@@ -374,9 +460,6 @@ export default function StrategyDashboard() {
                       <div style={{fontSize:"0.75rem",color:"#64748b"}}>{pct(roiScale(d.roiPct))} del bono máximo · Máx ${cop(IND1_MAX)} COP</div>
                     </div>
                   </div>
-                  <div style={{marginTop:"1rem",padding:"0.6rem 0.85rem",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0",fontSize:"0.75rem",color:"#94a3b8"}}>
-                    Cambia el ciclo en la barra superior para ver o editar el ROI de periodos anteriores.
-                  </div>
                 </div>
               );
             })}
@@ -387,60 +470,122 @@ export default function StrategyDashboard() {
         {tab==="samples" && (
           <section>
             <header className="section-header">
-              <div><h2>Samples que Generan Contenido</h2>
-                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #2 · 30% del bono variable · Máx $195.000 COP</p>
+              <div><h2>Sample Content Performance</h2>
+                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #2 · 30% del bono variable · Máx $195.000 COP · Por creador (Coverage 80pts + Additional 20pts)</p>
               </div>
               <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setEditing(null);setSErr("");}}>+ Agregar Sample</button>
             </header>
 
-            {/* Stats chips — based on current date range */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"0.65rem",marginBottom:"1.25rem"}}>
+            {/* Official period banner */}
+            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"0.85rem 1.1rem",marginBottom:"1.1rem",display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap"}}>
+              <div>
+                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#1d4ed8",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 0.2rem"}}>Período oficial del bono</p>
+                <p style={{fontWeight:800,fontSize:"1rem",color:"#1e293b",margin:0}}>{officialPeriod.from} → {officialPeriod.to}</p>
+              </div>
+              <div style={{flex:1,minWidth:260,fontSize:"0.75rem",color:"#3b82f6",lineHeight:1.5,paddingTop:"0.15rem"}}>
+                Bonus calculations are based on all eligible samples assigned to the selected bonus period, regardless of the table filters currently applied.
+              </div>
+              {stats.gracePeriodActive && (
+                <div style={{background:"#fefce8",border:"1px solid #fef08a",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#854d0e",fontWeight:600}}>
+                  ⏳ Período de gracia activo hasta {stats.graceEnd}
+                </div>
+              )}
+              {!stats.gracePeriodActive && (
+                <div style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#64748b",fontWeight:600}}>
+                  Período de gracia terminó el {stats.graceEnd}
+                </div>
+              )}
+            </div>
+
+            {/* Bonus score cards */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"0.65rem",marginBottom:"1.1rem"}}>
               {[
-                {label:"Total enviados",value:cycleSamples.length,color:C.samples},
-                {label:"Con contenido",value:withContent,color:"#15803d"},
-                {label:"Sin contenido",value:cycleSamples.length-withContent,color:"#dc2626",click:()=>setFilterZero(v=>!v),active:filterZero},
-                {label:"Tasa contenido",value:`${contentRate}%`,color:"#7c3aed"},
-                {label:"Bono estimado",value:`$${cop(IND2_MAX*samplesScale(contentRate))}`,color:C.operative},
-              ].map(s=>(
-                <div key={s.label} onClick={s.click}
-                  style={{border:`1px solid ${s.active?s.color:s.color+"30"}`,borderTop:`3px solid ${s.color}`,borderRadius:10,padding:"0.75rem 1rem",background:s.active?s.color+"0d":"white",cursor:s.click?"pointer":"default"}}>
-                  <div style={{fontSize:"0.65rem",fontWeight:700,color:s.color,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.25rem"}}>{s.label}</div>
+                { label:"Creadores elegibles", value:stats.totalCreators,         color:C.samples },
+                { label:"Con ≥1 video (Coverage)", value:stats.coverageCreators,  color:"#15803d" },
+                { label:"Con ≥2 videos (Additional)", value:stats.additionalCreators, color:"#7c3aed" },
+                { label:"Score final", value:`${stats.finalScore.toFixed(1)} pts`, color:"#1d4ed8" },
+                { label:"Bono estimado", value:`$${cop(stats.bonusEst)}`, color:C.operative },
+              ].map(s => (
+                <div key={s.label} style={{border:`1px solid ${s.color}30`,borderTop:`3px solid ${s.color}`,borderRadius:10,padding:"0.75rem 1rem",background:"white"}}>
+                  <div style={{fontSize:"0.65rem",fontWeight:700,color:s.color,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.25rem"}}>{s.label}</div>
                   <div style={{fontSize:"1.15rem",fontWeight:800,color:"#1e293b"}}>{s.value}</div>
                 </div>
               ))}
             </div>
 
+            {/* Bonus breakdown */}
+            <div className="card" style={{marginBottom:"1.1rem",background:"#f0f9ff",border:"1px solid #bae6fd"}}>
+              <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.85rem"}}>Desglose del bono</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"0.85rem"}}>
+                <BonusBar label="A. Sample Coverage" weight="80 pts" description={`${stats.coverageCreators} de ${stats.totalCreators} creadores publicaron ≥1 video`}
+                  rate={stats.totalCreators>0?stats.coverageCreators/stats.totalCreators:0}
+                  score={stats.coverageScore} maxScore={80} color="#15803d" />
+                <BonusBar label="B. Additional Content" weight="20 pts" description={`${stats.additionalCreators} de ${stats.totalCreators} creadores publicaron ≥2 videos`}
+                  rate={stats.totalCreators>0?stats.additionalCreators/stats.totalCreators:0}
+                  score={stats.additionalScore} maxScore={20} color="#7c3aed" />
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.65rem 0.85rem",background:"white",borderRadius:8,border:"1px solid #e0f2fe"}}>
+                <div>
+                  <span style={{fontSize:"0.75rem",color:"#64748b"}}>Score final = {stats.coverageScore.toFixed(1)} + {stats.additionalScore.toFixed(1)} = </span>
+                  <span style={{fontWeight:800,fontSize:"1rem",color:"#1d4ed8"}}>{stats.finalScore.toFixed(1)} pts</span>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:"0.7rem",color:"#64748b"}}>Bono estimado ({stats.finalScore.toFixed(1)}% × $195.000)</div>
+                  <div style={{fontWeight:800,fontSize:"1.2rem",color:C.operative}}>${cop(stats.bonusEst)} COP</div>
+                </div>
+              </div>
+              <p style={{fontSize:"0.7rem",color:"#94a3b8",marginTop:"0.6rem",marginBottom:0}}>
+                Nota: el máximo aporte por creador es 2 niveles (1 por Coverage + 1 por Additional). Videos adicionales se registran pero no generan puntos extra.
+              </p>
+            </div>
+
+            {/* Pending alert */}
+            {stats.pendingSamples.length > 0 && (
+              <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"0.85rem 1.1rem",marginBottom:"1.1rem"}}>
+                <p style={{fontWeight:700,fontSize:"0.82rem",color:"#9a3412",marginBottom:"0.5rem"}}>
+                  ⚠ {stats.pendingSamples.length} sample{stats.pendingSamples.length>1?"s":""} pendiente{stats.pendingSamples.length>1?"s":""} de entrega
+                </p>
+                {stats.gracePeriodActive ? (
+                  <p style={{fontSize:"0.78rem",color:"#c2410c",margin:"0 0 0.5rem"}}>Período de gracia activo — aún cuentan para el bono. Márcalos como entregados o muévelos al siguiente período.</p>
+                ) : (
+                  <p style={{fontSize:"0.78rem",color:"#c2410c",margin:"0 0 0.5rem"}}>Período de gracia expirado — estos samples ya no cuentan en el bono actual. Muévelos al siguiente período o elimínalos.</p>
+                )}
+                <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                  {stats.pendingSamples.map(s => (
+                    <span key={s.id} style={{background:"#fee2e2",borderRadius:6,padding:"0.2rem 0.6rem",fontSize:"0.75rem",color:"#991b1b",fontWeight:600}}>{s.username} / {s.sku}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Filters */}
             <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
-              <p style={{fontWeight:700,fontSize:"0.75rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.65rem"}}>Filtros</p>
-              <div style={{display:"grid",gridTemplateColumns:"auto auto 1fr 1fr auto",gap:"0.75rem",alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div><label style={lbl}>Desde</label>
-                  <input type="date" className="form-control" value={fromDate} onChange={e=>setFromDate(e.target.value)} />
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
+                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>Filtros de tabla (no afectan el cálculo del bono)</p>
+                <div style={{display:"flex",gap:"0.4rem"}}>
+                  <button style={{...qBtn,borderColor:viewMode==="samples"?"#0891b2":"#e2e8f0",color:viewMode==="samples"?C.samples:"#64748b"}} onClick={()=>setViewMode("samples")}>Por sample</button>
+                  <button style={{...qBtn,borderColor:viewMode==="creators"?"#0891b2":"#e2e8f0",color:viewMode==="creators"?C.samples:"#64748b"}} onClick={()=>setViewMode("creators")}>Por creador</button>
                 </div>
-                <div><label style={lbl}>Hasta</label>
-                  <input type="date" className="form-control" value={toDate} onChange={e=>setToDate(e.target.value)} />
-                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"0.75rem",alignItems:"flex-end"}}>
                 <div><label style={lbl}>Buscar username</label>
                   <input type="text" className="form-control" placeholder="@username..." value={filterUser} onChange={e=>setFilterUser(e.target.value)} />
                 </div>
                 <div><label style={lbl}>Buscar SKU</label>
                   <input type="text" className="form-control" placeholder="SKU..." value={filterSku} onChange={e=>setFilterSku(e.target.value)} />
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:"0.3rem"}}>
-                  <label style={lbl}>Quick</label>
-                  <button onClick={()=>{setFromDate(cycleDates.from);setToDate(cycleDates.to);}} style={qBtn}>Corte actual</button>
-                  <button onClick={()=>setFilterZero(v=>!v)} style={{...qBtn,borderColor:filterZero?"#dc2626":"#e2e8f0",color:filterZero?"#dc2626":"#64748b",background:filterZero?"#fef2f2":"white"}}>
-                    {filterZero?"✕ Sin videos":"Sin videos"}
-                  </button>
+                <div><label style={lbl}>Estado</label>
+                  <select className="form-control" value={filterStatus} onChange={e=>setFilterStatus(e.target.value as any)}>
+                    <option value="all">Todos</option>
+                    <option value="delivered">Entregados</option>
+                    <option value="pending">Pendientes</option>
+                  </select>
                 </div>
-              </div>
-              <div style={{marginTop:"0.5rem",fontSize:"0.72rem",color:"#94a3b8"}}>
-                Corte actual: {fromDate} → {toDate} · {cycleSamples.length} samples · Stats arriba reflejan este rango
               </div>
             </div>
 
             {/* Add/Edit form */}
-            {(showAdd||editing) && (
+            {(showAdd || editing) && (
               <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                 <h4 style={{margin:"0 0 1rem",color:C.samples}}>{editing?"Editar Sample":"Agregar Nuevo Sample"}</h4>
                 {sErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{sErr}</p>}
@@ -460,6 +605,14 @@ export default function StrategyDashboard() {
                             editing?setEditing({...editing,[field]:v} as StrategySample):setNewS({...newS,[field]:v} as any);}} />
                       </div>
                     ))}
+                    <div><label style={lbl}>Estado de entrega</label>
+                      <select className="form-control"
+                        value={editing?editing.deliveryStatus:newS.deliveryStatus}
+                        onChange={e=>{const v=e.target.value as "delivered"|"pending";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
+                        <option value="delivered">Entregado</option>
+                        <option value="pending">Pendiente</option>
+                      </select>
+                    </div>
                   </div>
                   <div style={{display:"flex",gap:"0.5rem"}}>
                     <button type="submit" className="btn btn-primary btn-sm" disabled={sSaving}>{sSaving?"...":editing?"Guardar cambios":"Agregar"}</button>
@@ -469,50 +622,142 @@ export default function StrategyDashboard() {
               </div>
             )}
 
-            {/* Delete password prompt */}
+            {/* Password prompts */}
             {delPw && (
-              <div className="card" style={{marginBottom:"1rem",border:"2px solid #dc2626",background:"#fef2f2"}}>
-                <h4 style={{margin:"0 0 0.75rem",color:"#dc2626"}}>Confirmar eliminación</h4>
-                <p style={{fontSize:"0.85rem",color:"#64748b",marginBottom:"0.75rem"}}>Ingresa la contraseña de admin para eliminar este sample.</p>
-                {delPw.err && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.5rem"}}>{delPw.err}</p>}
-                <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-                  <input type="password" className="form-control" style={{maxWidth:220}} placeholder="Contraseña admin"
-                    value={delPw.pw} onChange={e=>setDelPw({...delPw,pw:e.target.value,err:""})}
-                    onKeyDown={e=>e.key==="Enter"&&confirmDelete(delPw.id,delPw.pw)} autoFocus />
-                  <button className="btn btn-danger btn-sm" onClick={()=>confirmDelete(delPw.id,delPw.pw)}>Eliminar</button>
-                  <button className="btn btn-secondary btn-sm" onClick={()=>setDelPw(null)}>Cancelar</button>
-                </div>
+              <PwPrompt title="Confirmar eliminación" desc="Ingresa la contraseña de admin para eliminar."
+                pw={delPw.pw} err={delPw.err} btnLabel="Eliminar" btnColor="#dc2626"
+                onChange={pw=>setDelPw({...delPw,pw,err:""})}
+                onConfirm={()=>confirmDelete(delPw.id,delPw.pw)}
+                onCancel={()=>setDelPw(null)} />
+            )}
+            {movePw && (
+              <PwPrompt title="Mover al siguiente período" desc={`El sample se asignará al período: ${getNextCycleKey(year,cycleId)}`}
+                pw={movePw.pw} err={movePw.err} btnLabel="Mover" btnColor="#0891b2"
+                onChange={pw=>setMovePw({...movePw,pw,err:""})}
+                onConfirm={()=>confirmMove(movePw.id,movePw.pw)}
+                onCancel={()=>setMovePw(null)} />
+            )}
+
+            {/* Table — samples view */}
+            {viewMode==="samples" && (
+              <div className="card" style={{overflowX:"auto"}}>
+                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{tableRows.length} resultado{tableRows.length!==1?"s":""} · período oficial: {stats.officialSamples.length} samples</p>
+                {tableRows.length===0 ? (
+                  <EmptyCard msg="No hay samples para este período." />
+                ) : (
+                  <table className="data-table">
+                    <thead><tr><th>Estado</th><th>Username</th><th>SKU</th><th>Fecha envío</th><th>Videos</th><th>Aporte al bono</th><th>Notas</th><th>Acciones</th></tr></thead>
+                    <tbody>
+                      {tableRows.map(s => {
+                        const totalForCreator = stats.byCreator[s.username] ?? 0;
+                        return (
+                          <tr key={s.id} style={{background:s.deliveryStatus==="pending"?"#fffbeb":undefined}}>
+                            <td>
+                              {s.deliveryStatus==="pending" ? (
+                                <span style={{background:"#fef3c7",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>⏳ Pendiente</span>
+                              ) : (
+                                <span style={{background:"#f0fdf4",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#166534",fontWeight:700}}>✓ Entregado</span>
+                              )}
+                            </td>
+                            <td style={{fontWeight:600}}>{s.username}</td>
+                            <td><span style={{background:"#f1f5f9",borderRadius:4,padding:"0.1rem 0.45rem",fontSize:"0.8rem",fontFamily:"monospace"}}>{s.sku}</span></td>
+                            <td>{s.sentDate}</td>
+                            <td><span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"0":"✓ "+s.videosPublished}</span></td>
+                            <td style={{fontSize:"0.75rem"}}>
+                              {totalForCreator>=2 && <span style={{color:"#7c3aed",fontWeight:600}}>Coverage + Additional</span>}
+                              {totalForCreator===1 && <span style={{color:"#15803d",fontWeight:600}}>Coverage</span>}
+                              {totalForCreator===0 && <span style={{color:"#94a3b8"}}>Sin cumplimiento</span>}
+                            </td>
+                            <td style={{color:"var(--text-muted)",fontSize:"0.8rem"}}>{s.notes||"—"}</td>
+                            <td style={{whiteSpace:"nowrap",display:"flex",gap:"0.3rem",flexWrap:"wrap"}}>
+                              {s.deliveryStatus==="pending" && (
+                                <button className="btn btn-sm btn-secondary" onClick={()=>markDelivered(s.id)}>Entregar</button>
+                              )}
+                              <button className="btn btn-sm btn-secondary" onClick={()=>{setEditing(s);setShowAdd(false);setSErr("");setDelPw(null);setMovePw(null);}}>Editar</button>
+                              <button className="btn btn-sm btn-secondary" style={{color:"#0891b2",borderColor:"#bae6fd"}} onClick={()=>setMovePw({id:s.id,pw:"",err:""})}>→ Sig. período</button>
+                              <button className="btn btn-sm btn-danger" onClick={()=>setDelPw({id:s.id,pw:"",err:""})}>Eliminar</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* Table */}
-            <div className="card" style={{overflowX:"auto"}}>
-              <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>
-                {filtered.length} resultado{filtered.length!==1?"s":""} mostrados
-              </p>
-              {filtered.length===0 ? (
-                <div style={{textAlign:"center",padding:"2.5rem",color:"var(--text-muted)"}}>No hay samples para este rango.</div>
-              ) : (
-                <table className="data-table">
-                  <thead><tr><th>Username</th><th>SKU</th><th>Fecha envío</th><th>Videos</th><th>Notas</th><th>Acciones</th></tr></thead>
-                  <tbody>
-                    {filtered.map(s=>(
-                      <tr key={s.id} style={{background:s.videosPublished===0?"#fff7f7":undefined}}>
-                        <td style={{fontWeight:600}}>{s.username}</td>
-                        <td><span style={{background:"#f1f5f9",borderRadius:4,padding:"0.1rem 0.45rem",fontSize:"0.8rem",fontFamily:"monospace"}}>{s.sku}</span></td>
-                        <td>{s.sentDate}</td>
-                        <td><span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"⚠ 0":`✓ ${s.videosPublished}`}</span></td>
-                        <td style={{color:"var(--text-muted)",fontSize:"0.8rem"}}>{s.notes||"—"}</td>
-                        <td style={{whiteSpace:"nowrap"}}>
-                          <button className="btn btn-sm btn-secondary" onClick={()=>{setEditing(s);setShowAdd(false);setSErr("");setDelPw(null);}}>Editar</button>{" "}
-                          <button className="btn btn-sm btn-danger" onClick={()=>setDelPw({id:s.id,pw:"",err:""})}>Eliminar</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {/* Table — creators view */}
+            {viewMode==="creators" && (
+              <div className="card" style={{overflowX:"auto"}}>
+                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{creatorRows.length} creadores en este período (de muestras contables)</p>
+                {creatorRows.length===0 ? (
+                  <EmptyCard msg="No hay creadores para este período." />
+                ) : (
+                  <table className="data-table">
+                    <thead><tr><th>Creador</th><th>Total videos</th><th>Coverage (≥1 video)</th><th>Additional (≥2 videos)</th><th>Samples enviados</th></tr></thead>
+                    <tbody>
+                      {creatorRows.map(r => (
+                        <tr key={r.username}>
+                          <td style={{fontWeight:700}}>{r.username}</td>
+                          <td style={{fontWeight:700,color:r.totalVideos>0?"#15803d":"#dc2626"}}>{r.totalVideos}</td>
+                          <td>{r.coverage ? <span style={{color:"#15803d",fontWeight:700}}>✓ Sí</span> : <span style={{color:"#94a3b8"}}>✗ No</span>}</td>
+                          <td>{r.additional ? <span style={{color:"#7c3aed",fontWeight:700}}>✓ Sí</span> : <span style={{color:"#94a3b8"}}>✗ No</span>}</td>
+                          <td style={{fontSize:"0.78rem",color:"#64748b"}}>{r.samples.map(s=>s.sku).join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* Bonus authorization */}
+            {agents.map(ag => {
+              const entry = entries.find(e => e.agentId === ag.id);
+              return (
+                <div key={ag.id} className="card" style={{marginTop:"1.25rem",border:`1px solid ${entry?.bonusSamplesLocked?"#16a34a":"#e2e8f0"}`,background:entry?.bonusSamplesLocked?"#f0fdf4":"white"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"1rem",flexWrap:"wrap"}}>
+                    <div>
+                      <p style={{fontWeight:700,fontSize:"0.82rem",color:entry?.bonusSamplesLocked?"#15803d":"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:"0 0 0.3rem"}}>
+                        {entry?.bonusSamplesLocked ? "🔒 Bono autorizado y bloqueado" : "Autorizar bono final"}
+                      </p>
+                      {entry?.bonusSamplesLocked ? (
+                        <>
+                          <p style={{fontSize:"1.3rem",fontWeight:800,color:"#15803d",margin:"0 0 0.2rem"}}>${cop(entry.bonusSamplesLockedAmount ?? stats.bonusEst)} COP</p>
+                          <p style={{fontSize:"0.75rem",color:"#64748b",margin:0}}>Bloqueado el {entry.bonusSamplesLockedAt ? new Date(entry.bonusSamplesLockedAt).toLocaleString("es-CO") : "—"}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p style={{fontSize:"1.3rem",fontWeight:800,color:C.operative,margin:"0 0 0.2rem"}}>${cop(stats.bonusEst)} COP <span style={{fontSize:"0.75rem",color:"#94a3b8",fontWeight:400}}>(calculado en vivo)</span></p>
+                          <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:0}}>Al bloquear se congela el monto actual.</p>
+                        </>
+                      )}
+                    </div>
+                    <div>
+                      {entry?.bonusSamplesLocked ? (
+                        <button className="btn btn-secondary btn-sm" onClick={()=>setLockPw({agId:ag.id,action:"unlock",pw:"",err:""})}>Desbloquear</button>
+                      ) : (
+                        <button className="btn btn-primary btn-sm" style={{background:"#15803d",borderColor:"#15803d"}} onClick={()=>{if(!entry){alert("Guarda primero los indicadores del período.");return;}setLockPw({agId:ag.id,action:"lock",pw:"",err:""});}}>
+                          Autorizar y bloquear bono
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {lockPw && lockPw.agId === ag.id && (
+                    <div style={{marginTop:"1rem"}}>
+                      <PwPrompt title={lockPw.action==="lock"?"Confirmar autorización":"Confirmar desbloqueo"}
+                        desc="Ingresa la contraseña de admin para continuar."
+                        pw={lockPw.pw} err={lockPw.err}
+                        btnLabel={lockPw.action==="lock"?"Autorizar":"Desbloquear"}
+                        btnColor={lockPw.action==="lock"?"#15803d":"#0891b2"}
+                        onChange={pw=>setLockPw({...lockPw,pw,err:""})}
+                        onConfirm={()=>confirmLock(lockPw.agId,lockPw.action,lockPw.pw)}
+                        onCancel={()=>setLockPw(null)} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </section>
         )}
 
@@ -524,7 +769,7 @@ export default function StrategyDashboard() {
                 <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #3 · 20% del bono variable · Máx $130.000 COP · Pesos: Neg. Review 45% · Non-Buyer 45% · Product Score 10%</p>
               </div>
             </header>
-            {saveErr && <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{saveErr}</div>}
+            {saveErr && <ErrBox msg={saveErr} />}
             {agents.map(ag=>{
               const d = drafts[ag.id]; if(!d) return null;
               const pA=productScoreScale(d.productScore), pB=nonBuyerScale(d.nonBuyerFaultRate), pC=negReviewScale(d.negativeReviewRate);
@@ -542,12 +787,12 @@ export default function StrategyDashboard() {
                     </div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"1rem"}}>
-                    <SubMetric color={C.health} label="A. Product Satisfaction Score" sublabel="Meta: ≥ 4.5" scalePct={pA}
+                    <SubMetric color={C.health} label="A. Product Satisfaction Score" sublabel="Meta: ≥ 4.5 · Peso: 10%" scalePct={pA}
                       scales={[{r:"≥ 4.6",p:"100%"},{r:"4.5–4.59",p:"80%"},{r:"4.3–4.49",p:"60%"},{r:"4.2–4.29",p:"30%"},{r:"4.1–4.19",p:"10%"},{r:"< 4.1",p:"0%"}]}>
                       <input type="number" min={0} max={5} step={0.01} className="form-control"
                         value={nv(d.productScore)} onChange={e=>setF(ag.id,"productScore",parseFloat(e.target.value)||0)} />
                     </SubMetric>
-                    <SubMetric color={C.health} label="B. Non-Buyer Fault Rate" sublabel="Meta: < 2%" scalePct={pB}
+                    <SubMetric color={C.health} label="B. Non-Buyer Fault Rate" sublabel="Meta: < 2% · Peso: 45%" scalePct={pB}
                       scales={[{r:"≤ 2%",p:"100%"},{r:"2.01–2.50%",p:"50%"},{r:"> 2.50%",p:"0%"}]}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={20} step={0.01} className="form-control"
@@ -555,7 +800,7 @@ export default function StrategyDashboard() {
                         <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
                       </div>
                     </SubMetric>
-                    <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 1.2%" scalePct={pC}
+                    <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 1.2% · Peso: 45%" scalePct={pC}
                       scales={[{r:"≤ 0.45%",p:"100%"},{r:"≤ 0.80%",p:"50%"},{r:"≤ 1.20%",p:"25%"},{r:"> 1.20%",p:"0%"}]}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={10} step={0.01} className="form-control"
@@ -581,7 +826,7 @@ export default function StrategyDashboard() {
                 <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #4 · 10% del bono variable · Máx $65.000 COP · Sí=100% · Más o menos=50% · No=0%</p>
               </div>
             </header>
-            {saveErr && <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{saveErr}</div>}
+            {saveErr && <ErrBox msg={saveErr} />}
             {agents.map(ag=>{
               const d  = drafts[ag.id]; if(!d) return null;
               const qa = qaState[ag.id] ?? {};
@@ -603,21 +848,16 @@ export default function StrategyDashboard() {
                       <button className="btn btn-primary btn-sm" onClick={()=>saveEntry(ag.id)} disabled={saving}>{saving?"...":"Guardar"}</button>
                     </div>
                   </div>
-
-                  {/* Progress bar */}
                   <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"1.25rem"}}>
                     <div style={{width:`${compliancePct}%`,height:"100%",background:C.operative,transition:"width 0.3s",borderRadius:4}} />
                   </div>
-
-                  {/* QA questions */}
                   <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
                     {QA_ITEMS.map(({key,label},i)=>{
                       const ans = qa[key] ?? "";
                       return (
                         <div key={key} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"1rem",alignItems:"center",padding:"0.65rem 0.85rem",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
                           <div style={{fontSize:"0.85rem",fontWeight:600,color:"#1e293b"}}>
-                            <span style={{fontSize:"0.7rem",color:"#94a3b8",marginRight:"0.4rem"}}>#{i+1}</span>
-                            {label}
+                            <span style={{fontSize:"0.7rem",color:"#94a3b8",marginRight:"0.4rem"}}>#{i+1}</span>{label}
                           </div>
                           <div style={{display:"flex",gap:"0.35rem"}}>
                             {(["si","masomenos","no"] as QaAnswer[]).map(opt=>(
@@ -634,9 +874,8 @@ export default function StrategyDashboard() {
                       );
                     })}
                   </div>
-
                   <div style={{marginTop:"1rem",padding:"0.6rem 0.85rem",background:"#fff7ed",borderRadius:8,border:"1px solid #fed7aa",fontSize:"0.75rem",color:"#9a3412"}}>
-                    Cada pregunta vale 1/7 del cumplimiento total. Sí=100% · Más o menos=50% · No=0%. Preguntas sin responder cuentan como 0%.
+                    Cada pregunta vale 1/7 del cumplimiento total. Sí=100% · Más o menos=50% · No=0%.
                   </div>
                 </div>
               );
@@ -687,11 +926,52 @@ export default function StrategyDashboard() {
   );
 }
 
-// ── Styles & sub-components ────────────────────────────────────────────────────
-const lbl: React.CSSProperties = {fontSize:"0.72rem",fontWeight:700,color:"#64748b",display:"block",marginBottom:"0.3rem",textTransform:"uppercase",letterSpacing:"0.05em"};
-const qBtn: React.CSSProperties = {padding:"0.28rem 0.65rem",borderRadius:6,fontSize:"0.75rem",fontWeight:600,cursor:"pointer",border:"1px solid #e2e8f0",background:"white",color:"#64748b"};
+// ── Sub-components ─────────────────────────────────────────────────────────────
+function ErrBox({ msg }: { msg: string }) {
+  return <div style={{marginBottom:"1rem",padding:"0.75rem 1rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#dc2626",fontSize:"0.85rem"}}>{msg}</div>;
+}
+function EmptyCard({ msg }: { msg: string }) {
+  return <div className="card" style={{textAlign:"center",padding:"2.5rem",color:"var(--text-muted)"}}>{msg}</div>;
+}
 
-function SummaryBox({label,value,color,sub,large}:{label:string;value:number;color:string;sub:string;large?:boolean}) {
+function PwPrompt({ title, desc, pw, err, btnLabel, btnColor, onChange, onConfirm, onCancel }:
+  { title:string; desc:string; pw:string; err:string; btnLabel:string; btnColor:string; onChange:(pw:string)=>void; onConfirm:()=>void; onCancel:()=>void }) {
+  return (
+    <div className="card" style={{border:"2px solid #dc2626",background:"#fef2f2",marginBottom:"1rem"}}>
+      <h4 style={{margin:"0 0 0.35rem",color:"#dc2626"}}>{title}</h4>
+      <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.6rem"}}>{desc}</p>
+      {err && <p style={{color:"#dc2626",fontSize:"0.82rem",margin:"0 0 0.5rem"}}>{err}</p>}
+      <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+        <input type="password" className="form-control" style={{maxWidth:220}} placeholder="Contraseña admin"
+          value={pw} onChange={e=>onChange(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onConfirm()} autoFocus />
+        <button className="btn btn-sm" style={{background:btnColor,color:"white",border:"none"}} onClick={onConfirm}>{btnLabel}</button>
+        <button className="btn btn-sm btn-secondary" onClick={onCancel}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+function BonusBar({ label, weight, description, rate, score, maxScore, color }:
+  { label:string; weight:string; description:string; rate:number; score:number; maxScore:number; color:string }) {
+  return (
+    <div style={{background:"white",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.3rem"}}>
+        <span style={{fontWeight:700,fontSize:"0.82rem",color:"#1e293b"}}>{label}</span>
+        <span style={{fontSize:"0.72rem",color,fontWeight:700}}>máx {weight}</span>
+      </div>
+      <div style={{fontSize:"0.75rem",color:"#64748b",marginBottom:"0.6rem"}}>{description}</div>
+      <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
+        <div style={{width:`${rate*100}%`,height:"100%",background:color,transition:"width 0.4s",borderRadius:4}} />
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.75rem"}}>
+        <span style={{color:"#64748b"}}>{Math.round(rate*100)}% de creadores</span>
+        <span style={{fontWeight:700,color}}>{score.toFixed(1)} / {maxScore} pts</span>
+      </div>
+    </div>
+  );
+}
+
+function SummaryBox({ label, value, color, sub, large }:{ label:string; value:number; color:string; sub:string; large?:boolean }) {
   return (
     <div style={{border:`1px solid ${color}25`,borderTop:`3px solid ${color}`,borderRadius:12,padding:"1.1rem 1.25rem",background:"white",textAlign:"center"}}>
       <div style={{fontSize:"0.7rem",fontWeight:700,color,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"0.4rem"}}>{label}</div>
@@ -704,9 +984,12 @@ function SummaryBox({label,value,color,sub,large}:{label:string;value:number;col
   );
 }
 
-function IndSummaryCard({num,weight,label,earned,max,color,scalePct,detail}:{num:string;weight:string;label:string;earned:number;max:number;color:string;scalePct:number;detail:string}) {
+function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, detail, locked, lockedAmount }:
+  { num:string; weight:string; label:string; earned:number; max:number; color:string; scalePct:number; detail:string; locked?:boolean; lockedAmount?:number }) {
+  const displayEarned = locked && lockedAmount != null ? lockedAmount : Math.round(earned);
   return (
-    <div style={{border:`1px solid ${color}20`,borderTop:`3px solid ${color}`,borderRadius:10,padding:"1rem 1.1rem",background:"white"}}>
+    <div style={{border:`1px solid ${color}20`,borderTop:`3px solid ${color}`,borderRadius:10,padding:"1rem 1.1rem",background:"white",position:"relative"}}>
+      {locked && <span style={{position:"absolute",top:"0.6rem",right:"0.75rem",fontSize:"0.65rem",background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",borderRadius:4,padding:"0.1rem 0.4rem",fontWeight:700}}>🔒 Bloqueado</span>}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.3rem"}}>
         <span style={{fontSize:"0.65rem",fontWeight:800,color,textTransform:"uppercase"}}>#{num} · {weight}</span>
         <span style={{fontSize:"0.65rem",color:"#94a3b8"}}>máx ${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(max)}</span>
@@ -717,14 +1000,15 @@ function IndSummaryCard({num,weight,label,earned,max,color,scalePct,detail}:{num
       </div>
       <div style={{fontSize:"0.7rem",color:"#64748b",marginBottom:"0.4rem"}}>{detail}</div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-        <div style={{fontSize:"1.05rem",fontWeight:800,color}}>${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(Math.round(earned))}</div>
+        <div style={{fontSize:"1.05rem",fontWeight:800,color}}>${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(displayEarned)}</div>
         <div style={{fontSize:"0.7rem",color:"#94a3b8"}}>{Math.round(scalePct*100)}%</div>
       </div>
     </div>
   );
 }
 
-function SubMetric({color,label,sublabel,scalePct,scales,children}:{color:string;label:string;sublabel:string;scalePct:number;scales:{r:string;p:string}[];children:React.ReactNode}) {
+function SubMetric({ color, label, sublabel, scalePct, scales, children }:
+  { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string}[]; children:React.ReactNode }) {
   return (
     <div style={{background:"#f8fafc",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
       <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1e293b",marginBottom:"0.15rem"}}>{label}</div>
