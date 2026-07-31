@@ -256,6 +256,19 @@ export interface StrategyEntry {
   bonusSamplesLockedAmount?: number;
 }
 
+export interface StrategyIncident {
+  id: number;
+  agentId: number;
+  year: string;
+  cycleId: string;
+  metricType: 'non_buyer' | 'neg_review';
+  orderNumber?: string;
+  username?: string;
+  note: string;
+  status: 'solved' | 'pending' | 'not_solved';
+  createdAt: string;
+}
+
 export interface StrategySample {
   id: number;
   agentId: number;

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
   getStrategySamples, createStrategySample, updateStrategySample,
   deleteStrategySample, lockSampleBonus, unlockSampleBonus,
+  getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -175,6 +176,58 @@ export default function StrategyDashboard() {
   const loadSamples = useCallback(async () => {
     setAllSamples(await getStrategySamples());
   }, []);
+
+  // ── Incident log state ────────────────────────────────────────────────────────
+  type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
+  const [incidents,     setIncidents]     = useState<Record<IncidentKey, StrategyIncident[]>>({});
+  const [openIncident,  setOpenIncident]  = useState<{agentId:number; metric:'non_buyer'|'neg_review'} | null>(null);
+  const [incidentForm,  setIncidentForm]  = useState<{orderNumber:string;username:string;note:string;status:'solved'|'pending'|'not_solved'}>({orderNumber:"",username:"",note:"",status:"pending"});
+  const [incidentSaving, setIncidentSaving] = useState(false);
+
+  const loadIncidents = useCallback(async (agentId: number, metric: 'non_buyer'|'neg_review') => {
+    const key = `${agentId}-${metric}`;
+    const data = await getStrategyIncidents(agentId, year, cycleId, metric);
+    setIncidents(p => ({ ...p, [key]: data }));
+  }, [year, cycleId]);
+
+  const openIncidentPanel = async (agentId: number, metric: 'non_buyer'|'neg_review') => {
+    if (openIncident?.agentId === agentId && openIncident?.metric === metric) {
+      setOpenIncident(null); return;
+    }
+    setOpenIncident({ agentId, metric });
+    setIncidentForm({ orderNumber:"", username:"", note:"", status:"pending" });
+    await loadIncidents(agentId, metric);
+  };
+
+  const submitIncident = async () => {
+    if (!openIncident || !incidentForm.note.trim()) return;
+    setIncidentSaving(true);
+    try {
+      const created = await createStrategyIncident({
+        agentId: openIncident.agentId, year, cycleId,
+        metricType: openIncident.metric,
+        orderNumber: incidentForm.orderNumber || undefined,
+        username: incidentForm.username || undefined,
+        note: incidentForm.note, status: incidentForm.status,
+      });
+      const key = `${openIncident.agentId}-${openIncident.metric}`;
+      setIncidents(p => ({ ...p, [key]: [created, ...(p[key] ?? [])] }));
+      setIncidentForm({ orderNumber:"", username:"", note:"", status:"pending" });
+    } finally { setIncidentSaving(false); }
+  };
+
+  const cycleIncidentStatus = async (inc: StrategyIncident) => {
+    const next: StrategyIncident["status"] = inc.status==="pending"?"not_solved":inc.status==="not_solved"?"solved":"pending";
+    await updateStrategyIncident(inc.id, { status: next });
+    const key = `${inc.agentId}-${inc.metricType}`;
+    setIncidents(p => ({ ...p, [key]: (p[key]??[]).map(x=>x.id===inc.id?{...x,status:next}:x) }));
+  };
+
+  const removeIncident = async (inc: StrategyIncident) => {
+    await deleteStrategyIncident(inc.id);
+    const key = `${inc.agentId}-${inc.metricType}`;
+    setIncidents(p => ({ ...p, [key]: (p[key]??[]).filter(x=>x.id!==inc.id) }));
+  };
 
   useEffect(() => { load(); },        [load]);
   useEffect(() => { loadSamples(); }, [loadSamples]);
@@ -815,7 +868,9 @@ export default function StrategyDashboard() {
                         {r:"2.31–2.50%", p:"50%",  setVal:2.40},
                         {r:"> 2.50%",    p:"0%",   setVal:2.60},
                       ]}
-                      onSetVal={v=>setF(ag.id,"nonBuyerFaultRate",v)}>
+                      onSetVal={v=>setF(ag.id,"nonBuyerFaultRate",v)}
+                      incidentCount={(incidents[`${ag.id}-non_buyer`]??[]).length}
+                      onOpenIncidents={()=>openIncidentPanel(ag.id,"non_buyer")}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={20} step={0.01} className="form-control"
                           value={nv(d.nonBuyerFaultRate)} onChange={e=>setF(ag.id,"nonBuyerFaultRate",parseFloat(e.target.value)||0)} />
@@ -830,7 +885,9 @@ export default function StrategyDashboard() {
                         {r:"1.31–1.60%", p:"25%",  setVal:1.45},
                         {r:"> 1.60%",    p:"0%",   setVal:1.70},
                       ]}
-                      onSetVal={v=>setF(ag.id,"negativeReviewRate",v)}>
+                      onSetVal={v=>setF(ag.id,"negativeReviewRate",v)}
+                      incidentCount={(incidents[`${ag.id}-neg_review`]??[]).length}
+                      onOpenIncidents={()=>openIncidentPanel(ag.id,"neg_review")}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={10} step={0.01} className="form-control"
                           value={nv(d.negativeReviewRate)} onChange={e=>setF(ag.id,"negativeReviewRate",parseFloat(e.target.value)||0)} />
@@ -838,6 +895,80 @@ export default function StrategyDashboard() {
                       </div>
                     </SubMetric>
                   </div>
+                  {/* ── Incident panel ─────────────────────────────────────── */}
+                  {openIncident?.agentId === ag.id && (() => {
+                    const metric = openIncident.metric;
+                    const key = `${ag.id}-${metric}`;
+                    const list = incidents[key] ?? [];
+                    const metricLabel = metric==="non_buyer" ? "Non-Buyer Fault Rate" : "Negative Review Rate";
+                    const STATUS_COLORS: Record<string, string> = { solved:"#16a34a", pending:"#ca8a04", not_solved:"#dc2626" };
+                    const STATUS_LABELS: Record<string, string> = { solved:"Resuelto ✓", pending:"Pendiente ◐", not_solved:"Sin solución ✗" };
+                    return (
+                      <div style={{marginTop:"1rem",border:`1.5px solid ${C.health}`,borderRadius:10,overflow:"hidden"}}>
+                        <div style={{background:C.health,padding:"0.6rem 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{color:"white",fontWeight:700,fontSize:"0.85rem"}}>Incidentes · {metricLabel}</span>
+                          <button onClick={()=>setOpenIncident(null)} style={{background:"transparent",border:"none",color:"white",cursor:"pointer",fontSize:"1rem",lineHeight:1}}>✕</button>
+                        </div>
+                        <div style={{padding:"1rem",background:"white"}}>
+                          {/* Add form */}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr auto",gap:"0.5rem",marginBottom:"1rem",alignItems:"end"}}>
+                            <div>
+                              <label style={lbl}>N° Orden</label>
+                              <input className="form-control" placeholder="Opcional" value={incidentForm.orderNumber}
+                                onChange={e=>setIncidentForm(f=>({...f,orderNumber:e.target.value}))} />
+                            </div>
+                            <div>
+                              <label style={lbl}>Usuario</label>
+                              <input className="form-control" placeholder="Opcional" value={incidentForm.username}
+                                onChange={e=>setIncidentForm(f=>({...f,username:e.target.value}))} />
+                            </div>
+                            <div>
+                              <label style={lbl}>Nota *</label>
+                              <input className="form-control" placeholder="¿Qué pasó?" value={incidentForm.note}
+                                onChange={e=>setIncidentForm(f=>({...f,note:e.target.value}))} />
+                            </div>
+                            <div style={{display:"flex",flexDirection:"column",gap:"0.25rem"}}>
+                              <label style={lbl}>Estado</label>
+                              <div style={{display:"flex",gap:"0.25rem"}}>
+                                {(["pending","not_solved","solved"] as const).map(s=>(
+                                  <button key={s} onClick={()=>setIncidentForm(f=>({...f,status:s}))}
+                                    style={{width:28,height:28,borderRadius:"50%",border:`2px solid ${STATUS_COLORS[s]}`,
+                                      background:incidentForm.status===s?STATUS_COLORS[s]:"white",cursor:"pointer"}}
+                                    title={STATUS_LABELS[s]} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <button className="btn btn-primary btn-sm" onClick={submitIncident} disabled={incidentSaving||!incidentForm.note.trim()} style={{marginBottom:"1rem"}}>
+                            {incidentSaving?"...":"+ Agregar incidente"}
+                          </button>
+                          {/* List */}
+                          {list.length===0
+                            ? <div style={{textAlign:"center",color:"#94a3b8",fontSize:"0.8rem",padding:"1rem"}}>Sin incidentes registrados</div>
+                            : <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+                                {list.map(inc=>(
+                                  <div key={inc.id} style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:"0.75rem",alignItems:"center",padding:"0.6rem 0.75rem",borderRadius:8,border:"1px solid #e2e8f0",background:"#f8fafc"}}>
+                                    <button onClick={()=>cycleIncidentStatus(inc)}
+                                      title={STATUS_LABELS[inc.status]}
+                                      style={{width:26,height:26,borderRadius:"50%",border:`2px solid ${STATUS_COLORS[inc.status]}`,
+                                        background:STATUS_COLORS[inc.status],cursor:"pointer",flexShrink:0}} />
+                                    <div>
+                                      <div style={{fontSize:"0.8rem",fontWeight:600,color:"#1e293b"}}>
+                                        {inc.orderNumber && <span style={{color:"#64748b",marginRight:"0.5rem"}}>#{inc.orderNumber}</span>}
+                                        {inc.username && <span style={{color:"#64748b",marginRight:"0.5rem"}}>@{inc.username}</span>}
+                                        {inc.note}
+                                      </div>
+                                      <div style={{fontSize:"0.68rem",color:"#94a3b8"}}>{STATUS_LABELS[inc.status]} · {inc.createdAt.slice(0,10)}</div>
+                                    </div>
+                                    <button onClick={()=>removeIncident(inc)} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:"0.9rem"}} title="Eliminar">✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                          }
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{marginTop:"1rem",padding:"0.65rem 1rem",background:"#f0fdf4",borderRadius:8,fontSize:"0.78rem",color:"#166534",border:"1px solid #bbf7d0"}}>
                     Score ponderado: Neg.Review {pct(pC)}×45% + Non-Buyer {pct(pB)}×50% + Product {pct(pA)}×5% → {pct(pA*0.05+pB*0.50+pC*0.45)} · Valores en 0 = sin dato
                   </div>
@@ -1036,11 +1167,21 @@ function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, deta
   );
 }
 
-function SubMetric({ color, label, sublabel, scalePct, scales, onSetVal, children }:
-  { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string;setVal?:number}[]; onSetVal?:(v:number)=>void; children:React.ReactNode }) {
+function SubMetric({ color, label, sublabel, scalePct, scales, onSetVal, incidentCount, onOpenIncidents, children }:
+  { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string;setVal?:number}[];
+    onSetVal?:(v:number)=>void; incidentCount?:number; onOpenIncidents?:()=>void; children:React.ReactNode }) {
   return (
     <div style={{background:"#f8fafc",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
-      <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1e293b",marginBottom:"0.15rem"}}>{label}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"0.15rem"}}>
+        <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1e293b"}}>{label}</div>
+        {onOpenIncidents && (
+          <button onClick={onOpenIncidents}
+            style={{fontSize:"0.65rem",fontWeight:700,color:"white",background:incidentCount&&incidentCount>0?"#dc2626":"#64748b",
+              border:"none",borderRadius:12,padding:"0.15rem 0.5rem",cursor:"pointer",whiteSpace:"nowrap",lineHeight:1.4}}>
+            {incidentCount&&incidentCount>0?`${incidentCount} incidente${incidentCount>1?"s":""}`:"Incidentes"}
+          </button>
+        )}
+      </div>
       <div style={{fontSize:"0.7rem",color:"#64748b",marginBottom:"0.75rem"}}>{sublabel}</div>
       {children}
       <div style={{height:6,background:"#e2e8f0",borderRadius:3,overflow:"hidden",margin:"0.6rem 0 0.4rem"}}>

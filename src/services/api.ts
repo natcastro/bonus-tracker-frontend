@@ -928,6 +928,58 @@ export async function unlockSampleBonus(agentId: number, year: string, cycleId: 
   if (error) throw error;
 }
 
+// ── Strategy Incidents ─────────────────────────────────────────────────────────
+
+export async function getStrategyIncidents(agentId: number, year: string, cycleId: string, metricType: 'non_buyer' | 'neg_review'): Promise<StrategyIncident[]> {
+  const { data, error } = await supabase
+    .from("strategy_incidents")
+    .select("*")
+    .eq("agent_id", agentId)
+    .eq("year", year)
+    .eq("cycle_id", cycleId)
+    .eq("metric_type", metricType)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapStrategyIncident);
+}
+
+export async function createStrategyIncident(i: Omit<StrategyIncident, "id" | "createdAt">): Promise<StrategyIncident> {
+  const { data, error } = await supabase
+    .from("strategy_incidents")
+    .insert({
+      agent_id: i.agentId, year: i.year, cycle_id: i.cycleId,
+      metric_type: i.metricType, order_number: i.orderNumber ?? null,
+      username: i.username ?? null, note: i.note, status: i.status,
+    })
+    .select().single();
+  if (error) throw new Error(error.message);
+  return mapStrategyIncident(data);
+}
+
+export async function updateStrategyIncident(id: number, fields: Partial<Pick<StrategyIncident, "orderNumber" | "username" | "note" | "status">>): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (fields.orderNumber !== undefined) patch.order_number = fields.orderNumber;
+  if (fields.username    !== undefined) patch.username     = fields.username;
+  if (fields.note        !== undefined) patch.note         = fields.note;
+  if (fields.status      !== undefined) patch.status       = fields.status;
+  const { error } = await supabase.from("strategy_incidents").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteStrategyIncident(id: number): Promise<void> {
+  const { error } = await supabase.from("strategy_incidents").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+function mapStrategyIncident(r: any): StrategyIncident {
+  return {
+    id: r.id, agentId: r.agent_id, year: r.year, cycleId: r.cycle_id,
+    metricType: r.metric_type, orderNumber: r.order_number ?? undefined,
+    username: r.username ?? undefined, note: r.note ?? "",
+    status: r.status ?? "pending", createdAt: r.created_at ?? "",
+  };
+}
+
 function mapStrategySample(r: any): StrategySample {
   return {
     id: r.id,
