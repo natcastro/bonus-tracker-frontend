@@ -238,6 +238,7 @@ export default function StrategyDashboard() {
   const [filterSku,    setFilterSku]    = useState("");
   const [filterStatus, setFilterStatus] = useState<"all"|"delivered"|"pending">("all");
   const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
+  const [showBanner,   setShowBanner]   = useState(true);
 
   const [showAdd,  setShowAdd]  = useState(false);
   const [editing,  setEditing]  = useState<StrategySample | null>(null);
@@ -514,22 +515,25 @@ export default function StrategyDashboard() {
             )}
 
             {/* Official period banner */}
-            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"0.85rem 1.1rem",marginBottom:"1.1rem",display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap"}}>
-              <div>
-                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#1d4ed8",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 0.2rem"}}>Período oficial del bono</p>
-                <p style={{fontWeight:800,fontSize:"1rem",color:"#1e293b",margin:0}}>{officialPeriod.from} → {officialPeriod.to}</p>
-              </div>
-              <div style={{flex:1,minWidth:260,fontSize:"0.75rem",color:"#3b82f6",lineHeight:1.5,paddingTop:"0.15rem"}}>
-                Bonus calculations are based on all eligible samples assigned to the selected bonus period, regardless of the table filters currently applied.
-              </div>
-              {stats.gracePeriodActive && (
-                <div style={{background:"#fefce8",border:"1px solid #fef08a",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#854d0e",fontWeight:600}}>
-                  ⏳ Período de gracia activo hasta {stats.graceEnd}
+            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,marginBottom:"1.1rem",overflow:"hidden"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.6rem 1.1rem",cursor:"pointer"}} onClick={()=>setShowBanner(v=>!v)}>
+                <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
+                  <span style={{fontWeight:700,fontSize:"0.72rem",color:"#1d4ed8",textTransform:"uppercase",letterSpacing:"0.06em"}}>Período oficial del bono</span>
+                  <span style={{fontWeight:800,fontSize:"0.95rem",color:"#1e293b"}}>{officialPeriod.from} → {officialPeriod.to}</span>
+                  {stats.gracePeriodActive && <span style={{background:"#fefce8",border:"1px solid #fef08a",borderRadius:6,padding:"0.1rem 0.5rem",fontSize:"0.72rem",color:"#854d0e",fontWeight:600}}>⏳ Gracia hasta {stats.graceEnd}</span>}
                 </div>
-              )}
-              {!stats.gracePeriodActive && (
-                <div style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#64748b",fontWeight:600}}>
-                  Período de gracia terminó el {stats.graceEnd}
+                <span style={{fontSize:"0.72rem",color:"#3b82f6",fontWeight:600}}>{showBanner ? "Ocultar ▲" : "Ver detalles ▼"}</span>
+              </div>
+              {showBanner && (
+                <div style={{padding:"0 1.1rem 0.85rem",display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap",borderTop:"1px solid #bfdbfe"}}>
+                  <div style={{flex:1,minWidth:260,fontSize:"0.75rem",color:"#3b82f6",lineHeight:1.5,paddingTop:"0.65rem"}}>
+                    Bonus calculations are based on all eligible samples assigned to the selected bonus period, regardless of the table filters currently applied.
+                  </div>
+                  {!stats.gracePeriodActive && (
+                    <div style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#64748b",fontWeight:600,marginTop:"0.65rem"}}>
+                      Período de gracia terminó el {stats.graceEnd}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
