@@ -473,8 +473,45 @@ export default function StrategyDashboard() {
               <div><h2>Sample Content Performance</h2>
                 <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #2 · 30% del bono variable · Máx $195.000 COP · Por creador (Coverage 80pts + Additional 20pts)</p>
               </div>
-              <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setEditing(null);setSErr("");}}>+ Agregar Sample</button>
             </header>
+
+            {/* Add/Edit form — appears at TOP so it's always visible */}
+            {(showAdd || editing) && (
+              <div className="card" style={{marginBottom:"1.1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                <h4 style={{margin:"0 0 1rem",color:C.samples}}>{editing?"Editar Sample":"Agregar Nuevo Sample"}</h4>
+                {sErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{sErr}</p>}
+                <form onSubmit={editing?submitEdit:submitSample}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:"0.75rem",marginBottom:"0.75rem"}}>
+                    {[
+                      {field:"username",label:"Username / User ID",ph:"@username",type:"text",req:true},
+                      {field:"sku",label:"SKU del producto",ph:"SKU-123",type:"text",req:true},
+                      {field:"sentDate",label:"Fecha de envío",ph:"",type:"date",req:true},
+                      {field:"videosPublished",label:"Videos publicados",ph:"0",type:"number",req:false},
+                      {field:"notes",label:"Notas",ph:"Opcional",type:"text",req:false},
+                    ].map(({field,label,ph,type,req})=>(
+                      <div key={field}><label style={lbl}>{label}</label>
+                        <input type={type} className="form-control" placeholder={ph} required={req} min={type==="number"?0:undefined}
+                          value={editing?(editing as any)[field]:(newS as any)[field]}
+                          onChange={e=>{const v=type==="number"?Number(e.target.value):e.target.value;
+                            editing?setEditing({...editing,[field]:v} as StrategySample):setNewS({...newS,[field]:v} as any);}} />
+                      </div>
+                    ))}
+                    <div><label style={lbl}>Estado de entrega</label>
+                      <select className="form-control"
+                        value={editing?editing.deliveryStatus:newS.deliveryStatus}
+                        onChange={e=>{const v=e.target.value as "delivered"|"pending";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
+                        <option value="delivered">Entregado</option>
+                        <option value="pending">Pendiente</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:"0.5rem"}}>
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={sSaving}>{sSaving?"...":editing?"Guardar cambios":"Agregar"}</button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{setShowAdd(false);setEditing(null);setSErr("");}}>Cancelar</button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             {/* Official period banner */}
             <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"0.85rem 1.1rem",marginBottom:"1.1rem",display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap"}}>
@@ -558,6 +595,13 @@ export default function StrategyDashboard() {
               </div>
             )}
 
+            {/* Add button — sits just above the filters */}
+            {!showAdd && !editing && (
+              <div style={{marginBottom:"0.75rem"}}>
+                <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setSErr("");}}>+ Agregar Sample</button>
+              </div>
+            )}
+
             {/* Filters */}
             <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
@@ -583,44 +627,6 @@ export default function StrategyDashboard() {
                 </div>
               </div>
             </div>
-
-            {/* Add/Edit form */}
-            {(showAdd || editing) && (
-              <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
-                <h4 style={{margin:"0 0 1rem",color:C.samples}}>{editing?"Editar Sample":"Agregar Nuevo Sample"}</h4>
-                {sErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{sErr}</p>}
-                <form onSubmit={editing?submitEdit:submitSample}>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:"0.75rem",marginBottom:"0.75rem"}}>
-                    {[
-                      {field:"username",label:"Username / User ID",ph:"@username",type:"text",req:true},
-                      {field:"sku",label:"SKU del producto",ph:"SKU-123",type:"text",req:true},
-                      {field:"sentDate",label:"Fecha de envío",ph:"",type:"date",req:true},
-                      {field:"videosPublished",label:"Videos publicados",ph:"0",type:"number",req:false},
-                      {field:"notes",label:"Notas",ph:"Opcional",type:"text",req:false},
-                    ].map(({field,label,ph,type,req})=>(
-                      <div key={field}><label style={lbl}>{label}</label>
-                        <input type={type} className="form-control" placeholder={ph} required={req} min={type==="number"?0:undefined}
-                          value={editing?(editing as any)[field]:(newS as any)[field]}
-                          onChange={e=>{const v=type==="number"?Number(e.target.value):e.target.value;
-                            editing?setEditing({...editing,[field]:v} as StrategySample):setNewS({...newS,[field]:v} as any);}} />
-                      </div>
-                    ))}
-                    <div><label style={lbl}>Estado de entrega</label>
-                      <select className="form-control"
-                        value={editing?editing.deliveryStatus:newS.deliveryStatus}
-                        onChange={e=>{const v=e.target.value as "delivered"|"pending";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
-                        <option value="delivered">Entregado</option>
-                        <option value="pending">Pendiente</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:"0.5rem"}}>
-                    <button type="submit" className="btn btn-primary btn-sm" disabled={sSaving}>{sSaving?"...":editing?"Guardar cambios":"Agregar"}</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{setShowAdd(false);setEditing(null);setSErr("");}}>Cancelar</button>
-                  </div>
-                </form>
-              </div>
-            )}
 
             {/* Password prompts */}
             {delPw && (
