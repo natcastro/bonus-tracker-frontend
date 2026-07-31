@@ -42,9 +42,9 @@ const IND3_MAX  = 130_000;
 const IND4_MAX  =  65_000;
 
 function roiScale(v: number) { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
-function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.6)return 1;if(v>=4.5)return .80;if(v>=4.3)return .60;if(v>=4.2)return .30;if(v>=4.1)return .10;return 0; }
-function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2)return 1;if(v<=2.5)return .50;return 0; }
-function negReviewScale(v: number)   { if(v<=0)return 0;if(v<=0.45)return 1;if(v<=0.80)return .50;if(v<=1.20)return .25;return 0; }
+function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.5)return 1;if(v>=4.3)return .80;if(v>=4.2)return .40;if(v>=4.1)return .30;return 0; }
+function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2.10)return 1;if(v<=2.20)return .80;if(v<=2.30)return .60;if(v<=2.50)return .50;return 0; }
+function negReviewScale(v: number)   { if(v<=0)return 0;if(v<0.55)return 1;if(v<=0.90)return .75;if(v<=1.30)return .50;if(v<=1.60)return .25;return 0; }
 function operativeScale(v: number)   { if(v>=100)return 1;if(v>=80)return .75;if(v>=60)return .50;if(v>=40)return .25;return 0; }
 
 // finalScore: 0–100 (Coverage 80pts + Additional 20pts)
@@ -54,7 +54,7 @@ function calcBonus(e: StrategyEntry, finalScore: number) {
   const pA = productScoreScale(e.productScore);
   const pB = nonBuyerScale(e.nonBuyerFaultRate);
   const pC = negReviewScale(e.negativeReviewRate);
-  const ind3 = IND3_MAX * (pA * 0.10 + pB * 0.45 + pC * 0.45);
+  const ind3 = IND3_MAX * (pA * 0.05 + pB * 0.50 + pC * 0.45);
   const ind4  = IND4_MAX * operativeScale(e.operativeCompliancePct);
   const bonoVariable = ind1 + ind2 + ind3 + ind4;
   return { ind1, ind2, ind3, pA, pB, pC, ind4, bonoVariable, total: BONO_BASE + bonoVariable };
@@ -391,7 +391,7 @@ export default function StrategyDashboard() {
                         locked={entry.bonusSamplesLocked}
                         lockedAmount={entry.bonusSamplesLockedAmount} />
                       <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health}
-                        scalePct={b!.pA*0.10+b!.pB*0.45+b!.pC*0.45}
+                        scalePct={b!.pA*0.05+b!.pB*0.50+b!.pC*0.45}
                         detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
                       <IndSummaryCard num="4" weight="10%" label="Cumplimiento Operativo" earned={b!.ind4} max={IND4_MAX} color={C.operative}
                         scalePct={operativeScale(entry.operativeCompliancePct)}
@@ -781,7 +781,7 @@ export default function StrategyDashboard() {
             {agents.map(ag=>{
               const d = drafts[ag.id]; if(!d) return null;
               const pA=productScoreScale(d.productScore), pB=nonBuyerScale(d.nonBuyerFaultRate), pC=negReviewScale(d.negativeReviewRate);
-              const earned=IND3_MAX*(pA*0.10+pB*0.45+pC*0.45);
+              const earned=IND3_MAX*(pA*0.05+pB*0.50+pC*0.45);
               return (
                 <div key={ag.id} className="card" style={{borderTop:`3px solid ${C.health}`,marginBottom:"1rem"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem",flexWrap:"wrap",gap:"0.5rem"}}>
@@ -795,21 +795,42 @@ export default function StrategyDashboard() {
                     </div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"1rem"}}>
-                    <SubMetric color={C.health} label="A. Product Satisfaction Score" sublabel="Meta: ≥ 4.5 · Peso: 10%" scalePct={pA}
-                      scales={[{r:"≥ 4.6",p:"100%"},{r:"4.5–4.59",p:"80%"},{r:"4.3–4.49",p:"60%"},{r:"4.2–4.29",p:"30%"},{r:"4.1–4.19",p:"10%"},{r:"< 4.1",p:"0%"}]}>
+                    <SubMetric color={C.health} label="A. Product Satisfaction Score" sublabel="Meta: ≥ 4.5 · Peso: 5%" scalePct={pA}
+                      scales={[
+                        {r:"≥ 4.5",   p:"100%", setVal:4.5},
+                        {r:"4.3–4.49",p:"80%",  setVal:4.3},
+                        {r:"4.2–4.29",p:"40%",  setVal:4.2},
+                        {r:"4.1–4.19",p:"30%",  setVal:4.1},
+                        {r:"< 4.1",   p:"0%",   setVal:4.0},
+                      ]}
+                      onSetVal={v=>setF(ag.id,"productScore",v)}>
                       <input type="number" min={0} max={5} step={0.01} className="form-control"
                         value={nv(d.productScore)} onChange={e=>setF(ag.id,"productScore",parseFloat(e.target.value)||0)} />
                     </SubMetric>
-                    <SubMetric color={C.health} label="B. Non-Buyer Fault Rate" sublabel="Meta: < 2% · Peso: 45%" scalePct={pB}
-                      scales={[{r:"≤ 2%",p:"100%"},{r:"2.01–2.50%",p:"50%"},{r:"> 2.50%",p:"0%"}]}>
+                    <SubMetric color={C.health} label="B. Non-Buyer Fault Rate" sublabel="Meta: ≤ 2.10% · Peso: 50%" scalePct={pB}
+                      scales={[
+                        {r:"≤ 2.10%",    p:"100%", setVal:2.10},
+                        {r:"2.11–2.20%", p:"80%",  setVal:2.15},
+                        {r:"2.21–2.30%", p:"60%",  setVal:2.25},
+                        {r:"2.31–2.50%", p:"50%",  setVal:2.40},
+                        {r:"> 2.50%",    p:"0%",   setVal:2.60},
+                      ]}
+                      onSetVal={v=>setF(ag.id,"nonBuyerFaultRate",v)}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={20} step={0.01} className="form-control"
                           value={nv(d.nonBuyerFaultRate)} onChange={e=>setF(ag.id,"nonBuyerFaultRate",parseFloat(e.target.value)||0)} />
                         <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
                       </div>
                     </SubMetric>
-                    <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 1.2% · Peso: 45%" scalePct={pC}
-                      scales={[{r:"≤ 0.45%",p:"100%"},{r:"≤ 0.80%",p:"50%"},{r:"≤ 1.20%",p:"25%"},{r:"> 1.20%",p:"0%"}]}>
+                    <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 0.55% · Peso: 45%" scalePct={pC}
+                      scales={[
+                        {r:"< 0.55%",    p:"100%", setVal:0.40},
+                        {r:"0.55–0.90%", p:"75%",  setVal:0.70},
+                        {r:"0.91–1.30%", p:"50%",  setVal:1.10},
+                        {r:"1.31–1.60%", p:"25%",  setVal:1.45},
+                        {r:"> 1.60%",    p:"0%",   setVal:1.70},
+                      ]}
+                      onSetVal={v=>setF(ag.id,"negativeReviewRate",v)}>
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={10} step={0.01} className="form-control"
                           value={nv(d.negativeReviewRate)} onChange={e=>setF(ag.id,"negativeReviewRate",parseFloat(e.target.value)||0)} />
@@ -818,7 +839,7 @@ export default function StrategyDashboard() {
                     </SubMetric>
                   </div>
                   <div style={{marginTop:"1rem",padding:"0.65rem 1rem",background:"#f0fdf4",borderRadius:8,fontSize:"0.78rem",color:"#166534",border:"1px solid #bbf7d0"}}>
-                    Score ponderado: Neg.Review {pct(pC)}×45% + Non-Buyer {pct(pB)}×45% + Product {pct(pA)}×10% → {pct(pA*0.10+pB*0.45+pC*0.45)} · Valores en 0 = sin dato
+                    Score ponderado: Neg.Review {pct(pC)}×45% + Non-Buyer {pct(pB)}×50% + Product {pct(pA)}×5% → {pct(pA*0.05+pB*0.50+pC*0.45)} · Valores en 0 = sin dato
                   </div>
                 </div>
               );
@@ -1015,8 +1036,8 @@ function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, deta
   );
 }
 
-function SubMetric({ color, label, sublabel, scalePct, scales, children }:
-  { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string}[]; children:React.ReactNode }) {
+function SubMetric({ color, label, sublabel, scalePct, scales, onSetVal, children }:
+  { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string;setVal?:number}[]; onSetVal?:(v:number)=>void; children:React.ReactNode }) {
   return (
     <div style={{background:"#f8fafc",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
       <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1e293b",marginBottom:"0.15rem"}}>{label}</div>
@@ -1025,13 +1046,24 @@ function SubMetric({ color, label, sublabel, scalePct, scales, children }:
       <div style={{height:6,background:"#e2e8f0",borderRadius:3,overflow:"hidden",margin:"0.6rem 0 0.4rem"}}>
         <div style={{width:`${scalePct*100}%`,height:"100%",background:color,transition:"width 0.3s",borderRadius:3}} />
       </div>
-      <div style={{fontSize:"0.7rem",color,fontWeight:700,marginBottom:"0.6rem"}}>{Math.round(scalePct*100)}% de este sub-indicador</div>
-      <div style={{display:"flex",flexDirection:"column",gap:"0.25rem"}}>
-        {scales.map(s=>(
-          <div key={s.r} style={{display:"flex",justifyContent:"space-between",fontSize:"0.68rem",color:"#64748b",padding:"0.1rem 0"}}>
-            <span>{s.r}</span><span style={{fontWeight:600}}>{s.p}</span>
-          </div>
-        ))}
+      <div style={{fontSize:"0.7rem",color,fontWeight:700,marginBottom:"0.5rem"}}>{Math.round(scalePct*100)}% de este sub-indicador</div>
+      {onSetVal && <div style={{fontSize:"0.6rem",color:"#94a3b8",marginBottom:"0.35rem"}}>Clic para autocompletar →</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:"0.2rem"}}>
+        {scales.map(s=>{
+          const clickable = onSetVal && s.setVal != null;
+          return (
+            <div key={s.r}
+              onClick={clickable ? ()=>onSetVal!(s.setVal!) : undefined}
+              style={{display:"flex",justifyContent:"space-between",fontSize:"0.68rem",padding:"0.2rem 0.4rem",borderRadius:4,
+                cursor:clickable?"pointer":"default",
+                color:clickable?"#374151":"#64748b",
+                border:clickable?"1px solid #e2e8f0":"1px solid transparent",
+                background:"white",transition:"background 0.15s"}}>
+              <span>{s.r}</span>
+              <span style={{fontWeight:700,color:clickable?color:"#64748b"}}>{s.p}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
