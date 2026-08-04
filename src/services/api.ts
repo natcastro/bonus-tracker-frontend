@@ -7,7 +7,7 @@ import type {
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
-  StrategyEntry, StrategySample,
+  StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -854,6 +854,21 @@ function mapStrategyEntry(r: any): StrategyEntry {
   };
 }
 
+// ── Sample Catalog ─────────────────────────────────────────────────────────────
+
+export async function getSampleCatalog(): Promise<SampleCatalogItem[]> {
+  const { data, error } = await supabase
+    .from("strategy_sample_catalog")
+    .select("*")
+    .eq("active", true)
+    .order("sort_order");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(r => ({
+    id: r.id, productName: r.product_name, productId: r.product_id ?? "",
+    monthlyQuota: r.monthly_quota, active: r.active, sortOrder: r.sort_order,
+  }));
+}
+
 // ── Strategy Samples ───────────────────────────────────────────────────────────
 
 export async function getStrategySamples(): Promise<StrategySample[]> {
@@ -879,6 +894,7 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
       notes: s.notes,
       delivery_status: s.deliveryStatus ?? "delivered",
       bonus_cycle_key: s.bonusCycleKey ?? null,
+      catalog_id: s.catalogId ?? null,
     })
     .select()
     .single();
@@ -886,7 +902,7 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
   return mapStrategySample(data);
 }
 
-export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate" | "deliveryStatus" | "bonusCycleKey">>): Promise<void> {
+export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate" | "deliveryStatus" | "bonusCycleKey" | "catalogId">>): Promise<void> {
   const patch: any = {};
   if (fields.videosPublished != null) patch.videos_published = fields.videosPublished;
   if (fields.notes != null) patch.notes = fields.notes;
@@ -895,6 +911,7 @@ export async function updateStrategySample(id: number, fields: Partial<Pick<Stra
   if (fields.sentDate != null) patch.sent_date = fields.sentDate;
   if (fields.deliveryStatus != null) patch.delivery_status = fields.deliveryStatus;
   if (fields.bonusCycleKey !== undefined) patch.bonus_cycle_key = fields.bonusCycleKey;
+  if (fields.catalogId !== undefined) patch.catalog_id = fields.catalogId ?? null;
   const { error } = await supabase.from("strategy_samples").update(patch).eq("id", id);
   if (error) throw error;
 }
@@ -993,5 +1010,6 @@ function mapStrategySample(r: any): StrategySample {
     notes: r.notes ?? "",
     deliveryStatus: r.delivery_status ?? "delivered",
     bonusCycleKey: r.bonus_cycle_key ?? undefined,
+    catalogId: r.catalog_id ?? undefined,
   };
 }

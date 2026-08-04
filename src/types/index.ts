@@ -256,6 +256,15 @@ export interface StrategyEntry {
   bonusSamplesLockedAmount?: number;
 }
 
+export interface SampleCatalogItem {
+  id: number;
+  productName: string;
+  productId: string;
+  monthlyQuota: number;
+  active: boolean;
+  sortOrder: number;
+}
+
 export interface StrategyIncident {
   id: number;
   agentId: number;
@@ -280,5 +289,6 @@ export interface StrategySample {
   month: number;
   notes: string;
   deliveryStatus: "delivered" | "pending";
-  bonusCycleKey?: string; // "year-cycleId" override, e.g. "2026-7"
+  bonusCycleKey?: string;
+  catalogId?: number;
 }

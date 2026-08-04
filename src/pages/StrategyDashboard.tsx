@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
   getStrategySamples, createStrategySample, updateStrategySample,
   deleteStrategySample, lockSampleBonus, unlockSampleBonus,
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
+  getSampleCatalog,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -177,6 +178,15 @@ export default function StrategyDashboard() {
     setAllSamples(await getStrategySamples());
   }, []);
 
+  const [catalog, setCatalog] = useState<SampleCatalogItem[]>([]);
+  useEffect(() => { getSampleCatalog().then(setCatalog).catch(()=>{}); }, []);
+
+  // Samples sub-tab and inventory month
+  const [samplesTab, setSamplesTab] = useState<"tracking"|"inventory">("tracking");
+  const [invMonth, setInvMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  });
+
   // ── Incident log state ────────────────────────────────────────────────────────
   type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
   const [incidents,     setIncidents]     = useState<Record<IncidentKey, StrategyIncident[]>>({});
@@ -298,7 +308,7 @@ export default function StrategyDashboard() {
   const [sErr,     setSErr]     = useState("");
   const [sSaving,  setSSaving]  = useState(false);
 
-  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "delivered"|"pending" });
+  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "delivered"|"pending", catalogId: undefined as number|undefined });
 
   // Password prompts
   const [delPw,  setDelPw]  = useState<{ id:number; pw:string; err:string } | null>(null);
@@ -329,8 +339,8 @@ export default function StrategyDashboard() {
     try {
       await createStrategySample({ agentId, username:newS.username.trim(), sku:newS.sku.trim(),
         sentDate:newS.sentDate, videosPublished:newS.videosPublished, year:sy, month:sm,
-        notes:newS.notes, deliveryStatus:newS.deliveryStatus });
-      setNewS({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" });
+        notes:newS.notes, deliveryStatus:newS.deliveryStatus, catalogId:newS.catalogId });
+      setNewS({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered", catalogId:undefined });
       setShowAdd(false);
       await loadSamples();
     } catch(err: any) { setSErr(err?.message ?? "Error al guardar."); }
@@ -529,6 +539,88 @@ export default function StrategyDashboard() {
               </div>
             </header>
 
+            {/* Sub-tabs */}
+            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.25rem",borderBottom:"2px solid #e2e8f0",paddingBottom:"0"}}>
+              {([["tracking","📦 Tracking"],["inventory","📋 Inventario de Samples"]] as const).map(([k,l])=>(
+                <button key={k} onClick={()=>setSamplesTab(k)}
+                  style={{padding:"0.5rem 1.1rem",border:"none",borderBottom:samplesTab===k?`2px solid ${C.samples}`:"2px solid transparent",
+                    marginBottom:-2,background:"transparent",fontWeight:samplesTab===k?700:500,
+                    color:samplesTab===k?C.samples:"#64748b",cursor:"pointer",fontSize:"0.85rem"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* ── INVENTORY TAB ─────────────────────────────────────────────── */}
+            {samplesTab==="inventory" && (
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
+                  <div>
+                    <label style={lbl}>Mes</label>
+                    <input type="month" className="form-control" value={invMonth} onChange={e=>setInvMonth(e.target.value)} style={{maxWidth:170}} />
+                  </div>
+                  <div style={{fontSize:"0.8rem",color:"#64748b",marginTop:"1rem"}}>
+                    Mostrando samples enviados en {new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"})}
+                  </div>
+                </div>
+                {catalog.length === 0
+                  ? <div className="card" style={{textAlign:"center",color:"#94a3b8",padding:"2rem"}}>
+                      Catálogo vacío — agrega productos en Supabase (tabla strategy_sample_catalog)
+                    </div>
+                  : <div className="card" style={{overflowX:"auto",padding:0}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
+                        <thead>
+                          <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
+                            {["Producto","Product ID","Cuota mensual","Enviados","Disponibles","Estado"].map(h=>(
+                              <th key={h} style={{padding:"0.75rem 1rem",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:"0.72rem",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {catalog.map((item,i)=>{
+                            const sent = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth)).length;
+                            const avail = Math.max(0, item.monthlyQuota - sent);
+                            const done  = sent >= item.monthlyQuota;
+                            const started = sent > 0 && !done;
+                            return (
+                              <tr key={item.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"white":"#fafafa"}}>
+                                <td style={{padding:"0.75rem 1rem",fontWeight:600,color:"#1e293b",maxWidth:320}}>{item.productName}</td>
+                                <td style={{padding:"0.75rem 1rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.75rem",whiteSpace:"nowrap"}}>{item.productId || "—"}</td>
+                                <td style={{padding:"0.75rem 1rem",fontWeight:700,color:"#1e293b",textAlign:"center"}}>{item.monthlyQuota}</td>
+                                <td style={{padding:"0.75rem 1rem",fontWeight:700,textAlign:"center",color:done?"#15803d":started?"#ca8a04":"#64748b"}}>{sent}</td>
+                                <td style={{padding:"0.75rem 1rem",textAlign:"center",color:done?"#94a3b8":"#1e293b"}}>{avail}</td>
+                                <td style={{padding:"0.75rem 1rem"}}>
+                                  <span style={{display:"inline-block",padding:"0.2rem 0.75rem",borderRadius:20,fontSize:"0.72rem",fontWeight:700,
+                                    background:done?"#dcfce7":started?"#fef9c3":"#f1f5f9",
+                                    color:done?"#15803d":started?"#854d0e":"#64748b",
+                                    border:`1px solid ${done?"#bbf7d0":started?"#fef08a":"#e2e8f0"}`}}>
+                                    {done?"✓ Completo":started?"En progreso":"Pendiente"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
+                            <td colSpan={2} style={{padding:"0.65rem 1rem",fontWeight:700,color:"#64748b",fontSize:"0.78rem"}}>TOTAL</td>
+                            <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:"#1e293b"}}>
+                              {catalog.reduce((s,c)=>s+c.monthlyQuota,0)}
+                            </td>
+                            <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:C.samples}}>
+                              {catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth)).length,0)}
+                            </td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                }
+              </div>
+            )}
+
+            {samplesTab==="tracking" && (<>
+
             {/* Official period banner */}
             <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,marginBottom:"1.1rem",overflow:"hidden"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.6rem 1.1rem",cursor:"pointer"}} onClick={()=>setShowBanner(v=>!v)}>
@@ -626,20 +718,45 @@ export default function StrategyDashboard() {
                 {sErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{sErr}</p>}
                 <form onSubmit={editing?submitEdit:submitSample}>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:"0.75rem",marginBottom:"0.75rem"}}>
-                    {[
-                      {field:"username",label:"Username / User ID",ph:"@username",type:"text",req:true},
-                      {field:"sku",label:"SKU del producto",ph:"SKU-123",type:"text",req:true},
-                      {field:"sentDate",label:"Fecha de envío",ph:"",type:"date",req:true},
-                      {field:"videosPublished",label:"Videos publicados",ph:"0",type:"number",req:false},
-                      {field:"notes",label:"Notas",ph:"Opcional",type:"text",req:false},
-                    ].map(({field,label,ph,type,req})=>(
-                      <div key={field}><label style={lbl}>{label}</label>
-                        <input type={type} className="form-control" placeholder={ph} required={req} min={type==="number"?0:undefined}
-                          value={editing?(editing as any)[field]:(newS as any)[field]}
-                          onChange={e=>{const v=type==="number"?Number(e.target.value):e.target.value;
-                            editing?setEditing({...editing,[field]:v} as StrategySample):setNewS({...newS,[field]:v} as any);}} />
-                      </div>
-                    ))}
+                    {/* Username */}
+                    <div><label style={lbl}>Username / User ID</label>
+                      <input type="text" className="form-control" placeholder="@username" required
+                        value={editing?editing.username:newS.username}
+                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,username:v}):setNewS({...newS,username:v});}} />
+                    </div>
+                    {/* SKU autocomplete */}
+                    <div style={{gridColumn:"span 2"}}>
+                      <label style={lbl}>Producto</label>
+                      <SkuSelect
+                        catalog={catalog}
+                        value={editing?editing.sku:newS.sku}
+                        onSelect={(sku,catId)=>{
+                          editing?setEditing({...editing,sku,catalogId:catId}):setNewS({...newS,sku,catalogId:catId});
+                        }} />
+                    </div>
+                    {/* Date */}
+                    <div><label style={lbl}>Fecha de envío</label>
+                      <input type="date" className="form-control" required
+                        value={editing?editing.sentDate:newS.sentDate}
+                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,sentDate:v}):setNewS({...newS,sentDate:v});}} />
+                    </div>
+                    {/* Videos */}
+                    <div><label style={lbl}>Videos publicados</label>
+                      <input type="number" className="form-control" placeholder="0" min={0}
+                        value={editing?nv(editing.videosPublished):nv(newS.videosPublished)}
+                        onChange={e=>{const v=Number(e.target.value); editing?setEditing({...editing,videosPublished:v}):setNewS({...newS,videosPublished:v});}} />
+                    </div>
+                    {/* Notes with size hint */}
+                    <div>
+                      <label style={{...lbl,display:"flex",gap:"0.3rem",alignItems:"center"}}>
+                        Notas
+                        <span title="Importante: incluye la talla del creador en las notas (ej: S, M, L, XL, 2XL)" style={{cursor:"help",color:"#f59e0b",fontSize:"0.8rem"}}>⚠️</span>
+                      </label>
+                      <input type="text" className="form-control" placeholder="Incluye la talla aquí (ej: M)"
+                        value={editing?editing.notes:newS.notes}
+                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,notes:v}):setNewS({...newS,notes:v});}} />
+                    </div>
+                    {/* Delivery status */}
                     <div><label style={lbl}>Estado de entrega</label>
                       <select className="form-control"
                         value={editing?editing.deliveryStatus:newS.deliveryStatus}
@@ -819,6 +936,7 @@ export default function StrategyDashboard() {
                 </div>
               );
             })}
+            </>)}
           </section>
         )}
 
@@ -1163,6 +1281,50 @@ function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, deta
         <div style={{fontSize:"1.05rem",fontWeight:800,color}}>${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(displayEarned)}</div>
         <div style={{fontSize:"0.7rem",color:"#94a3b8"}}>{Math.round(scalePct*100)}%</div>
       </div>
+    </div>
+  );
+}
+
+function SkuSelect({ catalog, value, onSelect }: {
+  catalog: SampleCatalogItem[];
+  value: string;
+  onSelect: (sku: string, catalogId: number | undefined) => void;
+}) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen]   = useState(false);
+  const filtered = query.trim().length === 0
+    ? catalog
+    : catalog.filter(c => c.productName.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div style={{position:"relative"}}>
+      <input
+        type="text"
+        className="form-control"
+        placeholder="Buscar producto... (ej: BBL, Corset, S-002)"
+        value={query}
+        onChange={e => { setQuery(e.target.value); onSelect(e.target.value, undefined); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        required
+      />
+      {open && filtered.length > 0 && (
+        <div style={{position:"absolute",zIndex:100,left:0,right:0,top:"100%",marginTop:2,
+          background:"white",border:"1px solid #e2e8f0",borderRadius:8,
+          boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:240,overflowY:"auto"}}>
+          {filtered.map(c => (
+            <div key={c.id}
+              onMouseDown={() => { setQuery(c.productName); onSelect(c.productName, c.id); setOpen(false); }}
+              style={{padding:"0.55rem 0.85rem",cursor:"pointer",borderBottom:"1px solid #f1f5f9",
+                display:"flex",flexDirection:"column",gap:"0.1rem"}}
+              onMouseEnter={e=>(e.currentTarget.style.background="#f0f9ff")}
+              onMouseLeave={e=>(e.currentTarget.style.background="white")}>
+              <span style={{fontSize:"0.82rem",fontWeight:600,color:"#1e293b"}}>{c.productName}</span>
+              {c.productId && <span style={{fontSize:"0.68rem",color:"#94a3b8",fontFamily:"monospace"}}>ID: {c.productId}</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
