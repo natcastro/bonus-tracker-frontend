@@ -315,6 +315,10 @@ export default function StrategyDashboard() {
   const [movePw, setMovePw] = useState<{ id:number; pw:string; err:string } | null>(null);
   const [lockPw, setLockPw] = useState<{ agId:number; action:"lock"|"unlock"; pw:string; err:string } | null>(null);
 
+  const activeCatalogIds = new Set(catalog.map(c => c.id));
+  const isInactiveProduct = (s: StrategySample) =>
+    s.catalogId !== undefined && !activeCatalogIds.has(s.catalogId);
+
   // Sync local filter from/to are not needed — we filter on officialSamples directly
   const tableRows = stats.officialSamples
     .filter(s => filterStatus === "all" || s.deliveryStatus === filterStatus)
@@ -828,8 +832,9 @@ export default function StrategyDashboard() {
                     <tbody>
                       {tableRows.map(s => {
                         const totalForCreator = stats.byCreator[s.username] ?? 0;
+                        const inactive = isInactiveProduct(s);
                         return (
-                          <tr key={s.id} style={{background:s.deliveryStatus==="pending"?"#fffbeb":undefined}}>
+                          <tr key={s.id} style={{background:inactive?"#fef2f2":s.deliveryStatus==="pending"?"#fffbeb":undefined}}>
                             <td>
                               {s.deliveryStatus==="pending" ? (
                                 <span style={{background:"#fef3c7",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>⏳ Pendiente</span>
@@ -838,7 +843,10 @@ export default function StrategyDashboard() {
                               )}
                             </td>
                             <td style={{fontWeight:600}}>{s.username}</td>
-                            <td><span style={{background:"#f1f5f9",borderRadius:4,padding:"0.1rem 0.45rem",fontSize:"0.8rem",fontFamily:"monospace"}}>{s.sku}</span></td>
+                            <td>
+                              <span style={{background:"#f1f5f9",borderRadius:4,padding:"0.1rem 0.45rem",fontSize:"0.8rem",fontFamily:"monospace"}}>{s.sku}</span>
+                              {inactive && <span style={{marginLeft:"0.4rem",background:"#fee2e2",color:"#b91c1c",borderRadius:4,padding:"0.1rem 0.4rem",fontSize:"0.68rem",fontWeight:700}}>DESCONTINUADO</span>}
+                            </td>
                             <td>{s.sentDate}</td>
                             <td><span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"0":"✓ "+s.videosPublished}</span></td>
                             <td style={{fontSize:"0.75rem"}}>
