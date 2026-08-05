@@ -396,7 +396,7 @@ export default function OperationsDashboard() {
               <table className="data-table">
                 <thead><tr><th>Handling Time</th><th>Bonus</th></tr></thead>
                 <tbody>
-                  {[["≤ 15 h","$50"],["15 – 20 h","$40"],["20 – 25 h","$30"],["25 – 30 h","$20"],["30 – 35 h","$10"],["> 35 h","$0"]].map(([r, b]) => (
+                  {[["≤ 30 h","$50"],["30 – 32 h","$40"],["32 – 34 h","$30"],["34 – 36 h","$20"],["36 – 38.5 h","$10"],["> 38.5 h","$0"]].map(([r, b]) => (
                     <tr key={r}><td>{r}</td><td>{b}</td></tr>
                   ))}
                 </tbody>
