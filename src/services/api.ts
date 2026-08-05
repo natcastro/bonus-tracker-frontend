@@ -865,6 +865,7 @@ export async function getLogisticsOrders(): Promise<LogisticsOrder[]> {
   if (error) throw new Error(error.message);
   return (data ?? []).map(r => ({
     id: r.id,
+    storeId: r.store_id ?? 1,
     platform: (r.platform ?? "other") as LogisticsOrder["platform"],
     article: r.article,
     orderNumber: r.order_number,
@@ -880,7 +881,7 @@ export async function getLogisticsOrders(): Promise<LogisticsOrder[]> {
 
 export async function createLogisticsOrder(o: Omit<LogisticsOrder, "id" | "createdAt" | "doneAt">): Promise<void> {
   const { error } = await supabase.from("logistics_orders").insert({
-    platform: o.platform, article: o.article, order_number: o.orderNumber,
+    store_id: o.storeId, platform: o.platform, article: o.article, order_number: o.orderNumber,
     tracking_number: o.trackingNumber ?? null,
     label_url: o.labelUrl ?? null, status: "pending",
     ship_date: o.shipDate ?? null, notes: o.notes ?? "",
@@ -900,8 +901,9 @@ export async function markLogisticsOrderPending(id: number): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function updateLogisticsOrder(id: number, o: Partial<Pick<LogisticsOrder, "platform"|"article"|"orderNumber"|"trackingNumber"|"labelUrl"|"shipDate"|"notes">>): Promise<void> {
+export async function updateLogisticsOrder(id: number, o: Partial<Pick<LogisticsOrder, "storeId"|"platform"|"article"|"orderNumber"|"trackingNumber"|"labelUrl"|"shipDate"|"notes">>): Promise<void> {
   const patch: Record<string, unknown> = {};
+  if (o.storeId         !== undefined) patch.store_id        = o.storeId;
   if (o.platform        !== undefined) patch.platform        = o.platform;
   if (o.article         !== undefined) patch.article         = o.article;
   if (o.orderNumber     !== undefined) patch.order_number    = o.orderNumber;

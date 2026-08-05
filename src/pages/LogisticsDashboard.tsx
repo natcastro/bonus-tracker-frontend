@@ -7,6 +7,14 @@ import {
   deleteLogisticsOrder, uploadLogisticsLabel,
 } from "../services/api";
 
+// ── Store config ──────────────────────────────────────────────────────────────
+
+const NUM_STORES = 9;
+const STORE_COLORS = [
+  "#1e40af","#15803d","#b45309","#7c3aed",
+  "#be185d","#0891b2","#dc2626","#065f46","#92400e",
+];
+
 // ── Platform config ───────────────────────────────────────────────────────────
 
 type Platform = LogisticsOrder["platform"];
@@ -67,11 +75,11 @@ function inDateRange(o: LogisticsOrder, from: string, to: string): boolean {
 // ── Form state ────────────────────────────────────────────────────────────────
 
 type FormState = {
-  platform: Platform; article: string; orderNumber: string; trackingNumber: string;
+  storeId: number; platform: Platform; article: string; orderNumber: string; trackingNumber: string;
   shipDate: string; labelType: "url" | "file"; labelUrl: string; labelFile: File | null; notes: string;
 };
 const EMPTY_FORM: FormState = {
-  platform: "other", article: "", orderNumber: "", trackingNumber: "",
+  storeId: 1, platform: "other", article: "", orderNumber: "", trackingNumber: "",
   shipDate: "", labelType: "url", labelUrl: "", labelFile: null, notes: "",
 };
 
@@ -138,6 +146,9 @@ function OrderCard({ order, onDone, onUndo, onDelete, onEdit }: {
     }}>
       {/* Top badges */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.45rem" }}>
+        <span style={{ background: STORE_COLORS[(order.storeId - 1) % STORE_COLORS.length], color: "#fff", borderRadius: 6, padding: "0.12rem 0.55rem", fontSize: "0.68rem", fontWeight: 700 }}>
+          T{order.storeId}
+        </span>
         <span style={{
           background: pColor,
           color: order.platform === "amazon" ? "#78350f" : "#fff",
@@ -239,6 +250,22 @@ function ShipForm({ initial, onSave, onCancel, saving, err }: {
       marginBottom: "1rem", border: "2px solid #fca5a5",
       display: "flex", flexDirection: "column", gap: "0.75rem",
     }}>
+      {/* Store */}
+      <div>
+        <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginBottom: "0.35rem", letterSpacing: "0.05em" }}>TIENDA *</div>
+        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+          {Array.from({ length: NUM_STORES }, (_, i) => i + 1).map(n => (
+            <button key={n} type="button" onClick={() => setF(p => ({ ...p, storeId: n }))} style={{
+              padding: "0.35rem 0.75rem", borderRadius: 8,
+              border: `2px solid ${STORE_COLORS[(n - 1) % STORE_COLORS.length]}`,
+              background: f.storeId === n ? STORE_COLORS[(n - 1) % STORE_COLORS.length] : "#fff",
+              color: f.storeId === n ? "#fff" : STORE_COLORS[(n - 1) % STORE_COLORS.length],
+              fontWeight: 700, cursor: "pointer", fontSize: "0.8rem",
+            }}>T{n}</button>
+          ))}
+        </div>
+      </div>
+
       {/* Platform */}
       <div>
         <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginBottom: "0.35rem", letterSpacing: "0.05em" }}>PLATAFORMA *</div>
@@ -366,6 +393,8 @@ export default function LogisticsDashboard() {
   const [doneSortAsc, setDoneSortAsc]         = useState(true);
   const [pendingPlatform, setPendingPlatform] = useState<Platform | null>(null);
   const [donePlatform, setDonePlatform]       = useState<Platform | null>(null);
+  const [pendingStore, setPendingStore]       = useState<number | null>(null);
+  const [doneStore, setDoneStore]             = useState<number | null>(null);
   const [pendingFrom, setPendingFrom]         = useState("");
   const [pendingTo, setPendingTo]             = useState("");
   const [doneFrom, setDoneFrom]               = useState("");
@@ -388,15 +417,17 @@ export default function LogisticsDashboard() {
   // Derived lists
   const pendingOrders = useMemo(() => {
     let list = orders.filter(o => o.status === "pending");
+    if (pendingStore)   list = list.filter(o => o.storeId === pendingStore);
     if (pendingPlatform) list = list.filter(o => o.platform === pendingPlatform);
     list = list.filter(o => matches(o, pendingSearch));
     list = list.filter(o => inDateRange(o, pendingFrom, pendingTo));
     list.sort((a, b) => pendingSortAsc ? sortKey(a) - sortKey(b) : sortKey(b) - sortKey(a));
     return list;
-  }, [orders, pendingPlatform, pendingSearch, pendingSortAsc, pendingFrom, pendingTo]);
+  }, [orders, pendingStore, pendingPlatform, pendingSearch, pendingSortAsc, pendingFrom, pendingTo]);
 
   const doneOrders = useMemo(() => {
     let list = orders.filter(o => o.status === "done");
+    if (doneStore)   list = list.filter(o => o.storeId === doneStore);
     if (donePlatform) list = list.filter(o => o.platform === donePlatform);
     list = list.filter(o => matches(o, doneSearch));
     list = list.filter(o => inDateRange(o, doneFrom, doneTo));
@@ -406,7 +437,7 @@ export default function LogisticsDashboard() {
       return doneSortAsc ? ka - kb : kb - ka;
     });
     return list;
-  }, [orders, donePlatform, doneSearch, doneSortAsc, doneFrom, doneTo]);
+  }, [orders, doneStore, donePlatform, doneSearch, doneSortAsc, doneFrom, doneTo]);
 
   const handleAdd = async (f: FormState) => {
     setSaving(true); setFormErr("");
@@ -415,7 +446,7 @@ export default function LogisticsDashboard() {
       if (f.labelType === "url" && f.labelUrl.trim()) labelUrl = f.labelUrl.trim();
       else if (f.labelType === "file" && f.labelFile)  labelUrl = await uploadLogisticsLabel(f.labelFile);
       await createLogisticsOrder({
-        platform: f.platform, article: f.article.trim(), orderNumber: f.orderNumber.trim(),
+        storeId: f.storeId, platform: f.platform, article: f.article.trim(), orderNumber: f.orderNumber.trim(),
         trackingNumber: f.trackingNumber.trim() || undefined,
         labelUrl, shipDate: f.shipDate || undefined, notes: f.notes.trim(), status: "pending",
       });
@@ -433,7 +464,7 @@ export default function LogisticsDashboard() {
       if (f.labelType === "url")  labelUrl = f.labelUrl.trim() || undefined;
       else if (f.labelFile)       labelUrl = await uploadLogisticsLabel(f.labelFile);
       await updateLogisticsOrder(editing.id, {
-        platform: f.platform, article: f.article.trim(), orderNumber: f.orderNumber.trim(),
+        storeId: f.storeId, platform: f.platform, article: f.article.trim(), orderNumber: f.orderNumber.trim(),
         trackingNumber: f.trackingNumber.trim() || undefined,
         labelUrl, shipDate: f.shipDate || undefined, notes: f.notes.trim(),
       });
@@ -458,7 +489,7 @@ export default function LogisticsDashboard() {
   const showBoth = view === "both";
 
   const editInitial: FormState | undefined = editing ? {
-    platform: editing.platform, article: editing.article,
+    storeId: editing.storeId, platform: editing.platform, article: editing.article,
     orderNumber: editing.orderNumber, trackingNumber: editing.trackingNumber ?? "",
     shipDate: editing.shipDate ?? "", labelType: "url",
     labelUrl: editing.labelUrl ?? "", labelFile: null, notes: editing.notes ?? "",
@@ -472,8 +503,10 @@ export default function LogisticsDashboard() {
     const setSearch  = isPending ? setPendingSearch : setDoneSearch;
     const sortAsc    = isPending ? pendingSortAsc : doneSortAsc;
     const toggleSort = isPending ? () => setPendingSortAsc(v => !v) : () => setDoneSortAsc(v => !v);
-    const platform   = isPending ? pendingPlatform : donePlatform;
+    const platform    = isPending ? pendingPlatform : donePlatform;
     const setPlatform = isPending ? setPendingPlatform : setDonePlatform;
+    const store       = isPending ? pendingStore : doneStore;
+    const setStore    = isPending ? setPendingStore : setDoneStore;
     const dateFrom   = isPending ? pendingFrom : doneFrom;
     const dateTo     = isPending ? pendingTo   : doneTo;
     const setFrom    = isPending ? setPendingFrom : setDoneFrom;
@@ -506,6 +539,24 @@ export default function LogisticsDashboard() {
             <SearchBar value={search} onChange={setSearch} />
           </div>
           <SortToggle asc={sortAsc} onToggle={toggleSort} />
+        </div>
+
+        {/* Store chips */}
+        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+          <button onClick={() => setStore(null)} style={{
+            padding: "0.2rem 0.6rem", borderRadius: 20, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+            border: "1px solid #e2e8f0",
+            background: store === null ? "#0f172a" : "#fff",
+            color: store === null ? "#fff" : "#374151",
+          }}>Todas</button>
+          {Array.from({ length: NUM_STORES }, (_, i) => i + 1).map(n => (
+            <button key={n} onClick={() => setStore(store === n ? null : n)} style={{
+              padding: "0.2rem 0.55rem", borderRadius: 20, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+              border: `1.5px solid ${STORE_COLORS[(n - 1) % STORE_COLORS.length]}`,
+              background: store === n ? STORE_COLORS[(n - 1) % STORE_COLORS.length] : "#fff",
+              color: store === n ? "#fff" : STORE_COLORS[(n - 1) % STORE_COLORS.length],
+            }}>T{n}</button>
+          ))}
         </div>
 
         {/* Platform chips */}
