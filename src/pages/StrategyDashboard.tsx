@@ -1290,41 +1290,67 @@ function SkuSelect({ catalog, value, onSelect }: {
   value: string;
   onSelect: (sku: string, catalogId: number | undefined) => void;
 }) {
-  const [query, setQuery] = useState(value);
-  const [open, setOpen]   = useState(false);
+  const [query, setQuery]   = useState("");
+  const [open, setOpen]     = useState(false);
+  const selected = catalog.find(c => c.productName === value);
+
   const filtered = query.trim().length === 0
     ? catalog
     : catalog.filter(c => c.productName.toLowerCase().includes(query.toLowerCase()));
 
+  const handleOpen = () => { setQuery(""); setOpen(true); };
+  const handleClose = () => setTimeout(() => { setOpen(false); setQuery(""); }, 150);
+
   return (
     <div style={{position:"relative"}}>
-      <input
-        type="text"
-        className="form-control"
-        placeholder="Buscar producto... (ej: BBL, Corset, S-002)"
-        value={query}
-        onChange={e => { setQuery(e.target.value); onSelect(e.target.value, undefined); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        required
-      />
-      {open && filtered.length > 0 && (
-        <div style={{position:"absolute",zIndex:100,left:0,right:0,top:"100%",marginTop:2,
-          background:"white",border:"1px solid #e2e8f0",borderRadius:8,
-          boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:240,overflowY:"auto"}}>
-          {filtered.map(c => (
-            <div key={c.id}
-              onMouseDown={() => { setQuery(c.productName); onSelect(c.productName, c.id); setOpen(false); }}
-              style={{padding:"0.55rem 0.85rem",cursor:"pointer",borderBottom:"1px solid #f1f5f9",
-                display:"flex",flexDirection:"column",gap:"0.1rem"}}
-              onMouseEnter={e=>(e.currentTarget.style.background="#f0f9ff")}
-              onMouseLeave={e=>(e.currentTarget.style.background="white")}>
-              <span style={{fontSize:"0.82rem",fontWeight:600,color:"#1e293b"}}>{c.productName}</span>
-              {c.productId && <span style={{fontSize:"0.68rem",color:"#94a3b8",fontFamily:"monospace"}}>ID: {c.productId}</span>}
-            </div>
-          ))}
+      {/* Trigger — looks like a select */}
+      {!open ? (
+        <button type="button" onClick={handleOpen}
+          style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",
+            padding:"0.45rem 0.75rem",border:"1px solid #e2e8f0",borderRadius:8,background:"white",
+            cursor:"pointer",textAlign:"left",gap:"0.5rem",minHeight:38}}>
+          <span style={{fontSize:"0.85rem",color:selected?"#1e293b":"#94a3b8",flex:1,overflow:"hidden",
+            textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {selected ? selected.productName : "— Seleccionar producto —"}
+          </span>
+          <span style={{color:"#64748b",fontSize:"0.75rem",flexShrink:0}}>▼</span>
+        </button>
+      ) : (
+        /* Search input when open */
+        <input autoFocus type="text" className="form-control"
+          placeholder="Buscar (ej: BBL, Corset, S-002)..."
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onBlur={handleClose}
+          style={{borderRadius:"8px 8px 0 0"}}
+        />
+      )}
+
+      {/* Dropdown list */}
+      {open && (
+        <div style={{position:"absolute",zIndex:200,left:0,right:0,top:"100%",
+          background:"white",border:"1px solid #bae6fd",borderTop:"none",
+          borderRadius:"0 0 8px 8px",boxShadow:"0 8px 24px rgba(0,0,0,0.12)",
+          maxHeight:280,overflowY:"auto"}}>
+          {filtered.length === 0
+            ? <div style={{padding:"0.75rem 1rem",color:"#94a3b8",fontSize:"0.82rem"}}>Sin resultados</div>
+            : filtered.map(c => (
+                <div key={c.id}
+                  onMouseDown={() => { onSelect(c.productName, c.id); setOpen(false); setQuery(""); }}
+                  style={{padding:"0.6rem 1rem",cursor:"pointer",borderBottom:"1px solid #f1f5f9",
+                    display:"flex",flexDirection:"column",gap:"0.1rem",
+                    background:value===c.productName?"#eff6ff":"white"}}
+                  onMouseEnter={e=>(e.currentTarget.style.background="#f0f9ff")}
+                  onMouseLeave={e=>(e.currentTarget.style.background=value===c.productName?"#eff6ff":"white")}>
+                  <span style={{fontSize:"0.82rem",fontWeight:600,color:"#1e293b"}}>{c.productName}</span>
+                  {c.productId && <span style={{fontSize:"0.68rem",color:"#94a3b8",fontFamily:"monospace"}}>ID: {c.productId} · cuota mensual: {c.monthlyQuota}</span>}
+                </div>
+              ))
+          }
         </div>
       )}
+      {/* Hidden required input for form validation */}
+      <input type="text" required style={{position:"absolute",opacity:0,height:0,pointerEvents:"none"}} value={value} readOnly />
     </div>
   );
 }
