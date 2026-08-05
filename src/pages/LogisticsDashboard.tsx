@@ -252,18 +252,17 @@ function ShipForm({ initial, onSave, onCancel, saving, err }: {
     }}>
       {/* Store */}
       <div>
-        <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginBottom: "0.35rem", letterSpacing: "0.05em" }}>TIENDA *</div>
-        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+        <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginBottom: "0.28rem", letterSpacing: "0.05em" }}>TIENDA *</div>
+        <select value={f.storeId} onChange={e => setF(p => ({ ...p, storeId: Number(e.target.value) }))} required style={{
+          width: "100%", padding: "0.48rem 0.65rem", border: "1px solid #e2e8f0", borderRadius: 8,
+          fontSize: "0.86rem", background: "#fff", cursor: "pointer",
+          borderLeft: `5px solid ${STORE_COLORS[(f.storeId - 1) % STORE_COLORS.length]}`,
+          fontWeight: 700, color: "#0f172a",
+        }}>
           {Array.from({ length: NUM_STORES }, (_, i) => i + 1).map(n => (
-            <button key={n} type="button" onClick={() => setF(p => ({ ...p, storeId: n }))} style={{
-              padding: "0.35rem 0.75rem", borderRadius: 8,
-              border: `2px solid ${STORE_COLORS[(n - 1) % STORE_COLORS.length]}`,
-              background: f.storeId === n ? STORE_COLORS[(n - 1) % STORE_COLORS.length] : "#fff",
-              color: f.storeId === n ? "#fff" : STORE_COLORS[(n - 1) % STORE_COLORS.length],
-              fontWeight: 700, cursor: "pointer", fontSize: "0.8rem",
-            }}>T{n}</button>
+            <option key={n} value={n}>Tienda {n}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* Platform */}
