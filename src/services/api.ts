@@ -866,15 +866,16 @@ export async function getLogisticsOrders(): Promise<LogisticsOrder[]> {
   return (data ?? []).map(r => ({
     id: r.id, storeId: r.store_id, article: r.article,
     orderNumber: r.order_number, labelUrl: r.label_url ?? undefined,
-    status: r.status, createdAt: r.created_at,
-    doneAt: r.done_at ?? undefined, notes: r.notes ?? undefined,
+    status: r.status, shipDate: r.ship_date ?? undefined,
+    createdAt: r.created_at, doneAt: r.done_at ?? undefined, notes: r.notes ?? undefined,
   }));
 }
 
 export async function createLogisticsOrder(o: Omit<LogisticsOrder, "id" | "createdAt" | "doneAt">): Promise<void> {
   const { error } = await supabase.from("logistics_orders").insert({
     store_id: o.storeId, article: o.article, order_number: o.orderNumber,
-    label_url: o.labelUrl ?? null, status: "pending", notes: o.notes ?? "",
+    label_url: o.labelUrl ?? null, status: "pending",
+    ship_date: o.shipDate ?? null, notes: o.notes ?? "",
   });
   if (error) throw new Error(error.message);
 }

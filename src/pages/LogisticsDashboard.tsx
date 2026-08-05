@@ -19,7 +19,8 @@ function OrderCard({ order, onDone, onUndo, onDelete }: {
 }) {
   const isDone = order.status === "done";
   const color = STORE_COLORS[order.storeId - 1] ?? "#64748b";
-  const daysOld = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86_400_000);
+  const refDate = order.shipDate ? new Date(order.shipDate + "T00:00:00") : new Date(order.createdAt);
+  const daysOld = Math.floor((Date.now() - refDate.getTime()) / 86_400_000);
   const overdue = !isDone && daysOld >= 2;
 
   return (
@@ -53,14 +54,31 @@ function OrderCard({ order, onDone, onUndo, onDelete }: {
       <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.15rem" }}>
         Orden: <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#334155" }}>{order.orderNumber}</span>
       </div>
-      {order.notes && (
-        <div style={{ fontSize: "0.78rem", color: "#64748b", fontStyle: "italic", marginBottom: "0.15rem" }}>{order.notes}</div>
-      )}
-      <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.6rem" }}>
-        {isDone && order.doneAt
-          ? `✓ ${new Date(order.doneAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-          : `Creado ${new Date(order.createdAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+      {/* Date badges */}
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+        {order.shipDate && (
+          <span style={{
+            background: isDone ? "#d1fae5" : overdue ? "#ffedd5" : "#e0f2fe",
+            color: isDone ? "#065f46" : overdue ? "#7c2d12" : "#0369a1",
+            borderRadius: 6, padding: "0.18rem 0.6rem", fontSize: "0.75rem", fontWeight: 700,
+          }}>
+            📅 Envío: {new Date(order.shipDate + "T00:00:00").toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
+          </span>
+        )}
+        {isDone && order.doneAt && (
+          <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 6, padding: "0.18rem 0.6rem", fontSize: "0.75rem", fontWeight: 700 }}>
+            ✓ Completado: {new Date(order.doneAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+          </span>
+        )}
+        {!order.shipDate && (
+          <span style={{ color: "#94a3b8", fontSize: "0.7rem" }}>
+            Creado: {new Date(order.createdAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
+          </span>
+        )}
       </div>
+      {order.notes && (
+        <div style={{ fontSize: "0.78rem", color: "#64748b", fontStyle: "italic", marginBottom: "0.5rem" }}>{order.notes}</div>
+      )}
 
       {/* Actions */}
       <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
@@ -111,6 +129,7 @@ export default function LogisticsDashboard() {
     storeId: 1,
     article: "",
     orderNumber: "",
+    shipDate: "",
     labelType: "url" as "url" | "file",
     labelUrl: "",
     labelFile: null as File | null,
@@ -149,10 +168,11 @@ export default function LogisticsDashboard() {
       }
       await createLogisticsOrder({
         storeId: form.storeId, article: form.article.trim(),
-        orderNumber: form.orderNumber.trim(), labelUrl, notes: form.notes.trim(),
-        status: "pending",
+        orderNumber: form.orderNumber.trim(), labelUrl,
+        shipDate: form.shipDate || undefined,
+        notes: form.notes.trim(), status: "pending",
       });
-      setForm({ storeId: 1, article: "", orderNumber: "", labelType: "url", labelUrl: "", labelFile: null, notes: "" });
+      setForm({ storeId: 1, article: "", orderNumber: "", shipDate: "", labelType: "url", labelUrl: "", labelFile: null, notes: "" });
       setShowForm(false);
       await load();
     } catch (err) {
@@ -271,6 +291,18 @@ export default function LogisticsDashboard() {
                     style={{ width: "100%", padding: "0.5rem 0.7rem", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: "0.88rem", boxSizing: "border-box" }}
                   />
                 </div>
+              </div>
+
+              {/* Ship date */}
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 700, marginBottom: "0.3rem", letterSpacing: "0.05em" }}>FECHA DE ENVÍO *</div>
+                <input
+                  type="date"
+                  value={form.shipDate}
+                  onChange={e => setForm(f => ({ ...f, shipDate: e.target.value }))}
+                  required
+                  style={{ width: "100%", padding: "0.5rem 0.7rem", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: "0.88rem", boxSizing: "border-box" }}
+                />
               </div>
 
               {/* Label */}

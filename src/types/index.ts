@@ -285,6 +285,7 @@ export interface LogisticsOrder {
   orderNumber: string;
   labelUrl?: string;
   status: 'pending' | 'done';
+  shipDate?: string;
   createdAt: string;
   doneAt?: string;
   notes?: string;
