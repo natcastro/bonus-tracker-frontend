@@ -278,6 +278,18 @@ export interface StrategyIncident {
   createdAt: string;
 }
 
+export interface LogisticsOrder {
+  id: number;
+  storeId: number;
+  article: string;
+  orderNumber: string;
+  labelUrl?: string;
+  status: 'pending' | 'done';
+  createdAt: string;
+  doneAt?: string;
+  notes?: string;
+}
+
 export interface StrategySample {
   id: number;
   agentId: number;

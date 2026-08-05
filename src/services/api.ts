@@ -7,7 +7,7 @@ import type {
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
-  StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident,
+  StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -853,6 +853,55 @@ function mapStrategyEntry(r: any): StrategyEntry {
     bonusSamplesLockedAt: r.bonus_samples_locked_at ?? undefined,
     bonusSamplesLockedAmount: r.bonus_samples_locked_amount ?? undefined,
   };
+}
+
+// ── Logistics ─────────────────────────────────────────────────────────────────
+
+export async function getLogisticsOrders(): Promise<LogisticsOrder[]> {
+  const { data, error } = await supabase
+    .from("logistics_orders")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(r => ({
+    id: r.id, storeId: r.store_id, article: r.article,
+    orderNumber: r.order_number, labelUrl: r.label_url ?? undefined,
+    status: r.status, createdAt: r.created_at,
+    doneAt: r.done_at ?? undefined, notes: r.notes ?? undefined,
+  }));
+}
+
+export async function createLogisticsOrder(o: Omit<LogisticsOrder, "id" | "createdAt" | "doneAt">): Promise<void> {
+  const { error } = await supabase.from("logistics_orders").insert({
+    store_id: o.storeId, article: o.article, order_number: o.orderNumber,
+    label_url: o.labelUrl ?? null, status: "pending", notes: o.notes ?? "",
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function markLogisticsOrderDone(id: number): Promise<void> {
+  const { error } = await supabase.from("logistics_orders")
+    .update({ status: "done", done_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function markLogisticsOrderPending(id: number): Promise<void> {
+  const { error } = await supabase.from("logistics_orders")
+    .update({ status: "pending", done_at: null }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteLogisticsOrder(id: number): Promise<void> {
+  const { error } = await supabase.from("logistics_orders").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function uploadLogisticsLabel(file: File): Promise<string> {
+  const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const { data, error } = await supabase.storage.from("logistics-labels").upload(path, file);
+  if (error) throw new Error(error.message);
+  const { data: { publicUrl } } = supabase.storage.from("logistics-labels").getPublicUrl(data.path);
+  return publicUrl;
 }
 
 // ── Sample Catalog ─────────────────────────────────────────────────────────────
