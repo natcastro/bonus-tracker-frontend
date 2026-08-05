@@ -864,16 +864,24 @@ export async function getLogisticsOrders(): Promise<LogisticsOrder[]> {
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map(r => ({
-    id: r.id, storeId: r.store_id, article: r.article,
-    orderNumber: r.order_number, labelUrl: r.label_url ?? undefined,
-    status: r.status, shipDate: r.ship_date ?? undefined,
-    createdAt: r.created_at, doneAt: r.done_at ?? undefined, notes: r.notes ?? undefined,
+    id: r.id,
+    platform: (r.platform ?? "other") as LogisticsOrder["platform"],
+    article: r.article,
+    orderNumber: r.order_number,
+    trackingNumber: r.tracking_number ?? undefined,
+    labelUrl: r.label_url ?? undefined,
+    status: r.status,
+    shipDate: r.ship_date ?? undefined,
+    createdAt: r.created_at,
+    doneAt: r.done_at ?? undefined,
+    notes: r.notes ?? undefined,
   }));
 }
 
 export async function createLogisticsOrder(o: Omit<LogisticsOrder, "id" | "createdAt" | "doneAt">): Promise<void> {
   const { error } = await supabase.from("logistics_orders").insert({
-    store_id: o.storeId, article: o.article, order_number: o.orderNumber,
+    platform: o.platform, article: o.article, order_number: o.orderNumber,
+    tracking_number: o.trackingNumber ?? null,
     label_url: o.labelUrl ?? null, status: "pending",
     ship_date: o.shipDate ?? null, notes: o.notes ?? "",
   });
@@ -889,6 +897,19 @@ export async function markLogisticsOrderDone(id: number): Promise<void> {
 export async function markLogisticsOrderPending(id: number): Promise<void> {
   const { error } = await supabase.from("logistics_orders")
     .update({ status: "pending", done_at: null }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateLogisticsOrder(id: number, o: Partial<Pick<LogisticsOrder, "platform"|"article"|"orderNumber"|"trackingNumber"|"labelUrl"|"shipDate"|"notes">>): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (o.platform        !== undefined) patch.platform        = o.platform;
+  if (o.article         !== undefined) patch.article         = o.article;
+  if (o.orderNumber     !== undefined) patch.order_number    = o.orderNumber;
+  if (o.trackingNumber  !== undefined) patch.tracking_number = o.trackingNumber || null;
+  if (o.labelUrl        !== undefined) patch.label_url       = o.labelUrl || null;
+  if (o.shipDate        !== undefined) patch.ship_date       = o.shipDate || null;
+  if (o.notes           !== undefined) patch.notes           = o.notes;
+  const { error } = await supabase.from("logistics_orders").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

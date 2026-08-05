@@ -280,9 +280,10 @@ export interface StrategyIncident {
 
 export interface LogisticsOrder {
   id: number;
-  storeId: number;
+  platform: 'tiktok' | 'amazon' | 'shopify' | 'other';
   article: string;
   orderNumber: string;
+  trackingNumber?: string;
   labelUrl?: string;
   status: 'pending' | 'done';
   shipDate?: string;
