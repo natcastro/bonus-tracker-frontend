@@ -7,6 +7,7 @@ import StrategyDashboard from "./pages/StrategyDashboard";
 import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
 import CSQualityDashboard from "./pages/CSQualityDashboard";
 import ManagementDashboard from "./pages/ManagementDashboard";
+import LogisticsDashboard from "./pages/LogisticsDashboard";
 
 const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY"]);
 
@@ -44,6 +45,9 @@ export default function App() {
         } />
         <Route path="/management" element={
           <ProtectedRoute team="MGMT"><ManagementDashboard /></ProtectedRoute>
+        } />
+        <Route path="/logistics" element={
+          <ProtectedRoute team="LOGISTICS"><LogisticsDashboard /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

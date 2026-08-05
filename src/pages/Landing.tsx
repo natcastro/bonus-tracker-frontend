@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT";
+type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS";
 type View = "hub" | "ftc-usa" | "ops-tools";
 
 const ROUTES: Record<Team, string> = {
   MEX: "/mexico", OPS: "/operations",
   APT: "/strategy", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
-  MGMT: "/management",
+  MGMT: "/management", LOGISTICS: "/logistics",
 };
 
 const MANAGEMENT_PASSWORD = "123456";
@@ -248,6 +248,15 @@ export default function Landing() {
             onClick={() => setCsSelected(csSelected === "MGMT" ? null : "MGMT")}
             active={csSelected === "MGMT"}
           />
+          <HubCard
+            icon="📦"
+            title="Logística"
+            subtitle="Gestión de envíos y productos"
+            color="#b45309"
+            tags={["Envíos", "Inventario"]}
+            onClick={() => setCsSelected(csSelected === "LOGISTICS" ? null : "LOGISTICS")}
+            active={csSelected === "LOGISTICS"}
+          />
         </div>
 
         {/* México password inline */}
@@ -299,6 +308,18 @@ export default function Landing() {
                 </div>
               </form>
             </div>
+          </div>
+        )}
+
+        {/* Logística password inline */}
+        {csSelected === "LOGISTICS" && (
+          <div style={{ marginTop: "2rem" }}>
+            <PasswordForm
+              team="LOGISTICS"
+              label="Logística"
+              color="#b45309"
+              onBack={() => setCsSelected(null)}
+            />
           </div>
         )}
       </div>
