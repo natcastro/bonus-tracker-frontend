@@ -924,8 +924,16 @@ export async function uploadLogisticsLabel(file: File): Promise<string> {
   const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const { data, error } = await supabase.storage.from("logistics-labels").upload(path, file);
   if (error) throw new Error(error.message);
-  const { data: { publicUrl } } = supabase.storage.from("logistics-labels").getPublicUrl(data.path);
-  return publicUrl;
+  return data.path;
+}
+
+export async function getLogisticsLabelUrl(pathOrUrl: string): Promise<string> {
+  if (pathOrUrl.startsWith("http")) return pathOrUrl;
+  const { data, error } = await supabase.storage
+    .from("logistics-labels")
+    .createSignedUrl(pathOrUrl, 3600);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
 }
 
 // ── Sample Catalog ─────────────────────────────────────────────────────────────

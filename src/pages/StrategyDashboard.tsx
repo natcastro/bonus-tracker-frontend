@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem } from "../types";
 import {
@@ -558,14 +559,57 @@ export default function StrategyDashboard() {
             {/* ── INVENTORY TAB ─────────────────────────────────────────────── */}
             {samplesTab==="inventory" && (
               <div>
-                <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
-                  <div>
-                    <label style={lbl}>Mes</label>
-                    <input type="month" className="form-control" value={invMonth} onChange={e=>setInvMonth(e.target.value)} style={{maxWidth:170}} />
+                <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap",justifyContent:"space-between"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"1rem",flexWrap:"wrap"}}>
+                    <div>
+                      <label style={lbl}>Mes</label>
+                      <input type="month" className="form-control" value={invMonth} onChange={e=>setInvMonth(e.target.value)} style={{maxWidth:170}} />
+                    </div>
+                    <div style={{fontSize:"0.8rem",color:"#64748b",marginTop:"1rem"}}>
+                      Mostrando samples enviados en {new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"})}
+                    </div>
                   </div>
-                  <div style={{fontSize:"0.8rem",color:"#64748b",marginTop:"1rem"}}>
-                    Mostrando samples enviados en {new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"})}
-                  </div>
+                  <button
+                    onClick={() => {
+                      const monthLabel = new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"});
+                      const rows = catalog.map(item => {
+                        const sent  = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth)).length;
+                        const avail = Math.max(0, item.monthlyQuota - sent);
+                        const done  = sent >= item.monthlyQuota;
+                        const started = sent > 0 && !done;
+                        return {
+                          "Producto":       item.productName,
+                          "Product ID":     item.productId || "",
+                          "Cuota mensual":  item.monthlyQuota,
+                          "Enviados":       sent,
+                          "Disponibles":    avail,
+                          "Estado":         done ? "Completo" : started ? "En progreso" : "Pendiente",
+                        };
+                      });
+                      const totalSent = catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth)).length,0);
+                      rows.push({
+                        "Producto": "TOTAL", "Product ID": "",
+                        "Cuota mensual": catalog.reduce((s,c)=>s+c.monthlyQuota,0),
+                        "Enviados": totalSent, "Disponibles": 0, "Estado": "",
+                      });
+                      const ws = XLSX.utils.json_to_sheet(rows);
+                      ws["!cols"] = [{wch:36},{wch:20},{wch:15},{wch:12},{wch:13},{wch:14}];
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+                      XLSX.writeFile(wb, `inventario_samples_${invMonth}.xlsx`);
+                    }}
+                    style={{
+                      display:"flex",alignItems:"center",gap:"6px",
+                      background:"#0891b2",color:"#fff",border:"none",borderRadius:8,
+                      padding:"7px 14px",fontSize:"0.82rem",fontWeight:600,cursor:"pointer",
+                      whiteSpace:"nowrap",marginTop:"1rem",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Descargar Excel
+                  </button>
                 </div>
                 {catalog.length === 0
                   ? <div className="card" style={{textAlign:"center",color:"#94a3b8",padding:"2rem"}}>
