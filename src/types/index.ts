@@ -303,7 +303,30 @@ export interface StrategySample {
   year: string;
   month: number;
   notes: string;
-  deliveryStatus: "delivered" | "pending";
+  // "requested" = solicitud enviada (esperando respuesta del cliente)
+  // "pending"   = enviado (cliente respondió, sample en camino)
+  // "delivered" = entregado
+  deliveryStatus: "requested" | "delivered" | "pending";
+  responded?: boolean;
   bonusCycleKey?: string;
   catalogId?: number;
+  videoLog?: string[];
+}
+
+export interface UploadBatch {
+  id: number;
+  filename: string;
+  uploadedAt: string;
+  columns: string[];
+  nameColumn: string;
+}
+
+export interface UploadRow {
+  id: number;
+  uploadId: number;
+  data: Record<string, string>;
+  displayName: string;
+  decision: "pending" | "accepted" | "rejected";
+  decidedAt?: string;
+  sampleId?: number;
 }

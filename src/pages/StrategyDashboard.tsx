@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
-  getStrategySamples, createStrategySample, updateStrategySample,
-  deleteStrategySample, lockSampleBonus, unlockSampleBonus,
+  getStrategySamples, createStrategySample, updateStrategySample, bulkCreateStrategySamples,
+  deleteStrategySample, lockSampleBonus, unlockSampleBonus, addVideoLogEntry, removeLastVideoLogEntry,
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
   getSampleCatalog,
+  getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -131,9 +132,11 @@ function computeSamplesStats(
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const YEARS  = ["2025", "2026", "2027", "2028"];
 const TABS: [string, string][] = [
-  ["resumen","Resumen"],["roi","ROI"],["samples","Samples"],
+  ["resumen","Resumen"],["roi","ROI"],["uploads","Uploads"],["samples","Samples"],
   ["salud","Salud TikTok"],["cumplimiento","Cumplimiento"],["settings","Settings"],
 ];
+
+const NAME_COLUMN_HINTS = /usuario|username|tiktok|nombre|creator|influencer|handle/i;
 
 const cop = (n: number) => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Math.round(n));
 const pct  = (p: number) => `${Math.round(p * 100)}%`;
@@ -181,6 +184,15 @@ export default function StrategyDashboard() {
 
   const [catalog, setCatalog] = useState<SampleCatalogItem[]>([]);
   useEffect(() => { getSampleCatalog().then(setCatalog).catch(()=>{}); }, []);
+
+  // ── Uploads (agency Excel approval workflow) ───────────────────────────────
+  const [uploadBatches, setUploadBatches] = useState<UploadBatch[]>([]);
+  const [uploadRows,    setUploadRows]    = useState<UploadRow[]>([]);
+  const loadUploads = useCallback(async () => {
+    const [b, r] = await Promise.all([getUploadBatches(), getUploadRows()]);
+    setUploadBatches(b); setUploadRows(r);
+  }, []);
+  useEffect(() => { loadUploads(); }, [loadUploads]);
 
   // Samples sub-tab and inventory month
   const [samplesTab, setSamplesTab] = useState<"tracking"|"inventory">("tracking");
@@ -297,19 +309,289 @@ export default function StrategyDashboard() {
 
   const currentCycleName = cycles.find(c => c.id === cycleId)?.name ?? cycleId;
 
+  // ── Uploads local state ────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadsSubTab, setUploadsSubTab] = useState<"revisar"|"documentos">("revisar");
+  const [parsedUpload, setParsedUpload] = useState<{
+    filename: string; columns: string[]; nameColumn: string;
+    rows: { data: Record<string,string>; displayName: string }[];
+  } | null>(null);
+  const [uploadErr, setUploadErr] = useState("");
+  const [uploadSaving, setUploadSaving] = useState(false);
+  const [decidingRowId, setDecidingRowId] = useState<number | null>(null);
+  const [uploadSearch, setUploadSearch] = useState("");
+  const [uploadStatusFilter, setUploadStatusFilter] = useState<"pending"|"accepted"|"rejected">("pending");
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{filename:string; rows:number; error?:string}[] | null>(null);
+  const [reinstateMenuId, setReinstateMenuId] = useState<number | null>(null);
+  const [reinstatePrompt, setReinstatePrompt] = useState<{id:number; pw:string; err:string} | null>(null);
+
+  const parseWorkbookRows = (wb: XLSX.WorkBook) => {
+    const json: Record<string,string>[] = wb.SheetNames.flatMap(name =>
+      XLSX.utils.sheet_to_json<Record<string,string>>(wb.Sheets[name], { defval: "" })
+    );
+    const columns = Array.from(new Set(json.flatMap(row => Object.keys(row))));
+    const guess = columns.find(c => NAME_COLUMN_HINTS.test(c)) ?? columns[0];
+    return { json, columns, guess };
+  };
+
+  const handleFileSelected = async (file: File) => {
+    setUploadErr("");
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const { json, columns, guess } = parseWorkbookRows(wb);
+      if (json.length === 0) { setUploadErr("El archivo no tiene filas."); return; }
+      setParsedUpload({
+        filename: file.name, columns, nameColumn: guess,
+        rows: json.map(row => ({ data: row, displayName: String(row[guess] ?? "").trim() })),
+      });
+    } catch { setUploadErr("No se pudo leer el archivo. Verifica que sea un Excel válido."); }
+  };
+
+  const handleFilesSelected = async (fileList: FileList) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    if (files.length === 1) { await handleFileSelected(files[0]); return; }
+    setUploadErr(""); setBulkResult(null); setBulkUploading(true);
+    const results: {filename:string; rows:number; error?:string}[] = [];
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const { json, columns, guess } = parseWorkbookRows(wb);
+        if (json.length === 0) { results.push({ filename: file.name, rows: 0, error: "Sin filas" }); continue; }
+        const rows = json.map(row => ({ data: row, displayName: String(row[guess] ?? "").trim() }));
+        await createUploadBatch(file.name, columns, guess, rows);
+        results.push({ filename: file.name, rows: rows.length });
+      } catch (err: any) {
+        results.push({ filename: file.name, rows: 0, error: err?.message ?? "No se pudo leer el archivo." });
+      }
+    }
+    setBulkUploading(false);
+    setBulkResult(results);
+    await loadUploads();
+  };
+
+  const updateParsedNameColumn = (col: string) => {
+    if (!parsedUpload) return;
+    setParsedUpload({
+      ...parsedUpload, nameColumn: col,
+      rows: parsedUpload.rows.map(r => ({ ...r, displayName: String(r.data[col] ?? "").trim() })),
+    });
+  };
+
+  const confirmUpload = async () => {
+    if (!parsedUpload) return;
+    setUploadSaving(true);
+    try {
+      await createUploadBatch(parsedUpload.filename, parsedUpload.columns, parsedUpload.nameColumn, parsedUpload.rows);
+      setParsedUpload(null);
+      await loadUploads();
+    } catch (err: any) { setUploadErr(err?.message ?? "Error al guardar el archivo."); }
+    finally { setUploadSaving(false); }
+  };
+
+  const acceptUploadRow = async (row: UploadRow) => {
+    const agentId = agents[0]?.id;
+    if (!agentId) { alert("No hay agentes. Ve a Settings primero."); return; }
+    setDecidingRowId(row.id);
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const { year: sy, month: sm } = parseDateParts(today);
+      const sample = await createStrategySample({
+        agentId, username: row.displayName, sku: "", sentDate: today,
+        videosPublished: 0, year: sy, month: sm,
+        notes: `Aprobado desde upload: ${uploadBatches.find(b=>b.id===row.uploadId)?.filename ?? ""}`,
+        deliveryStatus: "requested", catalogId: undefined,
+      });
+      await decideUploadRow(row.id, "accepted", sample.id);
+      await Promise.all([loadUploads(), loadSamples()]);
+    } finally { setDecidingRowId(null); }
+  };
+
+  const rejectUploadRow = async (row: UploadRow) => {
+    setDecidingRowId(row.id);
+    try { await decideUploadRow(row.id, "rejected"); await loadUploads(); }
+    finally { setDecidingRowId(null); }
+  };
+
+  const reinstateRow = async (row: UploadRow, pw: string) => {
+    if (!verifySuperAdmin("APT", pw)) {
+      setReinstatePrompt({ id: row.id, pw, err: "Contraseña incorrecta." });
+      return;
+    }
+    setDecidingRowId(row.id);
+    try {
+      if (row.decision === "accepted" && row.sampleId) await deleteStrategySample(row.sampleId);
+      await reinstateUploadRow(row.id);
+      setReinstatePrompt(null);
+      setReinstateMenuId(null);
+      await Promise.all([loadUploads(), loadSamples()]);
+    } finally { setDecidingRowId(null); }
+  };
+
+  const filteredUploadRows = useMemo(() => {
+    const q = uploadSearch.trim().toLowerCase();
+    const rows = uploadRows.filter(r =>
+      r.decision === uploadStatusFilter &&
+      (!q || r.displayName.toLowerCase().includes(q))
+    );
+    if (uploadStatusFilter !== "pending") {
+      rows.sort((a,b) => new Date(b.decidedAt ?? 0).getTime() - new Date(a.decidedAt ?? 0).getTime());
+    }
+    return rows;
+  }, [uploadRows, uploadSearch, uploadStatusFilter]);
+
+  const uploadExtraColumns = useMemo(() => {
+    const set = new Set<string>();
+    uploadRows.forEach(r => {
+      const batch = uploadBatches.find(b => b.id === r.uploadId);
+      if (!batch) return;
+      batch.columns.forEach(c => { if (c !== batch.nameColumn) set.add(c); });
+    });
+    return Array.from(set);
+  }, [uploadRows, uploadBatches]);
+
+  const downloadUploadBatch = (batch: UploadBatch) => {
+    const rows = uploadRows.filter(r => r.uploadId === batch.id);
+    const sheetRows = rows.map(r => ({
+      ...r.data,
+      "Decisión": r.decision === "accepted" ? "Aceptado" : r.decision === "rejected" ? "Rechazado" : "Pendiente",
+    }));
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resultado");
+    XLSX.writeFile(wb, `resultado_${batch.filename.replace(/\.[^.]+$/,"")}.xlsx`);
+  };
+
   // ── Samples local state ────────────────────────────────────────────────────
   const [filterUser,   setFilterUser]   = useState("");
   const [filterSku,    setFilterSku]    = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all"|"delivered"|"pending">("all");
+  const [filterStatus, setFilterStatus] = useState<"all"|"requested"|"pending"|"delivered">("pending");
   const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
   const [showBanner,   setShowBanner]   = useState(true);
+  const [viewAllPeriods, setViewAllPeriods] = useState(false);
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo,   setFilterDateTo]   = useState("");
+  const [addVideoPopoverId, setAddVideoPopoverId] = useState<number|null>(null);
+  const [addVideoDate, setAddVideoDate] = useState("");
+  const [videoLogBusyId, setVideoLogBusyId] = useState<number|null>(null);
+
+  const daysSince = (dateStr: string): number => {
+    const d = new Date(dateStr + "T00:00:00");
+    if (isNaN(d.getTime())) return 0;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  };
+
+  const openAddVideo = (id: number) => {
+    const d = new Date(); const off = d.getTimezoneOffset();
+    setAddVideoDate(new Date(d.getTime() - off*60000).toISOString().slice(0,10));
+    setAddVideoPopoverId(id);
+  };
+
+  const confirmAddVideo = async (id: number) => {
+    if (!addVideoDate) return;
+    setVideoLogBusyId(id);
+    try { await addVideoLogEntry(id, addVideoDate); setAddVideoPopoverId(null); await loadSamples(); }
+    finally { setVideoLogBusyId(null); }
+  };
+
+  const removeLastVideo = async (id: number) => {
+    if (!confirm("¿Quitar el último video registrado para este sample?")) return;
+    setVideoLogBusyId(id);
+    try { await removeLastVideoLogEntry(id); await loadSamples(); }
+    finally { setVideoLogBusyId(null); }
+  };
+
+  const deleteStaleRequest = async (id: number) => {
+    if (!confirm("¿Eliminar esta solicitud sin respuesta? Lleva más de 7 días sin actualizarse.")) return;
+    await deleteStrategySample(id);
+    await loadSamples();
+  };
+
+  // ── Historical CSV import (TikTok order export → samples pipeline) ────────
+  const historyFileRef = useRef<HTMLInputElement>(null);
+  const [historyImporting, setHistoryImporting] = useState(false);
+  const [historyResult, setHistoryResult] = useState<{
+    total:number; imported:number; skippedCancelled:number; skippedUnrecognized:number; skippedNoUsername:number; reconciled:number;
+  } | null>(null);
+
+  const mapOrderStatusToStage = (status: string, substatus: string): "pending"|"delivered"|null => {
+    const s = status.trim().toLowerCase();
+    const ss = substatus.trim().toLowerCase();
+    if (s === "canceled" || s === "cancelled") return null;
+    if (s === "completed") return "delivered";
+    if (s === "shipped") return ss === "delivered" ? "delivered" : "pending";
+    if (s === "to ship") return "pending";
+    return null;
+  };
+
+  const parseUsDateToIso = (raw: string): string | null => {
+    const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!m) return null;
+    const [, mm, dd, yyyy] = m;
+    return `${yyyy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
+  };
+
+  const handleHistoryCsvSelected = async (file: File) => {
+    const agentId = agents[0]?.id;
+    if (!agentId) { alert("No hay agentes. Ve a Settings primero."); return; }
+    setHistoryImporting(true); setHistoryResult(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const json = XLSX.utils.sheet_to_json<Record<string,string>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
+      let skippedCancelled = 0, skippedUnrecognized = 0, skippedNoUsername = 0;
+      const toInsert: Omit<StrategySample,"id">[] = [];
+      for (const row of json) {
+        const status    = String(row["Order Status"] ?? "").trim();
+        const substatus = String(row["Order Substatus"] ?? "").trim();
+        const username  = String(row["Buyer Username"] ?? "").trim();
+        const orderId   = String(row["Order ID"] ?? "").trim();
+        const sku       = String(row["Seller SKU"] ?? "").trim();
+        const createdRaw = String(row["Created Time"] ?? "").trim();
+        if (status.toLowerCase() === "canceled" || status.toLowerCase() === "cancelled") { skippedCancelled++; continue; }
+        const stage = mapOrderStatusToStage(status, substatus);
+        const iso = parseUsDateToIso(createdRaw);
+        if (!stage || !iso) { skippedUnrecognized++; continue; }
+        if (!username) { skippedNoUsername++; continue; }
+        const { year, month } = parseDateParts(iso);
+        toInsert.push({
+          agentId, username, sku, sentDate: iso, videosPublished: 0, year, month,
+          notes: `Importado de historial CSV — Order ID ${orderId} — Estado original: ${status} / ${substatus}`,
+          deliveryStatus: stage, catalogId: undefined,
+        });
+      }
+      if (toInsert.length) await bulkCreateStrategySamples(toInsert);
+
+      // Reconcile: pre-existing "Enviado" samples with no matching creator anywhere in this
+      // historical export are demoted back to "Solicitud enviada" — the shipment was never confirmed.
+      const csvUsernames = new Set(
+        json.map(r => String(r["Buyer Username"] ?? "").trim().toLowerCase()).filter(Boolean)
+      );
+      const staleOld = allSamples.filter(s =>
+        s.deliveryStatus === "pending" &&
+        !s.notes?.startsWith("Importado de historial CSV") &&
+        !csvUsernames.has(s.username.trim().toLowerCase())
+      );
+      for (const s of staleOld) {
+        await updateStrategySample(s.id, { deliveryStatus: "requested" });
+      }
+
+      setHistoryResult({ total: json.length, imported: toInsert.length, skippedCancelled, skippedUnrecognized, skippedNoUsername, reconciled: staleOld.length });
+      await loadSamples();
+    } catch (err: any) {
+      alert(err?.message ?? "Error al importar el historial.");
+    } finally { setHistoryImporting(false); }
+  };
 
   const [showAdd,  setShowAdd]  = useState(false);
   const [editing,  setEditing]  = useState<StrategySample | null>(null);
   const [sErr,     setSErr]     = useState("");
   const [sSaving,  setSSaving]  = useState(false);
 
-  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "delivered"|"pending", catalogId: undefined as number|undefined });
+  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "requested"|"pending"|"delivered", catalogId: undefined as number|undefined });
 
   // Password prompts
   const [delPw,  setDelPw]  = useState<{ id:number; pw:string; err:string } | null>(null);
@@ -320,11 +602,19 @@ export default function StrategyDashboard() {
   const isInactiveProduct = (s: StrategySample) =>
     s.catalogId !== undefined && !activeCatalogIds.has(s.catalogId);
 
-  // Sync local filter from/to are not needed — we filter on officialSamples directly
-  const tableRows = stats.officialSamples
+  const tableRows = (viewAllPeriods ? allSamples : stats.officialSamples)
     .filter(s => filterStatus === "all" || s.deliveryStatus === filterStatus)
     .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()))
-    .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()));
+    .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()))
+    .filter(s => !filterDateFrom || s.sentDate >= filterDateFrom)
+    .filter(s => !filterDateTo   || s.sentDate <= filterDateTo);
+
+  const stageBase = viewAllPeriods ? allSamples : stats.officialSamples;
+  const stageCounts = {
+    requested: stageBase.filter(s => s.deliveryStatus === "requested").length,
+    pending:   stageBase.filter(s => s.deliveryStatus === "pending").length,
+    delivered: stageBase.filter(s => s.deliveryStatus === "delivered").length,
+  };
 
   // Creator summary for "creators" view
   const creatorRows = Object.entries(stats.byCreator).map(([username, totalVideos]) => ({
@@ -367,6 +657,11 @@ export default function StrategyDashboard() {
 
   const markDelivered = async (id: number) => {
     await updateStrategySample(id, { deliveryStatus: "delivered" });
+    await loadSamples();
+  };
+
+  const markResponded = async (id: number) => {
+    await updateStrategySample(id, { responded: true, deliveryStatus: "pending" });
     await loadSamples();
   };
 
@@ -535,6 +830,192 @@ export default function StrategyDashboard() {
           </section>
         )}
 
+        {/* ═══ UPLOADS ════════════════════════════════════════════════════════ */}
+        {tab==="uploads" && (
+          <section>
+            <header className="section-header">
+              <div><h2>Uploads — Documentos de la agencia</h2>
+                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Sube el Excel de influencers, apruébalos o recházalos.</p>
+              </div>
+            </header>
+
+            <div style={{display:"flex",gap:"0.4rem",marginBottom:"1rem"}}>
+              <button style={{...qBtn,borderColor:uploadsSubTab==="revisar"?"#0891b2":"#e2e8f0",color:uploadsSubTab==="revisar"?C.samples:"#64748b"}} onClick={()=>setUploadsSubTab("revisar")}>Revisar</button>
+              <button style={{...qBtn,borderColor:uploadsSubTab==="documentos"?"#0891b2":"#e2e8f0",color:uploadsSubTab==="documentos"?C.samples:"#64748b"}} onClick={()=>setUploadsSubTab("documentos")}>Documentos subidos</button>
+            </div>
+
+            {uploadsSubTab==="revisar" && (
+              <>
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{display:"none"}}
+                  onChange={e=>{const fs=e.target.files; if(fs && fs.length) handleFilesSelected(fs); e.target.value="";}} />
+
+                {!parsedUpload && (
+                  <div style={{marginBottom:"1rem"}}>
+                    <button className="btn btn-primary" disabled={bulkUploading} onClick={()=>fileInputRef.current?.click()}>
+                      {bulkUploading?"Subiendo...":"+ Subir Excel"}
+                    </button>
+                    <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0.4rem 0 0"}}>Puedes seleccionar varios archivos a la vez.</p>
+                    {uploadErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{uploadErr}</p>}
+                    {bulkResult && (
+                      <div className="card" style={{marginTop:"0.75rem",maxWidth:420}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.5rem"}}>
+                          <h4 style={{margin:0}}>Resultado de la subida masiva</h4>
+                          <button className="btn btn-sm btn-secondary" onClick={()=>setBulkResult(null)}>Cerrar</button>
+                        </div>
+                        {bulkResult.map((r,i)=>(
+                          <div key={i} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",fontSize:"0.8rem",padding:"0.25rem 0",borderBottom:i<bulkResult.length-1?"1px solid #f1f5f9":"none"}}>
+                            <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.filename}</span>
+                            {r.error
+                              ? <span style={{color:"#b91c1c",fontWeight:600,flexShrink:0}}>✗ {r.error}</span>
+                              : <span style={{color:"#166534",fontWeight:600,flexShrink:0}}>✓ {r.rows} filas</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {parsedUpload && (
+                  <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                    <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{parsedUpload.filename}</h4>
+                    <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{parsedUpload.rows.length} filas detectadas.</p>
+                    <div style={{marginBottom:"1rem"}}>
+                      <label style={lbl}>¿Cuál columna tiene el nombre/usuario del influencer?</label>
+                      <select className="form-control" style={{maxWidth:280}} value={parsedUpload.nameColumn} onChange={e=>updateParsedNameColumn(e.target.value)}>
+                        {parsedUpload.columns.map(c=><option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div style={{maxHeight:180,overflowY:"auto",border:"1px solid #e2e8f0",borderRadius:8,marginBottom:"1rem"}}>
+                      <table className="data-table" style={{margin:0}}>
+                        <thead><tr><th>#</th><th>Nombre detectado</th>{parsedUpload.columns.filter(c=>c!==parsedUpload.nameColumn).map(c=><th key={c}>{c}</th>)}</tr></thead>
+                        <tbody>
+                          {parsedUpload.rows.slice(0,8).map((r,i)=>(
+                            <tr key={i}>
+                              <td>{i+1}</td>
+                              <td style={{fontWeight:600}}>{r.displayName || <em style={{color:"#94a3b8"}}>vacío</em>}</td>
+                              {parsedUpload.columns.filter(c=>c!==parsedUpload.nameColumn).map(c=><td key={c} style={{fontSize:"0.82rem",color:"#64748b"}}>{r.data[c] ?? ""}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {parsedUpload.rows.length>8 && <p style={{fontSize:"0.75rem",color:"#94a3b8",padding:"0.5rem"}}>… y {parsedUpload.rows.length-8} más</p>}
+                    </div>
+                    {uploadErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{uploadErr}</p>}
+                    <div style={{display:"flex",gap:"0.5rem"}}>
+                      <button className="btn btn-primary btn-sm" disabled={uploadSaving} onClick={confirmUpload}>{uploadSaving?"...":"Confirmar y guardar"}</button>
+                      <button className="btn btn-secondary btn-sm" onClick={()=>{setParsedUpload(null);setUploadErr("");}}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{display:"flex",gap:"0.5rem",marginBottom:"0.75rem",flexWrap:"wrap",alignItems:"center"}}>
+                  <input className="form-control" style={{maxWidth:260}} placeholder="Buscar por nombre..."
+                    value={uploadSearch} onChange={e=>setUploadSearch(e.target.value)} />
+                  <div style={{display:"flex",gap:"0.4rem"}}>
+                    {([["pending","Pendientes"],["accepted","Aceptados"],["rejected","Rechazados"]] as const).map(([k,l])=>(
+                      <button key={k} style={{...qBtn,borderColor:uploadStatusFilter===k?"#0891b2":"#e2e8f0",color:uploadStatusFilter===k?C.samples:"#64748b"}}
+                        onClick={()=>setUploadStatusFilter(k)}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="card" style={{overflowX:"auto"}}>
+                  <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{filteredUploadRows.length} influencer{filteredUploadRows.length!==1?"s":""}</p>
+                  {filteredUploadRows.length===0 ? (
+                    <EmptyCard msg="No hay influencers en este filtro." />
+                  ) : (
+                    <table className="data-table">
+                      <thead><tr><th>Nombre</th>{uploadExtraColumns.map(c=><th key={c}>{c}</th>)}<th>Estado</th><th>Acciones</th></tr></thead>
+                      <tbody>
+                        {filteredUploadRows.map(r=>{
+                          const busy = decidingRowId===r.id;
+                          return (
+                            <tr key={r.id}>
+                              <td style={{fontWeight:600}}>{r.displayName}</td>
+                              {uploadExtraColumns.map(c=><td key={c} style={{fontSize:"0.82rem",color:"var(--text-muted)"}}>{r.data[c] ?? "—"}</td>)}
+                              <td>
+                                {r.decision==="pending" && <span style={{background:"#f1f5f9",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#64748b",fontWeight:700}}>Pendiente</span>}
+                                {r.decision==="accepted" && <span style={{background:"#f0fdf4",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#166534",fontWeight:700}}>✓ Aceptado</span>}
+                                {r.decision==="rejected" && <span style={{background:"#fef2f2",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#b91c1c",fontWeight:700}}>✗ Rechazado</span>}
+                              </td>
+                              <td style={{whiteSpace:"nowrap",position:"relative"}}>
+                                {r.decision==="pending" && (
+                                  <div style={{display:"flex",gap:"0.3rem"}}>
+                                    <button className="btn btn-sm btn-secondary" style={{color:"#166534",borderColor:"#bbf7d0"}} disabled={busy} onClick={()=>acceptUploadRow(r)}>{busy?"...":"Aceptar"}</button>
+                                    <button className="btn btn-sm btn-secondary" style={{color:"#b91c1c",borderColor:"#fecaca"}} disabled={busy} onClick={()=>rejectUploadRow(r)}>{busy?"...":"Rechazar"}</button>
+                                  </div>
+                                )}
+                                {r.decision!=="pending" && (
+                                  <div style={{position:"relative",display:"inline-block"}}>
+                                    <button className="btn btn-sm btn-secondary" style={{padding:"0.25rem 0.6rem"}}
+                                      onClick={()=>{setReinstateMenuId(reinstateMenuId===r.id?null:r.id); setReinstatePrompt(null);}}>⋯</button>
+                                    {reinstateMenuId===r.id && (
+                                      <div className="card" style={{position:"absolute",right:0,top:"110%",zIndex:20,width:220,padding:"0.75rem"}}>
+                                        {reinstatePrompt?.id===r.id ? (
+                                          <>
+                                            <label style={lbl}>Contraseña de administrador</label>
+                                            <input type="password" className="form-control" autoFocus
+                                              value={reinstatePrompt.pw}
+                                              onChange={e=>setReinstatePrompt({id:r.id,pw:e.target.value,err:""})}
+                                              onKeyDown={e=>{if(e.key==="Enter") reinstateRow(r, reinstatePrompt.pw);}} />
+                                            {reinstatePrompt.err && <p style={{color:"#dc2626",fontSize:"0.75rem",margin:"0.3rem 0 0"}}>{reinstatePrompt.err}</p>}
+                                            <div style={{display:"flex",gap:"0.3rem",marginTop:"0.5rem"}}>
+                                              <button className="btn btn-sm btn-primary" disabled={busy} onClick={()=>reinstateRow(r, reinstatePrompt.pw)}>{busy?"...":"Confirmar"}</button>
+                                              <button className="btn btn-sm btn-secondary" onClick={()=>setReinstatePrompt(null)}>Cancelar</button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <button className="btn btn-sm btn-secondary" style={{width:"100%"}}
+                                            onClick={()=>setReinstatePrompt({id:r.id,pw:"",err:""})}>↩ Reintegrar a pendientes</button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            )}
+
+            {uploadsSubTab==="documentos" && (
+              <div className="card" style={{overflowX:"auto"}}>
+                {uploadBatches.length===0 ? (
+                  <EmptyCard msg="No se han subido documentos todavía." />
+                ) : (
+                  <table className="data-table">
+                    <thead><tr><th>Archivo</th><th>Subido</th><th>Filas</th><th>Aceptados</th><th>Rechazados</th><th>Pendientes</th><th>Acciones</th></tr></thead>
+                    <tbody>
+                      {uploadBatches.map(b=>{
+                        const rows = uploadRows.filter(r=>r.uploadId===b.id);
+                        const accepted = rows.filter(r=>r.decision==="accepted").length;
+                        const rejected = rows.filter(r=>r.decision==="rejected").length;
+                        const pending  = rows.filter(r=>r.decision==="pending").length;
+                        return (
+                          <tr key={b.id}>
+                            <td style={{fontWeight:600}}>{b.filename}</td>
+                            <td style={{fontSize:"0.8rem",color:"var(--text-muted)"}}>{new Date(b.uploadedAt).toLocaleString("es-CO")}</td>
+                            <td>{rows.length}</td>
+                            <td style={{color:"#166534",fontWeight:700}}>{accepted}</td>
+                            <td style={{color:"#b91c1c",fontWeight:700}}>{rejected}</td>
+                            <td style={{color:"#92400e",fontWeight:700}}>{pending}</td>
+                            <td><button className="btn btn-sm btn-secondary" onClick={()=>downloadUploadBatch(b)}>Descargar</button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ═══ SAMPLES ════════════════════════════════════════════════════════ */}
         {tab==="samples" && (
           <section>
@@ -573,7 +1054,7 @@ export default function StrategyDashboard() {
                     onClick={() => {
                       const monthLabel = new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"});
                       const rows = catalog.map(item => {
-                        const sent  = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth)).length;
+                        const sent  = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
                         const avail = Math.max(0, item.monthlyQuota - sent);
                         const done  = sent >= item.monthlyQuota;
                         const started = sent > 0 && !done;
@@ -586,7 +1067,7 @@ export default function StrategyDashboard() {
                           "Estado":         done ? "Completo" : started ? "En progreso" : "Pendiente",
                         };
                       });
-                      const totalSent = catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth)).length,0);
+                      const totalSent = catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth) && x.deliveryStatus !== "requested").length,0);
                       rows.push({
                         "Producto": "TOTAL", "Product ID": "",
                         "Cuota mensual": catalog.reduce((s,c)=>s+c.monthlyQuota,0),
@@ -626,7 +1107,7 @@ export default function StrategyDashboard() {
                         </thead>
                         <tbody>
                           {catalog.map((item,i)=>{
-                            const sent = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth)).length;
+                            const sent = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
                             const avail = Math.max(0, item.monthlyQuota - sent);
                             const done  = sent >= item.monthlyQuota;
                             const started = sent > 0 && !done;
@@ -656,7 +1137,7 @@ export default function StrategyDashboard() {
                               {catalog.reduce((s,c)=>s+c.monthlyQuota,0)}
                             </td>
                             <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:C.samples}}>
-                              {catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth)).length,0)}
+                              {catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth) && x.deliveryStatus !== "requested").length,0)}
                             </td>
                             <td colSpan={2} />
                           </tr>
@@ -735,29 +1216,34 @@ export default function StrategyDashboard() {
               </p>
             </div>
 
-            {/* Pending alert */}
-            {stats.pendingSamples.length > 0 && (
-              <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"0.85rem 1.1rem",marginBottom:"1.1rem"}}>
-                <p style={{fontWeight:700,fontSize:"0.82rem",color:"#9a3412",marginBottom:"0.5rem"}}>
-                  ⚠ {stats.pendingSamples.length} sample{stats.pendingSamples.length>1?"s":""} pendiente{stats.pendingSamples.length>1?"s":""} de entrega
-                </p>
-                {stats.gracePeriodActive ? (
-                  <p style={{fontSize:"0.78rem",color:"#c2410c",margin:"0 0 0.5rem"}}>Período de gracia activo — aún cuentan para el bono. Márcalos como entregados o muévelos al siguiente período.</p>
-                ) : (
-                  <p style={{fontSize:"0.78rem",color:"#c2410c",margin:"0 0 0.5rem"}}>Período de gracia expirado — estos samples ya no cuentan en el bono actual. Muévelos al siguiente período o elimínalos.</p>
-                )}
-                <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
-                  {stats.pendingSamples.map(s => (
-                    <span key={s.id} style={{background:"#fee2e2",borderRadius:6,padding:"0.2rem 0.6rem",fontSize:"0.75rem",color:"#991b1b",fontWeight:600}}>{s.username} / {s.sku}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Button toggles into form in-place */}
             {!showAdd && !editing && (
-              <div style={{marginBottom:"0.75rem"}}>
+              <div style={{marginBottom:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
                 <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setSErr("");}}>+ Agregar Sample</button>
+                <input ref={historyFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
+                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleHistoryCsvSelected(f); e.target.value="";}} />
+                <button className="btn btn-secondary" disabled={historyImporting} onClick={()=>historyFileRef.current?.click()}>
+                  {historyImporting?"Importando...":"⇪ Importar historial (CSV)"}
+                </button>
+              </div>
+            )}
+            {historyResult && (
+              <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.4rem"}}>
+                  <h4 style={{margin:0,color:"#166534"}}>Historial importado</h4>
+                  <button className="btn btn-sm btn-secondary" onClick={()=>setHistoryResult(null)}>Cerrar</button>
+                </div>
+                <p style={{fontSize:"0.82rem",color:"#166534",margin:"0 0 0.25rem"}}>
+                  {historyResult.imported} de {historyResult.total} filas importadas como samples (Enviado/Entregado según estado).
+                </p>
+                <p style={{fontSize:"0.78rem",color:"#64748b",margin:"0 0 0.25rem"}}>
+                  Omitidas: {historyResult.skippedCancelled} canceladas · {historyResult.skippedUnrecognized} estado/fecha no reconocidos · {historyResult.skippedNoUsername} sin username.
+                </p>
+                {historyResult.reconciled > 0 && (
+                  <p style={{fontSize:"0.78rem",color:"#92400e",margin:0}}>
+                    ⚠ {historyResult.reconciled} sample{historyResult.reconciled!==1?"s":""} que estaban en "Enviado" no aparecen en este historial — se regresaron a "Solicitud enviada".
+                  </p>
+                )}
               </div>
             )}
             {(showAdd || editing) && (
@@ -805,12 +1291,13 @@ export default function StrategyDashboard() {
                         onChange={e=>{const v=e.target.value; editing?setEditing({...editing,notes:v}):setNewS({...newS,notes:v});}} />
                     </div>
                     {/* Delivery status */}
-                    <div><label style={lbl}>Estado de entrega</label>
+                    <div><label style={lbl}>Estado</label>
                       <select className="form-control"
                         value={editing?editing.deliveryStatus:newS.deliveryStatus}
-                        onChange={e=>{const v=e.target.value as "delivered"|"pending";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
+                        onChange={e=>{const v=e.target.value as "requested"|"pending"|"delivered";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
+                        <option value="requested">Solicitud enviada</option>
+                        <option value="pending">Enviado</option>
                         <option value="delivered">Entregado</option>
-                        <option value="pending">Pendiente</option>
                       </select>
                     </div>
                   </div>
@@ -822,28 +1309,58 @@ export default function StrategyDashboard() {
               </div>
             )}
 
+            {/* Stage pipeline tabs */}
+            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1rem",flexWrap:"wrap"}}>
+              {([
+                {key:"requested", label:"📩 Solicitud enviada", count:stageCounts.requested, color:"#6366f1"},
+                {key:"pending",   label:"📦 Enviado",           count:stageCounts.pending,   color:"#d97706"},
+                {key:"delivered", label:"✓ Entregado",          count:stageCounts.delivered, color:"#16a34a"},
+                {key:"all",       label:"Todos",                count:stageBase.length, color:"#64748b"},
+              ] as const).map(t => (
+                <button key={t.key}
+                  onClick={()=>setFilterStatus(t.key)}
+                  style={{
+                    display:"flex",alignItems:"center",gap:"0.4rem",
+                    border:`2px solid ${filterStatus===t.key?t.color:"#e2e8f0"}`,
+                    background:filterStatus===t.key?`${t.color}14`:"#fff",
+                    color:filterStatus===t.key?t.color:"#475569",
+                    borderRadius:10,padding:"0.5rem 0.9rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",
+                  }}>
+                  {t.label}
+                  <span style={{
+                    background:filterStatus===t.key?t.color:"#e2e8f0",
+                    color:filterStatus===t.key?"#fff":"#475569",
+                    borderRadius:999,padding:"0.05rem 0.45rem",fontSize:"0.72rem",fontWeight:800,
+                  }}>{t.count}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Filters */}
             <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
-                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>Filtros de tabla (no afectan el cálculo del bono)</p>
+                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>Buscar (no afecta el cálculo del bono)</p>
                 <div style={{display:"flex",gap:"0.4rem"}}>
                   <button style={{...qBtn,borderColor:viewMode==="samples"?"#0891b2":"#e2e8f0",color:viewMode==="samples"?C.samples:"#64748b"}} onClick={()=>setViewMode("samples")}>Por sample</button>
                   <button style={{...qBtn,borderColor:viewMode==="creators"?"#0891b2":"#e2e8f0",color:viewMode==="creators"?C.samples:"#64748b"}} onClick={()=>setViewMode("creators")}>Por creador</button>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"0.75rem",alignItems:"flex-end"}}>
+              <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.8rem",color:"#475569",marginBottom:"0.75rem",cursor:"pointer"}}>
+                <input type="checkbox" checked={viewAllPeriods} onChange={e=>setViewAllPeriods(e.target.checked)} />
+                Ver historial completo (todos los períodos, no solo el actual)
+              </label>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"0.75rem",alignItems:"flex-end"}}>
                 <div><label style={lbl}>Buscar username</label>
                   <input type="text" className="form-control" placeholder="@username..." value={filterUser} onChange={e=>setFilterUser(e.target.value)} />
                 </div>
                 <div><label style={lbl}>Buscar SKU</label>
                   <input type="text" className="form-control" placeholder="SKU..." value={filterSku} onChange={e=>setFilterSku(e.target.value)} />
                 </div>
-                <div><label style={lbl}>Estado</label>
-                  <select className="form-control" value={filterStatus} onChange={e=>setFilterStatus(e.target.value as any)}>
-                    <option value="all">Todos</option>
-                    <option value="delivered">Entregados</option>
-                    <option value="pending">Pendientes</option>
-                  </select>
+                <div><label style={lbl}>Desde</label>
+                  <input type="date" className="form-control" value={filterDateFrom} onChange={e=>setFilterDateFrom(e.target.value)} />
+                </div>
+                <div><label style={lbl}>Hasta</label>
+                  <input type="date" className="form-control" value={filterDateTo} onChange={e=>setFilterDateTo(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -877,11 +1394,22 @@ export default function StrategyDashboard() {
                       {tableRows.map(s => {
                         const totalForCreator = stats.byCreator[s.username] ?? 0;
                         const inactive = isInactiveProduct(s);
+                        const rowBg = inactive ? "#fef2f2"
+                          : s.deliveryStatus==="requested" ? "#eef2ff"
+                          : s.deliveryStatus==="pending" ? "#fffbeb"
+                          : undefined;
                         return (
-                          <tr key={s.id} style={{background:inactive?"#fef2f2":s.deliveryStatus==="pending"?"#fffbeb":undefined}}>
+                          <tr key={s.id} style={{background:rowBg}}>
                             <td>
-                              {s.deliveryStatus==="pending" ? (
-                                <span style={{background:"#fef3c7",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>⏳ Pendiente</span>
+                              {s.deliveryStatus==="requested" ? (
+                                <div style={{display:"flex",flexDirection:"column",gap:"0.2rem",alignItems:"flex-start"}}>
+                                  <span style={{background:"#e0e7ff",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#4338ca",fontWeight:700}}>📩 Solicitud enviada</span>
+                                  {daysSince(s.sentDate) > 7 && (
+                                    <span style={{background:"#fef2f2",borderRadius:6,padding:"0.1rem 0.45rem",fontSize:"0.68rem",color:"#b91c1c",fontWeight:700}}>⚠ {daysSince(s.sentDate)} días sin respuesta</span>
+                                  )}
+                                </div>
+                              ) : s.deliveryStatus==="pending" ? (
+                                <span style={{background:"#fef3c7",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>📦 Enviado</span>
                               ) : (
                                 <span style={{background:"#f0fdf4",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#166534",fontWeight:700}}>✓ Entregado</span>
                               )}
@@ -892,7 +1420,33 @@ export default function StrategyDashboard() {
                               {inactive && <span style={{marginLeft:"0.4rem",background:"#fee2e2",color:"#b91c1c",borderRadius:4,padding:"0.1rem 0.4rem",fontSize:"0.68rem",fontWeight:700}}>DESCONTINUADO</span>}
                             </td>
                             <td>{s.sentDate}</td>
-                            <td><span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"0":"✓ "+s.videosPublished}</span></td>
+                            <td>
+                              {s.deliveryStatus==="delivered" ? (
+                                <div style={{display:"flex",alignItems:"center",gap:"0.35rem",position:"relative"}}>
+                                  <button className="btn btn-sm btn-secondary" style={{padding:"0.05rem 0.5rem"}}
+                                    disabled={videoLogBusyId===s.id || (s.videoLog?.length ?? 0)===0}
+                                    onClick={()=>removeLastVideo(s.id)}>−</button>
+                                  <span style={{fontWeight:700,minWidth:16,textAlign:"center",color:(s.videoLog?.length ?? s.videosPublished)===0?"#dc2626":"#15803d"}}>
+                                    {s.videoLog?.length ?? s.videosPublished}
+                                  </span>
+                                  <button className="btn btn-sm btn-secondary" style={{padding:"0.05rem 0.5rem"}}
+                                    disabled={videoLogBusyId===s.id}
+                                    onClick={()=>openAddVideo(s.id)}>+</button>
+                                  {addVideoPopoverId===s.id && (
+                                    <div className="card" style={{position:"absolute",top:"110%",left:0,zIndex:20,width:190,padding:"0.6rem"}}>
+                                      <label style={lbl}>Fecha del video</label>
+                                      <input type="date" className="form-control" value={addVideoDate} onChange={e=>setAddVideoDate(e.target.value)} />
+                                      <div style={{display:"flex",gap:"0.3rem",marginTop:"0.4rem"}}>
+                                        <button className="btn btn-sm btn-primary" disabled={videoLogBusyId===s.id} onClick={()=>confirmAddVideo(s.id)}>{videoLogBusyId===s.id?"...":"Agregar"}</button>
+                                        <button className="btn btn-sm btn-secondary" onClick={()=>setAddVideoPopoverId(null)}>Cancelar</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"0":"✓ "+s.videosPublished}</span>
+                              )}
+                            </td>
                             <td style={{fontSize:"0.75rem"}}>
                               {totalForCreator>=2 && <span style={{color:"#7c3aed",fontWeight:600}}>Coverage + Additional</span>}
                               {totalForCreator===1 && <span style={{color:"#15803d",fontWeight:600}}>Coverage</span>}
@@ -900,6 +1454,12 @@ export default function StrategyDashboard() {
                             </td>
                             <td style={{color:"var(--text-muted)",fontSize:"0.8rem"}}>{s.notes||"—"}</td>
                             <td style={{whiteSpace:"nowrap",display:"flex",gap:"0.3rem",flexWrap:"wrap"}}>
+                              {s.deliveryStatus==="requested" && (
+                                <button className="btn btn-sm btn-secondary" style={{color:"#4338ca",borderColor:"#c7d2fe"}} onClick={()=>markResponded(s.id)}>✓ Contestó → Enviado</button>
+                              )}
+                              {s.deliveryStatus==="requested" && daysSince(s.sentDate) > 7 && (
+                                <button className="btn btn-sm btn-danger" onClick={()=>deleteStaleRequest(s.id)}>🗑 Eliminar</button>
+                              )}
                               {s.deliveryStatus==="pending" && (
                                 <button className="btn btn-sm btn-secondary" onClick={()=>markDelivered(s.id)}>Entregar</button>
                               )}

@@ -8,8 +8,10 @@ import TikTokLivesDashboard from "./pages/TikTokLivesDashboard";
 import CSQualityDashboard from "./pages/CSQualityDashboard";
 import ManagementDashboard from "./pages/ManagementDashboard";
 import LogisticsDashboard from "./pages/LogisticsDashboard";
+import LogisticsSelector from "./pages/LogisticsSelector";
+import LogisticsHubApp from "./pages/logistics-hub/LogisticsHubApp";
 
-const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY"]);
+const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY", "LOGISTICS"]);
 
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
@@ -47,7 +49,13 @@ export default function App() {
           <ProtectedRoute team="MGMT"><ManagementDashboard /></ProtectedRoute>
         } />
         <Route path="/logistics" element={
+          <ProtectedRoute team="LOGISTICS"><LogisticsSelector /></ProtectedRoute>
+        } />
+        <Route path="/logistics/current" element={
           <ProtectedRoute team="LOGISTICS"><LogisticsDashboard /></ProtectedRoute>
+        } />
+        <Route path="/logistics/hub/*" element={
+          <ProtectedRoute team="LOGISTICS"><LogisticsHubApp /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

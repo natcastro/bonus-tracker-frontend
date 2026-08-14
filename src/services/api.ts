@@ -8,6 +8,7 @@ import type {
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
   StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
+  UploadBatch, UploadRow,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -954,12 +955,21 @@ export async function getSampleCatalog(): Promise<SampleCatalogItem[]> {
 // ── Strategy Samples ───────────────────────────────────────────────────────────
 
 export async function getStrategySamples(): Promise<StrategySample[]> {
-  const { data, error } = await supabase
-    .from("strategy_samples")
-    .select("*")
-    .order("sent_date", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(mapStrategySample);
+  const PAGE = 1000;
+  let from = 0;
+  let all: any[] = [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("strategy_samples")
+      .select("*")
+      .order("sent_date", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    all = all.concat(data ?? []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all.map(mapStrategySample);
 }
 
 export async function createStrategySample(s: Omit<StrategySample, "id">): Promise<StrategySample> {
@@ -975,6 +985,7 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
       month: s.month,
       notes: s.notes,
       delivery_status: s.deliveryStatus ?? "delivered",
+      responded: s.responded ?? false,
       bonus_cycle_key: s.bonusCycleKey ?? null,
       catalog_id: s.catalogId ?? null,
     })
@@ -984,7 +995,33 @@ export async function createStrategySample(s: Omit<StrategySample, "id">): Promi
   return mapStrategySample(data);
 }
 
-export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate" | "deliveryStatus" | "bonusCycleKey" | "catalogId">>): Promise<void> {
+export async function bulkCreateStrategySamples(rows: Omit<StrategySample, "id">[]): Promise<number> {
+  const payload = rows.map(s => ({
+    agent_id: s.agentId,
+    username: s.username,
+    sku: s.sku,
+    sent_date: s.sentDate,
+    videos_published: s.videosPublished,
+    year: s.year,
+    month: s.month,
+    notes: s.notes,
+    delivery_status: s.deliveryStatus ?? "delivered",
+    responded: s.responded ?? false,
+    bonus_cycle_key: s.bonusCycleKey ?? null,
+    catalog_id: s.catalogId ?? null,
+  }));
+  const CHUNK = 500;
+  let inserted = 0;
+  for (let i = 0; i < payload.length; i += CHUNK) {
+    const chunk = payload.slice(i, i + CHUNK);
+    const { error } = await supabase.from("strategy_samples").insert(chunk);
+    if (error) throw error;
+    inserted += chunk.length;
+  }
+  return inserted;
+}
+
+export async function updateStrategySample(id: number, fields: Partial<Pick<StrategySample, "videosPublished" | "notes" | "username" | "sku" | "sentDate" | "deliveryStatus" | "responded" | "bonusCycleKey" | "catalogId">>): Promise<void> {
   const patch: any = {};
   if (fields.videosPublished != null) patch.videos_published = fields.videosPublished;
   if (fields.notes != null) patch.notes = fields.notes;
@@ -992,14 +1029,104 @@ export async function updateStrategySample(id: number, fields: Partial<Pick<Stra
   if (fields.sku != null) patch.sku = fields.sku;
   if (fields.sentDate != null) patch.sent_date = fields.sentDate;
   if (fields.deliveryStatus != null) patch.delivery_status = fields.deliveryStatus;
+  if (fields.responded != null) patch.responded = fields.responded;
   if (fields.bonusCycleKey !== undefined) patch.bonus_cycle_key = fields.bonusCycleKey;
   if (fields.catalogId !== undefined) patch.catalog_id = fields.catalogId ?? null;
   const { error } = await supabase.from("strategy_samples").update(patch).eq("id", id);
   if (error) throw error;
 }
 
+export async function addVideoLogEntry(id: number, date: string): Promise<string[]> {
+  const { data: cur, error: fetchErr } = await supabase
+    .from("strategy_samples").select("video_log").eq("id", id).single();
+  if (fetchErr) throw fetchErr;
+  const log: string[] = Array.isArray(cur?.video_log) ? cur.video_log : [];
+  const newLog = [...log, date];
+  const { error } = await supabase
+    .from("strategy_samples")
+    .update({ video_log: newLog, videos_published: newLog.length })
+    .eq("id", id);
+  if (error) throw error;
+  return newLog;
+}
+
+export async function removeLastVideoLogEntry(id: number): Promise<string[]> {
+  const { data: cur, error: fetchErr } = await supabase
+    .from("strategy_samples").select("video_log").eq("id", id).single();
+  if (fetchErr) throw fetchErr;
+  const log: string[] = Array.isArray(cur?.video_log) ? cur.video_log : [];
+  const newLog = log.slice(0, -1);
+  const { error } = await supabase
+    .from("strategy_samples")
+    .update({ video_log: newLog, videos_published: newLog.length })
+    .eq("id", id);
+  if (error) throw error;
+  return newLog;
+}
+
 export async function deleteStrategySample(id: number): Promise<void> {
   const { error } = await supabase.from("strategy_samples").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ── Agency uploads (influencer approval workflow) ──────────────────────────────
+
+export async function getUploadBatches(): Promise<UploadBatch[]> {
+  const { data, error } = await supabase
+    .from("strategy_uploads")
+    .select("*")
+    .order("uploaded_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id, filename: r.filename, uploadedAt: r.uploaded_at,
+    columns: r.columns ?? [], nameColumn: r.name_column,
+  }));
+}
+
+export async function getUploadRows(): Promise<UploadRow[]> {
+  const { data, error } = await supabase
+    .from("strategy_upload_rows")
+    .select("*")
+    .order("id", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id, uploadId: r.upload_id, data: r.data ?? {}, displayName: r.display_name,
+    decision: r.decision, decidedAt: r.decided_at ?? undefined, sampleId: r.sample_id ?? undefined,
+  }));
+}
+
+export async function createUploadBatch(
+  filename: string, columns: string[], nameColumn: string,
+  rows: { data: Record<string, string>; displayName: string }[],
+): Promise<UploadBatch> {
+  const { data: batch, error: batchErr } = await supabase
+    .from("strategy_uploads")
+    .insert({ filename, columns, name_column: nameColumn })
+    .select()
+    .single();
+  if (batchErr) throw batchErr;
+
+  const { error: rowsErr } = await supabase
+    .from("strategy_upload_rows")
+    .insert(rows.map(r => ({ upload_id: batch.id, data: r.data, display_name: r.displayName })));
+  if (rowsErr) throw rowsErr;
+
+  return { id: batch.id, filename: batch.filename, uploadedAt: batch.uploaded_at, columns: batch.columns ?? [], nameColumn: batch.name_column };
+}
+
+export async function decideUploadRow(rowId: number, decision: "accepted" | "rejected", sampleId?: number): Promise<void> {
+  const { error } = await supabase
+    .from("strategy_upload_rows")
+    .update({ decision, decided_at: new Date().toISOString(), sample_id: sampleId ?? null })
+    .eq("id", rowId);
+  if (error) throw error;
+}
+
+export async function reinstateUploadRow(rowId: number): Promise<void> {
+  const { error } = await supabase
+    .from("strategy_upload_rows")
+    .update({ decision: "pending", decided_at: null, sample_id: null })
+    .eq("id", rowId);
   if (error) throw error;
 }
 
@@ -1091,7 +1218,9 @@ function mapStrategySample(r: any): StrategySample {
     month: r.month ?? 0,
     notes: r.notes ?? "",
     deliveryStatus: r.delivery_status ?? "delivered",
+    responded: r.responded ?? false,
     bonusCycleKey: r.bonus_cycle_key ?? undefined,
     catalogId: r.catalog_id ?? undefined,
+    videoLog: Array.isArray(r.video_log) ? r.video_log : [],
   };
 }

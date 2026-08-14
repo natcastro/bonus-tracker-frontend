@@ -254,8 +254,7 @@ export default function Landing() {
             subtitle="Gestión de envíos y productos"
             color="#b45309"
             tags={["Envíos", "Inventario"]}
-            onClick={() => setCsSelected(csSelected === "LOGISTICS" ? null : "LOGISTICS")}
-            active={csSelected === "LOGISTICS"}
+            onClick={() => directGo("LOGISTICS")}
           />
         </div>
 
@@ -311,17 +310,6 @@ export default function Landing() {
           </div>
         )}
 
-        {/* Logística password inline */}
-        {csSelected === "LOGISTICS" && (
-          <div style={{ marginTop: "2rem" }}>
-            <PasswordForm
-              team="LOGISTICS"
-              label="Logística"
-              color="#b45309"
-              onBack={() => setCsSelected(null)}
-            />
-          </div>
-        )}
       </div>
     );
   }
