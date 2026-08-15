@@ -330,3 +330,12 @@ export interface UploadRow {
   decidedAt?: string;
   sampleId?: number;
 }
+
+export interface AffiliateContestEntry {
+  id: number;
+  username: string;
+  videosTotal: number;
+  lastSeenSnapshot: number;
+  qualified: boolean;
+  updatedAt: string;
+}

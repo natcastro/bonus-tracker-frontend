@@ -8,7 +8,7 @@ import type {
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
   StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
-  UploadBatch, UploadRow,
+  UploadBatch, UploadRow, AffiliateContestEntry,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -1127,6 +1127,72 @@ export async function reinstateUploadRow(rowId: number): Promise<void> {
     .from("strategy_upload_rows")
     .update({ decision: "pending", decided_at: null, sample_id: null })
     .eq("id", rowId);
+  if (error) throw error;
+}
+
+// ── Affiliate contest ("Concurso de Afiliados") ────────────────────────────────
+
+function mapContestEntry(r: any): AffiliateContestEntry {
+  return {
+    id: r.id,
+    username: r.username ?? "",
+    videosTotal: r.videos_total ?? 0,
+    lastSeenSnapshot: r.last_seen_snapshot ?? 0,
+    qualified: r.qualified ?? false,
+    updatedAt: r.updated_at ?? "",
+  };
+}
+
+export async function getAffiliateContestEntries(): Promise<AffiliateContestEntry[]> {
+  const { data, error } = await supabase
+    .from("affiliate_contest_entries")
+    .select("*")
+    .order("videos_total", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapContestEntry);
+}
+
+export async function upsertAffiliateContestSnapshot(
+  rows: { username: string; videos: number }[]
+): Promise<{ added: number; updated: number }> {
+  const { data: existing, error: fetchErr } = await supabase.from("affiliate_contest_entries").select("*");
+  if (fetchErr) throw fetchErr;
+  const byUsername = new Map((existing ?? []).map((r: any) => [String(r.username).trim().toLowerCase(), r]));
+  let added = 0, updated = 0;
+  for (const row of rows) {
+    const key = row.username.trim().toLowerCase();
+    if (!key) continue;
+    const found = byUsername.get(key);
+    if (found) {
+      const delta = Math.max(0, row.videos - (found.last_seen_snapshot ?? 0));
+      const { error } = await supabase
+        .from("affiliate_contest_entries")
+        .update({
+          videos_total: (found.videos_total ?? 0) + delta,
+          last_seen_snapshot: row.videos,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", found.id);
+      if (error) throw error;
+      updated++;
+    } else {
+      const { error } = await supabase
+        .from("affiliate_contest_entries")
+        .insert({ username: row.username.trim(), videos_total: row.videos, last_seen_snapshot: row.videos, qualified: false });
+      if (error) throw error;
+      added++;
+    }
+  }
+  return { added, updated };
+}
+
+export async function setAffiliateContestQualified(id: number, qualified: boolean): Promise<void> {
+  const { error } = await supabase.from("affiliate_contest_entries").update({ qualified }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAffiliateContestEntry(id: number): Promise<void> {
+  const { error } = await supabase.from("affiliate_contest_entries").delete().eq("id", id);
   if (error) throw error;
 }
 

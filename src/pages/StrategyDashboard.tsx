@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow, AffiliateContestEntry } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
@@ -10,6 +10,7 @@ import {
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
   getSampleCatalog,
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow,
+  getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -133,6 +134,7 @@ function computeSamplesStats(
 const YEARS  = ["2025", "2026", "2027", "2028"];
 const TABS: [string, string][] = [
   ["resumen","Resumen"],["roi","ROI"],["uploads","Uploads"],["samples","Samples"],
+  ["concurso","Concurso de Afiliados"],
   ["salud","Salud TikTok"],["cumplimiento","Cumplimiento"],["settings","Settings"],
 ];
 
@@ -193,6 +195,68 @@ export default function StrategyDashboard() {
     setUploadBatches(b); setUploadRows(r);
   }, []);
   useEffect(() => { loadUploads(); }, [loadUploads]);
+
+  // ── Affiliate contest ("Concurso de Afiliados") ────────────────────────────
+  const [contestEntries, setContestEntries] = useState<AffiliateContestEntry[]>([]);
+  const loadContest = useCallback(async () => { setContestEntries(await getAffiliateContestEntries()); }, []);
+  useEffect(() => { loadContest(); }, [loadContest]);
+
+  const contestFileRef = useRef<HTMLInputElement>(null);
+  const [contestImporting, setContestImporting] = useState(false);
+  const [contestResult, setContestResult] = useState<{added:number; updated:number; skipped:number} | null>(null);
+  const [contestSearch, setContestSearch] = useState("");
+
+  const CONTEST_NAME_HINTS = /creator_name|username|nombre/i;
+  const CONTEST_VIDEOS_HINTS = /videos_posted|videos/i;
+
+  const handleContestFileSelected = async (file: File) => {
+    setContestImporting(true); setContestResult(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const json = XLSX.utils.sheet_to_json<Record<string,string>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
+      if (json.length === 0) { setContestImporting(false); return; }
+      const columns = Object.keys(json[0]);
+      const nameCol = columns.find(c => CONTEST_NAME_HINTS.test(c)) ?? columns[0];
+      const videosCol = columns.find(c => CONTEST_VIDEOS_HINTS.test(c)) ?? columns[1];
+      let skipped = 0;
+      const rows: { username: string; videos: number }[] = [];
+      for (const row of json) {
+        const username = String(row[nameCol] ?? "").trim();
+        const videos = Number(row[videosCol] ?? 0);
+        if (!username || isNaN(videos)) { skipped++; continue; }
+        rows.push({ username, videos });
+      }
+      const { added, updated } = await upsertAffiliateContestSnapshot(rows);
+      setContestResult({ added, updated, skipped });
+      await loadContest();
+    } catch (err: any) {
+      alert(err?.message ?? "Error al importar el documento del concurso.");
+    } finally { setContestImporting(false); }
+  };
+
+  const toggleContestQualified = async (entry: AffiliateContestEntry) => {
+    await setAffiliateContestQualified(entry.id, !entry.qualified);
+    await loadContest();
+  };
+
+  const removeContestEntry = async (id: number) => {
+    if (!confirm("¿Eliminar este afiliado del concurso?")) return;
+    await deleteAffiliateContestEntry(id);
+    await loadContest();
+  };
+
+  const contestRanked = useMemo(() => {
+    const q = contestSearch.trim().toLowerCase();
+    const sorted = [...contestEntries]
+      .filter(e => !q || e.username.toLowerCase().includes(q))
+      .sort((a,b) => b.videosTotal - a.videosTotal);
+    let rank = 0;
+    return sorted.map(e => {
+      if (e.qualified) rank++;
+      return { ...e, rank: e.qualified ? rank : null };
+    });
+  }, [contestEntries, contestSearch]);
 
   // Samples sub-tab and inventory month
   const [samplesTab, setSamplesTab] = useState<"tracking"|"inventory">("tracking");
@@ -1549,6 +1613,69 @@ export default function StrategyDashboard() {
               );
             })}
             </>)}
+          </section>
+        )}
+
+        {/* ═══ CONCURSO DE AFILIADOS ══════════════════════════════════════════ */}
+        {tab==="concurso" && (
+          <section>
+            <header className="section-header">
+              <div><h2>Concurso de Afiliados</h2>
+                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>
+                  Ranking por videos publicados. Solo compiten los que tienen el ✓ de producto boleto de entrada.
+                </p>
+              </div>
+            </header>
+
+            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
+              <input ref={contestFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
+                onChange={e=>{const f=e.target.files?.[0]; if(f) handleContestFileSelected(f); e.target.value="";}} />
+              <button className="btn btn-primary" disabled={contestImporting} onClick={()=>contestFileRef.current?.click()}>
+                {contestImporting?"Importando...":"⇪ Subir documento"}
+              </button>
+              <input type="text" className="form-control" style={{maxWidth:240}} placeholder="Buscar username..."
+                value={contestSearch} onChange={e=>setContestSearch(e.target.value)} />
+            </div>
+
+            {contestResult && (
+              <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <p style={{fontSize:"0.82rem",color:"#166534",margin:0}}>
+                    {contestResult.added} afiliado{contestResult.added!==1?"s":""} nuevo{contestResult.added!==1?"s":""} · {contestResult.updated} actualizado{contestResult.updated!==1?"s":""}
+                    {contestResult.skipped>0 && ` · ${contestResult.skipped} omitido${contestResult.skipped!==1?"s":""} (sin username o videos inválidos)`}
+                  </p>
+                  <button className="btn btn-sm btn-secondary" onClick={()=>setContestResult(null)}>Cerrar</button>
+                </div>
+              </div>
+            )}
+
+            <div className="card" style={{overflowX:"auto"}}>
+              <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>
+                {contestRanked.length} afiliado{contestRanked.length!==1?"s":""} · {contestRanked.filter(e=>e.qualified).length} compitiendo
+              </p>
+              {contestRanked.length===0 ? (
+                <EmptyCard msg="Sube el documento de la plataforma para empezar el ranking." />
+              ) : (
+                <table className="data-table">
+                  <thead><tr><th>Puesto</th><th>Username</th><th>Videos</th><th style={{textAlign:"center"}}>✓ Boleto de entrada</th><th>Acciones</th></tr></thead>
+                  <tbody>
+                    {contestRanked.map(e => (
+                      <tr key={e.id} style={{background: e.qualified ? undefined : "#f8fafc", opacity: e.qualified ? 1 : 0.55}}>
+                        <td style={{fontWeight:800,color:e.qualified?C.samples:"#94a3b8"}}>{e.rank ?? "—"}</td>
+                        <td style={{fontWeight:600,color:e.qualified?"#1e293b":"#94a3b8"}}>{e.username}</td>
+                        <td style={{fontWeight:700,color:e.qualified?"#15803d":"#94a3b8"}}>{e.videosTotal}</td>
+                        <td style={{textAlign:"center"}}>
+                          <input type="checkbox" checked={e.qualified} onChange={()=>toggleContestQualified(e)} style={{width:18,height:18,cursor:"pointer"}} />
+                        </td>
+                        <td>
+                          <button className="btn btn-sm btn-danger" onClick={()=>removeContestEntry(e.id)}>Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </section>
         )}
 
