@@ -1114,6 +1114,11 @@ export async function createUploadBatch(
   return { id: batch.id, filename: batch.filename, uploadedAt: batch.uploaded_at, columns: batch.columns ?? [], nameColumn: batch.name_column };
 }
 
+export async function deleteUploadBatch(batchId: number): Promise<void> {
+  const { error } = await supabase.from("strategy_uploads").delete().eq("id", batchId);
+  if (error) throw error;
+}
+
 export async function decideUploadRow(rowId: number, decision: "accepted" | "rejected", sampleId?: number): Promise<void> {
   const { error } = await supabase
     .from("strategy_upload_rows")

@@ -9,7 +9,7 @@ import {
   deleteStrategySample, lockSampleBonus, unlockSampleBonus, addVideoLogEntry, removeLastVideoLogEntry,
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
   getSampleCatalog,
-  getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow,
+  getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry,
 } from "../services/api";
 import {
@@ -389,6 +389,26 @@ export default function StrategyDashboard() {
   const [bulkResult, setBulkResult] = useState<{filename:string; rows:number; error?:string}[] | null>(null);
   const [reinstateMenuId, setReinstateMenuId] = useState<number | null>(null);
   const [reinstatePrompt, setReinstatePrompt] = useState<{id:number; pw:string; err:string} | null>(null);
+  const [bulkNamesOpen, setBulkNamesOpen] = useState(false);
+  const [bulkNamesText, setBulkNamesText] = useState("");
+  const [bulkNamesSaving, setBulkNamesSaving] = useState(false);
+
+  const submitBulkNames = async () => {
+    const names = Array.from(new Set(
+      bulkNamesText.split(/[\n,;]+/).map(n => n.trim()).filter(Boolean)
+    ));
+    if (names.length === 0) return;
+    setBulkNamesSaving(true);
+    try {
+      await createUploadBatch(
+        `Ingreso manual — ${new Date().toLocaleDateString("es-CO")}`,
+        ["Username"], "Username",
+        names.map(n => ({ data: { Username: n }, displayName: n }))
+      );
+      setBulkNamesText(""); setBulkNamesOpen(false);
+      await loadUploads();
+    } finally { setBulkNamesSaving(false); }
+  };
 
   const parseWorkbookRows = (wb: XLSX.WorkBook) => {
     const json: Record<string,string>[] = wb.SheetNames.flatMap(name =>
@@ -527,6 +547,13 @@ export default function StrategyDashboard() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Resultado");
     XLSX.writeFile(wb, `resultado_${batch.filename.replace(/\.[^.]+$/,"")}.xlsx`);
+  };
+
+  const removeUploadBatch = async (batch: UploadBatch) => {
+    const rows = uploadRows.filter(r => r.uploadId === batch.id);
+    if (!confirm(`¿Eliminar "${batch.filename}" y sus ${rows.length} fila${rows.length!==1?"s":""}? Los samples ya creados a partir de aceptaciones NO se borran.`)) return;
+    await deleteUploadBatch(batch.id);
+    await loadUploads();
   };
 
   // ── Samples local state ────────────────────────────────────────────────────
@@ -915,11 +942,28 @@ export default function StrategyDashboard() {
 
                 {!parsedUpload && (
                   <div style={{marginBottom:"1rem"}}>
-                    <button className="btn btn-primary" disabled={bulkUploading} onClick={()=>fileInputRef.current?.click()}>
-                      {bulkUploading?"Subiendo...":"+ Subir Excel"}
-                    </button>
+                    <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                      <button className="btn btn-primary" disabled={bulkUploading} onClick={()=>fileInputRef.current?.click()}>
+                        {bulkUploading?"Subiendo...":"+ Subir Excel"}
+                      </button>
+                      <button className="btn btn-secondary" onClick={()=>setBulkNamesOpen(v=>!v)}>+ Agregar nombres en bulk</button>
+                    </div>
                     <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0.4rem 0 0"}}>Puedes seleccionar varios archivos a la vez.</p>
                     {uploadErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{uploadErr}</p>}
+                    {bulkNamesOpen && (
+                      <div className="card" style={{marginTop:"0.75rem",maxWidth:420,border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                        <label style={lbl}>Pega los usernames (uno por línea, o separados por coma)</label>
+                        <textarea className="form-control" rows={6} placeholder={"peytonxblack\nchristinadesid\nchaoticfamof8sahm"}
+                          value={bulkNamesText} onChange={e=>setBulkNamesText(e.target.value)} />
+                        <p style={{fontSize:"0.75rem",color:"#64748b",margin:"0.4rem 0 0.75rem"}}>
+                          {bulkNamesText.split(/[\n,;]+/).map(n=>n.trim()).filter(Boolean).length} nombre(s) detectados — entran como "Pendientes" para revisar.
+                        </p>
+                        <div style={{display:"flex",gap:"0.5rem"}}>
+                          <button className="btn btn-primary btn-sm" disabled={bulkNamesSaving} onClick={submitBulkNames}>{bulkNamesSaving?"...":"Agregar"}</button>
+                          <button className="btn btn-secondary btn-sm" onClick={()=>{setBulkNamesOpen(false);setBulkNamesText("");}}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
                     {bulkResult && (
                       <div className="card" style={{marginTop:"0.75rem",maxWidth:420}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.5rem"}}>
@@ -1068,7 +1112,10 @@ export default function StrategyDashboard() {
                             <td style={{color:"#166534",fontWeight:700}}>{accepted}</td>
                             <td style={{color:"#b91c1c",fontWeight:700}}>{rejected}</td>
                             <td style={{color:"#92400e",fontWeight:700}}>{pending}</td>
-                            <td><button className="btn btn-sm btn-secondary" onClick={()=>downloadUploadBatch(b)}>Descargar</button></td>
+                            <td style={{whiteSpace:"nowrap",display:"flex",gap:"0.3rem"}}>
+                              <button className="btn btn-sm btn-secondary" onClick={()=>downloadUploadBatch(b)}>Descargar</button>
+                              <button className="btn btn-sm btn-danger" onClick={()=>removeUploadBatch(b)}>Eliminar</button>
+                            </td>
                           </tr>
                         );
                       })}
