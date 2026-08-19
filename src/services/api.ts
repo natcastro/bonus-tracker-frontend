@@ -1201,6 +1201,12 @@ export async function deleteAffiliateContestEntry(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteAffiliateContestEntries(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from("affiliate_contest_entries").delete().in("id", ids);
+  if (error) throw error;
+}
+
 export async function lockSampleBonus(agentId: number, year: string, cycleId: string, amount: number): Promise<void> {
   const { error } = await supabase
     .from("strategy_entries")

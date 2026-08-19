@@ -10,7 +10,7 @@ import {
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
   getSampleCatalog,
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
-  getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry,
+  getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -243,6 +243,22 @@ export default function StrategyDashboard() {
   const removeContestEntry = async (id: number) => {
     if (!confirm("¿Eliminar este afiliado del concurso?")) return;
     await deleteAffiliateContestEntry(id);
+    await loadContest();
+  };
+
+  const [contestSelected, setContestSelected] = useState<Set<number>>(new Set());
+  const toggleContestSelected = (id: number) => {
+    setContestSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const removeSelectedContestEntries = async () => {
+    if (contestSelected.size === 0) return;
+    if (!confirm(`¿Eliminar ${contestSelected.size} afiliado${contestSelected.size!==1?"s":""} seleccionado${contestSelected.size!==1?"s":""} del concurso?`)) return;
+    await deleteAffiliateContestEntries(Array.from(contestSelected));
+    setContestSelected(new Set());
     await loadContest();
   };
 
@@ -1682,6 +1698,9 @@ export default function StrategyDashboard() {
               </button>
               <input type="text" className="form-control" style={{maxWidth:240}} placeholder="Buscar username..."
                 value={contestSearch} onChange={e=>setContestSearch(e.target.value)} />
+              <button className="btn btn-danger" disabled={contestSelected.size===0} onClick={removeSelectedContestEntries}>
+                🗑 Eliminar seleccionados{contestSelected.size>0?` (${contestSelected.size})`:""}
+              </button>
             </div>
 
             {contestResult && (
@@ -1704,10 +1723,20 @@ export default function StrategyDashboard() {
                 <EmptyCard msg="Sube el documento de la plataforma para empezar el ranking." />
               ) : (
                 <table className="data-table">
-                  <thead><tr><th>Puesto</th><th>Username</th><th>Videos</th><th style={{textAlign:"center"}}>✓ Boleto de entrada</th><th>Acciones</th></tr></thead>
+                  <thead><tr>
+                    <th style={{textAlign:"center"}}>
+                      <input type="checkbox" style={{width:16,height:16,cursor:"pointer"}}
+                        checked={contestRanked.length>0 && contestRanked.every(e=>contestSelected.has(e.id))}
+                        onChange={e=>setContestSelected(e.target.checked ? new Set(contestRanked.map(r=>r.id)) : new Set())} />
+                    </th>
+                    <th>Puesto</th><th>Username</th><th>Videos</th><th style={{textAlign:"center"}}>✓ Boleto de entrada</th><th>Acciones</th>
+                  </tr></thead>
                   <tbody>
                     {contestRanked.map(e => (
                       <tr key={e.id} style={{background: e.qualified ? undefined : "#f8fafc", opacity: e.qualified ? 1 : 0.55}}>
+                        <td style={{textAlign:"center"}}>
+                          <input type="checkbox" checked={contestSelected.has(e.id)} onChange={()=>toggleContestSelected(e.id)} style={{width:16,height:16,cursor:"pointer"}} />
+                        </td>
                         <td style={{fontWeight:800,color:e.qualified?C.samples:"#94a3b8"}}>{e.rank ?? "—"}</td>
                         <td style={{fontWeight:600,color:e.qualified?"#1e293b":"#94a3b8"}}>{e.username}</td>
                         <td style={{fontWeight:700,color:e.qualified?"#15803d":"#94a3b8"}}>{e.videosTotal}</td>
