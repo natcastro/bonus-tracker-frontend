@@ -10,6 +10,7 @@ import {
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
   getSampleCatalog,
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
+  deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
   addVideoLogEntriesBulk,
 } from "../services/api";
@@ -557,6 +558,52 @@ export default function StrategyDashboard() {
     finally { setDecidingRowId(null); }
   };
 
+  const [uploadRowSelected, setUploadRowSelected] = useState<Set<number>>(new Set());
+  const [bulkActingRows, setBulkActingRows] = useState(false);
+  const toggleUploadRowSelected = (id: number) => {
+    setUploadRowSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const bulkAcceptRows = async () => {
+    const ids = Array.from(uploadRowSelected);
+    if (ids.length === 0) return;
+    if (!confirm(`¿Aceptar ${ids.length} solicitud${ids.length!==1?"es":""} seleccionada${ids.length!==1?"s":""}?`)) return;
+    setBulkActingRows(true);
+    try {
+      const rows = filteredUploadRows.filter(r => uploadRowSelected.has(r.id));
+      for (const row of rows) await acceptUploadRow(row);
+      setUploadRowSelected(new Set());
+    } finally { setBulkActingRows(false); }
+  };
+
+  const bulkRejectRows = async () => {
+    const ids = Array.from(uploadRowSelected);
+    if (ids.length === 0) return;
+    if (!confirm(`¿Rechazar ${ids.length} solicitud${ids.length!==1?"es":""} seleccionada${ids.length!==1?"s":""}?`)) return;
+    setBulkActingRows(true);
+    try {
+      await decideUploadRowsBulk(ids, "rejected");
+      setUploadRowSelected(new Set());
+      await loadUploads();
+    } finally { setBulkActingRows(false); }
+  };
+
+  const bulkDeleteRows = async () => {
+    const ids = Array.from(uploadRowSelected);
+    if (ids.length === 0) return;
+    if (!confirm(`¿Eliminar ${ids.length} fila${ids.length!==1?"s":""} seleccionada${ids.length!==1?"s":""}? Esto las borra por completo, no queda registro.`)) return;
+    setBulkActingRows(true);
+    try {
+      await deleteUploadRows(ids);
+      setUploadRowSelected(new Set());
+      await loadUploads();
+    } finally { setBulkActingRows(false); }
+  };
+
   const reinstateRow = async (row: UploadRow, pw: string) => {
     if (!verifySuperAdmin("APT", pw)) {
       setReinstatePrompt({ id: row.id, pw, err: "Contraseña incorrecta." });
@@ -571,6 +618,8 @@ export default function StrategyDashboard() {
       await Promise.all([loadUploads(), loadSamples()]);
     } finally { setDecidingRowId(null); }
   };
+
+  useEffect(() => { setUploadRowSelected(new Set()); }, [uploadStatusFilter]);
 
   const filteredUploadRows = useMemo(() => {
     const q = uploadSearch.trim().toLowerCase();
@@ -1084,18 +1133,48 @@ export default function StrategyDashboard() {
                   </div>
                 </div>
 
+                {uploadStatusFilter==="pending" && (
+                  <div style={{display:"flex",gap:"0.5rem",marginBottom:"0.75rem",flexWrap:"wrap",alignItems:"center"}}>
+                    <button className="btn btn-sm btn-secondary" style={{color:"#166534",borderColor:"#bbf7d0"}}
+                      disabled={uploadRowSelected.size===0||bulkActingRows} onClick={bulkAcceptRows}>
+                      {bulkActingRows?"...":`✓ Aceptar seleccionados${uploadRowSelected.size>0?` (${uploadRowSelected.size})`:""}`}
+                    </button>
+                    <button className="btn btn-sm btn-secondary" style={{color:"#b91c1c",borderColor:"#fecaca"}}
+                      disabled={uploadRowSelected.size===0||bulkActingRows} onClick={bulkRejectRows}>
+                      {bulkActingRows?"...":`✗ Rechazar seleccionados${uploadRowSelected.size>0?` (${uploadRowSelected.size})`:""}`}
+                    </button>
+                    <button className="btn btn-sm btn-danger"
+                      disabled={uploadRowSelected.size===0||bulkActingRows} onClick={bulkDeleteRows}>
+                      {bulkActingRows?"...":`🗑 Eliminar seleccionados${uploadRowSelected.size>0?` (${uploadRowSelected.size})`:""}`}
+                    </button>
+                  </div>
+                )}
+
                 <div className="card" style={{overflowX:"auto"}}>
                   <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{filteredUploadRows.length} influencer{filteredUploadRows.length!==1?"s":""}</p>
                   {filteredUploadRows.length===0 ? (
                     <EmptyCard msg="No hay influencers en este filtro." />
                   ) : (
                     <table className="data-table">
-                      <thead><tr><th>Nombre</th>{uploadExtraColumns.map(c=><th key={c}>{c}</th>)}<th>Estado</th><th>Acciones</th></tr></thead>
+                      <thead><tr>
+                        {uploadStatusFilter==="pending" && (
+                          <th style={{textAlign:"center"}}>
+                            <input type="checkbox" style={{width:16,height:16,cursor:"pointer"}}
+                              checked={filteredUploadRows.length>0 && filteredUploadRows.every(r=>uploadRowSelected.has(r.id))}
+                              onChange={e=>setUploadRowSelected(e.target.checked ? new Set(filteredUploadRows.map(r=>r.id)) : new Set())} />
+                          </th>
+                        )}
+                        <th>Nombre</th>{uploadExtraColumns.map(c=><th key={c}>{c}</th>)}<th>Estado</th><th>Acciones</th></tr></thead>
                       <tbody>
                         {filteredUploadRows.map(r=>{
                           const busy = decidingRowId===r.id;
                           return (
                             <tr key={r.id}>
+                              {uploadStatusFilter==="pending" && (
+                                <td style={{textAlign:"center"}}>
+                                  <input type="checkbox" checked={uploadRowSelected.has(r.id)} onChange={()=>toggleUploadRowSelected(r.id)} style={{width:16,height:16,cursor:"pointer"}} />
+                                </td>
+                              )}
                               <td style={{fontWeight:600}}>{r.displayName}</td>
                               {uploadExtraColumns.map(c=><td key={c} style={{fontSize:"0.82rem",color:"var(--text-muted)"}}>{r.data[c] ?? "—"}</td>)}
                               <td>

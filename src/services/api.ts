@@ -1150,6 +1150,21 @@ export async function reinstateUploadRow(rowId: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteUploadRows(rowIds: number[]): Promise<void> {
+  if (rowIds.length === 0) return;
+  const { error } = await supabase.from("strategy_upload_rows").delete().in("id", rowIds);
+  if (error) throw error;
+}
+
+export async function decideUploadRowsBulk(rowIds: number[], decision: "accepted" | "rejected"): Promise<void> {
+  if (rowIds.length === 0) return;
+  const { error } = await supabase
+    .from("strategy_upload_rows")
+    .update({ decision, decided_at: new Date().toISOString() })
+    .in("id", rowIds);
+  if (error) throw error;
+}
+
 // ── Affiliate contest ("Concurso de Afiliados") ────────────────────────────────
 
 function mapContestEntry(r: any): AffiliateContestEntry {
