@@ -11,6 +11,7 @@ import {
   getSampleCatalog,
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
+  addVideoLogEntriesBulk,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -203,7 +204,7 @@ export default function StrategyDashboard() {
 
   const contestFileRef = useRef<HTMLInputElement>(null);
   const [contestImporting, setContestImporting] = useState(false);
-  const [contestResult, setContestResult] = useState<{added:number; updated:number; skipped:number} | null>(null);
+  const [contestResult, setContestResult] = useState<{added:number; updated:number; skipped:number; matchedSamples:number; removedZero:number} | null>(null);
   const [contestSearch, setContestSearch] = useState("");
 
   const CONTEST_NAME_HINTS = /creator_name|username|nombre/i;
@@ -227,9 +228,41 @@ export default function StrategyDashboard() {
         if (!username || isNaN(videos)) { skipped++; continue; }
         rows.push({ username, videos });
       }
+
+      // Compute per-row deltas against the currently loaded contest state (same rule the
+      // API uses internally) so we know how many *new* videos each creator got this upload.
+      const existingByUsername = new Map(contestEntries.map(e => [e.username.trim().toLowerCase(), e]));
+      const deltas = new Map<string, number>();
+      for (const row of rows) {
+        const key = row.username.trim().toLowerCase();
+        const existing = existingByUsername.get(key);
+        const delta = existing ? Math.max(0, row.videos - existing.lastSeenSnapshot) : row.videos;
+        deltas.set(key, (deltas.get(key) ?? 0) + delta);
+      }
+
       const { added, updated } = await upsertAffiliateContestSnapshot(rows);
-      setContestResult({ added, updated, skipped });
-      await loadContest();
+
+      // Push matching deltas into Samples: find the most recently sent "Entregado" sample
+      // for that username and log the new videos there too (dated today).
+      const today = new Date(); const off = today.getTimezoneOffset();
+      const todayIso = new Date(today.getTime() - off*60000).toISOString().slice(0,10);
+      let matchedSamples = 0;
+      for (const [key, delta] of deltas) {
+        if (delta <= 0) continue;
+        const candidates = allSamples.filter(s => s.deliveryStatus === "delivered" && s.username.trim().toLowerCase() === key);
+        if (candidates.length === 0) continue;
+        const target = candidates.reduce((a,b) => a.sentDate >= b.sentDate ? a : b);
+        await addVideoLogEntriesBulk(target.id, todayIso, delta);
+        matchedSamples++;
+      }
+
+      // Remove contest entries left at 0 videos (only those — never touches anyone with >0).
+      const freshEntries = await getAffiliateContestEntries();
+      const zeroIds = freshEntries.filter(e => e.videosTotal === 0).map(e => e.id);
+      if (zeroIds.length > 0) await deleteAffiliateContestEntries(zeroIds);
+
+      setContestResult({ added, updated, skipped, matchedSamples, removedZero: zeroIds.length });
+      await Promise.all([loadContest(), loadSamples()]);
     } catch (err: any) {
       alert(err?.message ?? "Error al importar el documento del concurso.");
     } finally { setContestImporting(false); }
@@ -247,6 +280,8 @@ export default function StrategyDashboard() {
   };
 
   const [contestSelected, setContestSelected] = useState<Set<number>>(new Set());
+  const [revealedContestId, setRevealedContestId] = useState<number | null>(null);
+  const CONTEST_MASK = "— — — —";
   const toggleContestSelected = (id: number) => {
     setContestSelected(prev => {
       const next = new Set(prev);
@@ -1709,6 +1744,8 @@ export default function StrategyDashboard() {
                   <p style={{fontSize:"0.82rem",color:"#166534",margin:0}}>
                     {contestResult.added} afiliado{contestResult.added!==1?"s":""} nuevo{contestResult.added!==1?"s":""} · {contestResult.updated} actualizado{contestResult.updated!==1?"s":""}
                     {contestResult.skipped>0 && ` · ${contestResult.skipped} omitido${contestResult.skipped!==1?"s":""} (sin username o videos inválidos)`}
+                    {contestResult.matchedSamples>0 && ` · ${contestResult.matchedSamples} sample${contestResult.matchedSamples!==1?"s":""} actualizados con los nuevos videos`}
+                    {contestResult.removedZero>0 && ` · ${contestResult.removedZero} afiliado${contestResult.removedZero!==1?"s":""} con 0 videos eliminado${contestResult.removedZero!==1?"s":""}`}
                   </p>
                   <button className="btn btn-sm btn-secondary" onClick={()=>setContestResult(null)}>Cerrar</button>
                 </div>
@@ -1738,7 +1775,12 @@ export default function StrategyDashboard() {
                           <input type="checkbox" checked={contestSelected.has(e.id)} onChange={()=>toggleContestSelected(e.id)} style={{width:16,height:16,cursor:"pointer"}} />
                         </td>
                         <td style={{fontWeight:800,color:e.qualified?C.samples:"#94a3b8"}}>{e.rank ?? "—"}</td>
-                        <td style={{fontWeight:600,color:e.qualified?"#1e293b":"#94a3b8"}}>{e.username}</td>
+                        <td style={{fontWeight:600,color:e.qualified?"#1e293b":"#94a3b8",cursor:"default",userSelect:revealedContestId===e.id?"text":"none"}}
+                          onMouseEnter={()=>setRevealedContestId(e.id)}
+                          onMouseLeave={()=>setRevealedContestId(null)}
+                          title={e.username}>
+                          {revealedContestId===e.id ? e.username : CONTEST_MASK}
+                        </td>
                         <td style={{fontWeight:700,color:e.qualified?"#15803d":"#94a3b8"}}>{e.videosTotal}</td>
                         <td style={{textAlign:"center"}}>
                           <input type="checkbox" checked={e.qualified} onChange={()=>toggleContestQualified(e)} style={{width:18,height:18,cursor:"pointer"}} />

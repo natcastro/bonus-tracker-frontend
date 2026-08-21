@@ -1050,6 +1050,21 @@ export async function addVideoLogEntry(id: number, date: string): Promise<string
   return newLog;
 }
 
+export async function addVideoLogEntriesBulk(id: number, date: string, count: number): Promise<string[]> {
+  if (count <= 0) return [];
+  const { data: cur, error: fetchErr } = await supabase
+    .from("strategy_samples").select("video_log").eq("id", id).single();
+  if (fetchErr) throw fetchErr;
+  const log: string[] = Array.isArray(cur?.video_log) ? cur.video_log : [];
+  const newLog = [...log, ...Array(count).fill(date)];
+  const { error } = await supabase
+    .from("strategy_samples")
+    .update({ video_log: newLog, videos_published: newLog.length })
+    .eq("id", id);
+  if (error) throw error;
+  return newLog;
+}
+
 export async function removeLastVideoLogEntry(id: number): Promise<string[]> {
   const { data: cur, error: fetchErr } = await supabase
     .from("strategy_samples").select("video_log").eq("id", id).single();
