@@ -282,6 +282,12 @@ export default function StrategyDashboard() {
   const [contestSelected, setContestSelected] = useState<Set<number>>(new Set());
   const [revealedContestId, setRevealedContestId] = useState<number | null>(null);
   const CONTEST_MASK = "— — — —";
+  const contestPeriodLabel = useMemo(() => {
+    const fmt = (d: Date) => d.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+    const start = new Date(2026, 7, 17); // 17 de agosto de 2026
+    const end = new Date(); end.setDate(end.getDate() - 2);
+    return `${fmt(start)} — ${fmt(end)}`;
+  }, []);
   const toggleContestSelected = (id: number) => {
     setContestSelected(prev => {
       const next = new Set(prev);
@@ -1753,8 +1759,11 @@ export default function StrategyDashboard() {
             )}
 
             <div className="card" style={{overflowX:"auto"}}>
-              <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>
+              <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.25rem"}}>
                 {contestRanked.length} afiliado{contestRanked.length!==1?"s":""} · {contestRanked.filter(e=>e.qualified).length} compitiendo
+              </p>
+              <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0 0 0.75rem",fontWeight:600}}>
+                Período: {contestPeriodLabel}
               </p>
               {contestRanked.length===0 ? (
                 <EmptyCard msg="Sube el documento de la plataforma para empezar el ranking." />
