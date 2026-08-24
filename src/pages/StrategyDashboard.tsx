@@ -13,7 +13,7 @@ import {
   deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
   addVideoLogEntriesBulk,
-  getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod,
+  getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod, setSampleAnalysisRowCatalog,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -355,6 +355,21 @@ export default function StrategyDashboard() {
     return isNaN(n) ? null : n;
   };
 
+  // Match a "Sample Analysis" product name to a catalog item by the trailing
+  // SKU code in parentheses (e.g. "...(LUXBBL-293)") — the numeric TikTok
+  // Product ID isn't reliable here since it's shared across several distinct
+  // catalog SKUs. Returns the catalog id only when exactly one candidate matches.
+  const trailingSkuCode = (name: string): string | null => {
+    const m = name.trim().match(/\(([^()]*)\)\s*$/);
+    return m ? m[1].trim().toUpperCase() : null;
+  };
+  const matchCatalogIdByName = (productName: string): number | null => {
+    const code = trailingSkuCode(productName);
+    if (!code) return null;
+    const candidates = catalog.filter(c => trailingSkuCode(c.productName) === code);
+    return candidates.length === 1 ? candidates[0].id : null;
+  };
+
   const handleAnalysisFileSelected = async (file: File) => {
     setAnalysisErr("");
     try {
@@ -383,6 +398,7 @@ export default function StrategyDashboard() {
           refundedOrders: parseAnalysisNum(row["Refunded orders"]),
           estRefundableGmv: parseAnalysisNum(row["Est. refundable GMV"]),
           ordersNeededForRefund: parseAnalysisNum(row["Orders needed for refund"]),
+          catalogId: matchCatalogIdByName(productName),
         });
       }
       if (rows.length === 0) { setAnalysisErr("No se detectaron productos en el archivo."); return; }
@@ -402,6 +418,28 @@ export default function StrategyDashboard() {
       await loadAnalysis();
     } catch (err: any) { setAnalysisErr(err?.message ?? "Error al guardar el documento."); }
     finally { setAnalysisSaving(false); }
+  };
+
+  // "Enviados" for a catalog item in the selected month: if the TikTok analysis
+  // document has linked rows overlapping that month, their "Samples shipped"
+  // replaces the manually-tracked count (it's the real platform number);
+  // otherwise fall back to what's tracked in the app's own samples.
+  const sentForCatalogItem = (catalogItemId: number): number => {
+    const [y, m] = invMonth.split("-").map(Number);
+    const monthStart = `${invMonth}-01`;
+    const monthEnd = new Date(y, m, 0).toISOString().slice(0,10);
+    const overlapping = analysisRows.filter(r => {
+      if (r.catalogId !== catalogItemId) return false;
+      const period = analysisPeriods.find(p => p.id === r.periodId);
+      return period && period.periodStart <= monthEnd && period.periodEnd >= monthStart;
+    });
+    if (overlapping.length > 0) return overlapping.reduce((s,r) => s + (r.samplesShipped ?? 0), 0);
+    return allSamples.filter(s => s.catalogId === catalogItemId && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
+  };
+
+  const updateAnalysisRowCatalog = async (rowId: number, catalogId: number | null) => {
+    await setSampleAnalysisRowCatalog(rowId, catalogId);
+    await loadAnalysis();
   };
 
   const removeAnalysisPeriod = async (p: SampleAnalysisPeriod) => {
@@ -767,9 +805,14 @@ export default function StrategyDashboard() {
   const [filterStatus, setFilterStatus] = useState<"all"|"requested"|"pending"|"delivered">("pending");
   const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
   const [showBanner,   setShowBanner]   = useState(true);
-  const [viewAllPeriods, setViewAllPeriods] = useState(false);
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo,   setFilterDateTo]   = useState("");
+  const [trackingFilterMode, setTrackingFilterMode] = useState<"period"|"month"|"all">("period");
+  const [trackingFrom, setTrackingFrom] = useState(officialPeriod.from);
+  const [trackingTo,   setTrackingTo]   = useState(officialPeriod.to);
+  const [trackingMonth, setTrackingMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  });
+  const [videoFilter, setVideoFilter] = useState<"all"|"withVideo"|"noVideo">("all");
+  useEffect(() => { setTrackingFrom(officialPeriod.from); setTrackingTo(officialPeriod.to); }, [officialPeriod.from, officialPeriod.to]);
   const [addVideoPopoverId, setAddVideoPopoverId] = useState<number|null>(null);
   const [addVideoDate, setAddVideoDate] = useState("");
   const [videoLogBusyId, setVideoLogBusyId] = useState<number|null>(null);
@@ -898,14 +941,22 @@ export default function StrategyDashboard() {
   const isInactiveProduct = (s: StrategySample) =>
     s.catalogId !== undefined && !activeCatalogIds.has(s.catalogId);
 
-  const tableRows = (viewAllPeriods ? allSamples : stats.officialSamples)
+  const trackingMonthBounds = () => {
+    const [y, m] = trackingMonth.split("-").map(Number);
+    return { start: `${trackingMonth}-01`, end: new Date(y, m, 0).toISOString().slice(0,10) };
+  };
+
+  const stageBase = trackingFilterMode === "all" ? allSamples
+    : trackingFilterMode === "month" ? (() => { const {start,end} = trackingMonthBounds(); return allSamples.filter(s => s.sentDate >= start && s.sentDate <= end); })()
+    : allSamples.filter(s => (!trackingFrom || s.sentDate >= trackingFrom) && (!trackingTo || s.sentDate <= trackingTo));
+
+  const videoCountOf = (s: StrategySample) => s.videoLog?.length ?? s.videosPublished;
+
+  const tableRows = stageBase
     .filter(s => filterStatus === "all" || s.deliveryStatus === filterStatus)
     .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()))
     .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()))
-    .filter(s => !filterDateFrom || s.sentDate >= filterDateFrom)
-    .filter(s => !filterDateTo   || s.sentDate <= filterDateTo);
-
-  const stageBase = viewAllPeriods ? allSamples : stats.officialSamples;
+    .filter(s => videoFilter === "all" || (videoFilter === "withVideo" ? videoCountOf(s) > 0 : videoCountOf(s) === 0));
   const stageCounts = {
     requested: stageBase.filter(s => s.deliveryStatus === "requested").length,
     pending:   stageBase.filter(s => s.deliveryStatus === "pending").length,
@@ -1408,7 +1459,7 @@ export default function StrategyDashboard() {
                     onClick={() => {
                       const monthLabel = new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"});
                       const rows = catalog.map(item => {
-                        const sent  = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
+                        const sent  = sentForCatalogItem(item.id);
                         const avail = Math.max(0, item.monthlyQuota - sent);
                         const done  = sent >= item.monthlyQuota;
                         const started = sent > 0 && !done;
@@ -1421,7 +1472,7 @@ export default function StrategyDashboard() {
                           "Estado":         done ? "Completo" : started ? "En progreso" : "Pendiente",
                         };
                       });
-                      const totalSent = catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth) && x.deliveryStatus !== "requested").length,0);
+                      const totalSent = catalog.reduce((s,c)=>s+sentForCatalogItem(c.id),0);
                       rows.push({
                         "Producto": "TOTAL", "Product ID": "",
                         "Cuota mensual": catalog.reduce((s,c)=>s+c.monthlyQuota,0),
@@ -1461,7 +1512,7 @@ export default function StrategyDashboard() {
                         </thead>
                         <tbody>
                           {catalog.map((item,i)=>{
-                            const sent = allSamples.filter(s=>s.catalogId===item.id && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
+                            const sent = sentForCatalogItem(item.id);
                             const avail = Math.max(0, item.monthlyQuota - sent);
                             const done  = sent >= item.monthlyQuota;
                             const started = sent > 0 && !done;
@@ -1491,7 +1542,7 @@ export default function StrategyDashboard() {
                               {catalog.reduce((s,c)=>s+c.monthlyQuota,0)}
                             </td>
                             <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:C.samples}}>
-                              {catalog.reduce((s,c)=>s+allSamples.filter(x=>x.catalogId===c.id&&x.sentDate.startsWith(invMonth) && x.deliveryStatus !== "requested").length,0)}
+                              {catalog.reduce((s,c)=>s+sentForCatalogItem(c.id),0)}
                             </td>
                             <td colSpan={2} />
                           </tr>
@@ -1571,7 +1622,7 @@ export default function StrategyDashboard() {
                             <thead><tr>
                               <th>Producto</th><th>Categoría</th><th>Content GMV</th><th>Refunds</th>
                               <th>Solicitados</th><th>Enviados</th><th>Status</th><th>Videos</th><th>LIVEs</th>
-                              <th>ROI 45d</th><th>ROI 90d</th>
+                              <th>ROI 45d</th><th>ROI 90d</th><th>Cupo vinculado</th>
                             </tr></thead>
                             <tbody>
                               {rows.map(r => (
@@ -1587,6 +1638,14 @@ export default function StrategyDashboard() {
                                   <td>{r.liveStreamsWithSamples ?? "—"}</td>
                                   <td>{r.roi45d ?? "—"}</td>
                                   <td>{r.roi90d ?? "—"}</td>
+                                  <td>
+                                    <select className="form-control" style={{fontSize:"0.75rem",minWidth:160,
+                                        borderColor:r.catalogId?"#bbf7d0":"#fde68a",background:r.catalogId?undefined:"#fffbeb"}}
+                                      value={r.catalogId ?? ""} onChange={e=>updateAnalysisRowCatalog(r.id, e.target.value?Number(e.target.value):null)}>
+                                      <option value="">Sin vincular</option>
+                                      {catalog.map(c=><option key={c.id} value={c.id}>{c.productName}</option>)}
+                                    </select>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1796,22 +1855,41 @@ export default function StrategyDashboard() {
                   <button style={{...qBtn,borderColor:viewMode==="creators"?"#0891b2":"#e2e8f0",color:viewMode==="creators"?C.samples:"#64748b"}} onClick={()=>setViewMode("creators")}>Por creador</button>
                 </div>
               </div>
-              <label style={{display:"flex",alignItems:"center",gap:"0.4rem",fontSize:"0.8rem",color:"#475569",marginBottom:"0.75rem",cursor:"pointer"}}>
-                <input type="checkbox" checked={viewAllPeriods} onChange={e=>setViewAllPeriods(e.target.checked)} />
-                Ver historial completo (todos los períodos, no solo el actual)
-              </label>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"0.75rem",alignItems:"flex-end"}}>
+              <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
+                <button style={{...qBtn,borderColor:trackingFilterMode==="period"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="period"?C.samples:"#64748b"}}
+                  onClick={()=>setTrackingFilterMode("period")}>Por período</button>
+                <button style={{...qBtn,borderColor:trackingFilterMode==="month"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="month"?C.samples:"#64748b"}}
+                  onClick={()=>setTrackingFilterMode("month")}>Por mes</button>
+                <button style={{...qBtn,borderColor:trackingFilterMode==="all"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="all"?C.samples:"#64748b"}}
+                  onClick={()=>setTrackingFilterMode("all")}>Ver historial completo</button>
+              </div>
+              {trackingFilterMode==="period" && (
+                <div style={{display:"flex",gap:"0.75rem",marginBottom:"0.75rem"}}>
+                  <div><label style={lbl}>Desde</label>
+                    <input type="date" className="form-control" value={trackingFrom} onChange={e=>setTrackingFrom(e.target.value)} /></div>
+                  <div><label style={lbl}>Hasta</label>
+                    <input type="date" className="form-control" value={trackingTo} onChange={e=>setTrackingTo(e.target.value)} /></div>
+                </div>
+              )}
+              {trackingFilterMode==="month" && (
+                <div style={{marginBottom:"0.75rem"}}>
+                  <label style={lbl}>Mes</label>
+                  <input type="month" className="form-control" style={{maxWidth:170}} value={trackingMonth} onChange={e=>setTrackingMonth(e.target.value)} />
+                </div>
+              )}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",alignItems:"flex-end"}}>
                 <div><label style={lbl}>Buscar username</label>
                   <input type="text" className="form-control" placeholder="@username..." value={filterUser} onChange={e=>setFilterUser(e.target.value)} />
                 </div>
                 <div><label style={lbl}>Buscar SKU</label>
                   <input type="text" className="form-control" placeholder="SKU..." value={filterSku} onChange={e=>setFilterSku(e.target.value)} />
                 </div>
-                <div><label style={lbl}>Desde</label>
-                  <input type="date" className="form-control" value={filterDateFrom} onChange={e=>setFilterDateFrom(e.target.value)} />
-                </div>
-                <div><label style={lbl}>Hasta</label>
-                  <input type="date" className="form-control" value={filterDateTo} onChange={e=>setFilterDateTo(e.target.value)} />
+                <div><label style={lbl}>Videos</label>
+                  <select className="form-control" value={videoFilter} onChange={e=>setVideoFilter(e.target.value as any)}>
+                    <option value="all">Todos</option>
+                    <option value="withVideo">Con video</option>
+                    <option value="noVideo">Sin video</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -1835,7 +1913,7 @@ export default function StrategyDashboard() {
             {/* Table — samples view */}
             {viewMode==="samples" && (
               <div className="card" style={{overflowX:"auto"}}>
-                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{tableRows.length} resultado{tableRows.length!==1?"s":""} · período oficial: {stats.officialSamples.length} samples</p>
+                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{tableRows.length} resultado{tableRows.length!==1?"s":""} · el bono siempre se calcula sobre el período oficial ({stats.officialSamples.length} samples), sin importar este filtro</p>
                 {tableRows.length===0 ? (
                   <EmptyCard msg="No hay samples para este período." />
                 ) : (

@@ -368,4 +368,5 @@ export interface SampleAnalysisRow {
   refundedOrders: number | null;
   estRefundableGmv: number | null;
   ordersNeededForRefund: number | null;
+  catalogId: number | null;
 }

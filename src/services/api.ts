@@ -1180,7 +1180,7 @@ function mapSampleAnalysisRow(r: any): SampleAnalysisRow {
     status: r.status ?? "", videosWithSamples: r.videos_with_samples, liveStreamsWithSamples: r.live_streams_with_samples,
     roi45d: r.roi_45d, roi90d: r.roi_90d, creatorsMetRefundCriteria: r.creators_met_refund_criteria,
     targetRoi: r.target_roi, refundedOrders: r.refunded_orders, estRefundableGmv: r.est_refundable_gmv,
-    ordersNeededForRefund: r.orders_needed_for_refund,
+    ordersNeededForRefund: r.orders_needed_for_refund, catalogId: r.catalog_id ?? null,
   };
 }
 
@@ -1214,7 +1214,7 @@ export async function createSampleAnalysisPeriod(
     status: r.status, videos_with_samples: r.videosWithSamples, live_streams_with_samples: r.liveStreamsWithSamples,
     roi_45d: r.roi45d, roi_90d: r.roi90d, creators_met_refund_criteria: r.creatorsMetRefundCriteria,
     target_roi: r.targetRoi, refunded_orders: r.refundedOrders, est_refundable_gmv: r.estRefundableGmv,
-    orders_needed_for_refund: r.ordersNeededForRefund,
+    orders_needed_for_refund: r.ordersNeededForRefund, catalog_id: r.catalogId,
   })));
   if (rowsErr) throw rowsErr;
 
@@ -1223,6 +1223,11 @@ export async function createSampleAnalysisPeriod(
 
 export async function deleteSampleAnalysisPeriod(id: number): Promise<void> {
   const { error } = await supabase.from("sample_analysis_periods").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setSampleAnalysisRowCatalog(rowId: number, catalogId: number | null): Promise<void> {
+  const { error } = await supabase.from("sample_analysis_rows").update({ catalog_id: catalogId }).eq("id", rowId);
   if (error) throw error;
 }
 
