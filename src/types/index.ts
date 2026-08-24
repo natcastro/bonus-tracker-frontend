@@ -339,3 +339,33 @@ export interface AffiliateContestEntry {
   qualified: boolean;
   updatedAt: string;
 }
+
+export interface SampleAnalysisPeriod {
+  id: number;
+  filename: string;
+  periodStart: string;
+  periodEnd: string;
+  uploadedAt: string;
+}
+
+export interface SampleAnalysisRow {
+  id: number;
+  periodId: number;
+  productName: string;
+  productId: string;
+  productCategory: string;
+  contentGmv: number | null;
+  refunds: number | null;
+  samplesRequested: number | null;
+  samplesShipped: number | null;
+  status: string;
+  videosWithSamples: number | null;
+  liveStreamsWithSamples: number | null;
+  roi45d: number | null;
+  roi90d: number | null;
+  creatorsMetRefundCriteria: number | null;
+  targetRoi: number | null;
+  refundedOrders: number | null;
+  estRefundableGmv: number | null;
+  ordersNeededForRefund: number | null;
+}

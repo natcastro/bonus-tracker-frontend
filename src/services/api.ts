@@ -8,7 +8,7 @@ import type {
   AptAccountHealth, AptTikTokHealth, AptPerformance,
   CSQualityCase, CSQualityPhoto,
   StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
-  UploadBatch, UploadRow, AffiliateContestEntry,
+  UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
 } from "../types";
 
 const USA_PASSWORD = "usa2026";
@@ -1162,6 +1162,67 @@ export async function decideUploadRowsBulk(rowIds: number[], decision: "accepted
     .from("strategy_upload_rows")
     .update({ decision, decided_at: new Date().toISOString() })
     .in("id", rowIds);
+  if (error) throw error;
+}
+
+// ── Sample product analysis (TikTok "Sample Analysis Product List" exports) ───
+
+function mapSampleAnalysisPeriod(r: any): SampleAnalysisPeriod {
+  return { id: r.id, filename: r.filename, periodStart: r.period_start, periodEnd: r.period_end, uploadedAt: r.uploaded_at };
+}
+
+function mapSampleAnalysisRow(r: any): SampleAnalysisRow {
+  return {
+    id: r.id, periodId: r.period_id,
+    productName: r.product_name ?? "", productId: r.product_id ?? "", productCategory: r.product_category ?? "",
+    contentGmv: r.content_gmv, refunds: r.refunds,
+    samplesRequested: r.samples_requested, samplesShipped: r.samples_shipped,
+    status: r.status ?? "", videosWithSamples: r.videos_with_samples, liveStreamsWithSamples: r.live_streams_with_samples,
+    roi45d: r.roi_45d, roi90d: r.roi_90d, creatorsMetRefundCriteria: r.creators_met_refund_criteria,
+    targetRoi: r.target_roi, refundedOrders: r.refunded_orders, estRefundableGmv: r.est_refundable_gmv,
+    ordersNeededForRefund: r.orders_needed_for_refund,
+  };
+}
+
+export async function getSampleAnalysisPeriods(): Promise<SampleAnalysisPeriod[]> {
+  const { data, error } = await supabase.from("sample_analysis_periods").select("*").order("period_start", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapSampleAnalysisPeriod);
+}
+
+export async function getSampleAnalysisRows(): Promise<SampleAnalysisRow[]> {
+  const { data, error } = await supabase.from("sample_analysis_rows").select("*");
+  if (error) throw error;
+  return (data ?? []).map(mapSampleAnalysisRow);
+}
+
+export async function createSampleAnalysisPeriod(
+  filename: string, periodStart: string, periodEnd: string,
+  rows: Omit<SampleAnalysisRow, "id" | "periodId">[],
+): Promise<SampleAnalysisPeriod> {
+  const { data: period, error: periodErr } = await supabase
+    .from("sample_analysis_periods")
+    .insert({ filename, period_start: periodStart, period_end: periodEnd })
+    .select().single();
+  if (periodErr) throw periodErr;
+
+  const { error: rowsErr } = await supabase.from("sample_analysis_rows").insert(rows.map(r => ({
+    period_id: period.id,
+    product_name: r.productName, product_id: r.productId, product_category: r.productCategory,
+    content_gmv: r.contentGmv, refunds: r.refunds,
+    samples_requested: r.samplesRequested, samples_shipped: r.samplesShipped,
+    status: r.status, videos_with_samples: r.videosWithSamples, live_streams_with_samples: r.liveStreamsWithSamples,
+    roi_45d: r.roi45d, roi_90d: r.roi90d, creators_met_refund_criteria: r.creatorsMetRefundCriteria,
+    target_roi: r.targetRoi, refunded_orders: r.refundedOrders, est_refundable_gmv: r.estRefundableGmv,
+    orders_needed_for_refund: r.ordersNeededForRefund,
+  })));
+  if (rowsErr) throw rowsErr;
+
+  return mapSampleAnalysisPeriod(period);
+}
+
+export async function deleteSampleAnalysisPeriod(id: number): Promise<void> {
+  const { error } = await supabase.from("sample_analysis_periods").delete().eq("id", id);
   if (error) throw error;
 }
 

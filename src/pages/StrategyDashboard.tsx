@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow, AffiliateContestEntry } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
@@ -13,6 +13,7 @@ import {
   deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
   addVideoLogEntriesBulk,
+  getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -49,9 +50,9 @@ const IND3_MAX  = 130_000;
 const IND4_MAX  =  65_000;
 
 function roiScale(v: number) { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
-function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.5)return 1;if(v>=4.3)return .80;if(v>=4.2)return .40;if(v>=4.1)return .30;return 0; }
-function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2.10)return 1;if(v<=2.20)return .80;if(v<=2.30)return .60;if(v<=2.50)return .50;return 0; }
-function negReviewScale(v: number)   { if(v<=0)return 0;if(v<0.55)return 1;if(v<=0.90)return .75;if(v<=1.30)return .50;if(v<=1.60)return .25;return 0; }
+function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.5)return 1;if(v>=4.3)return .80;if(v>=4.2)return .40;if(v>=4.1)return .30;if(v>=3.5)return .15;return 0; }
+function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2.10)return 1;if(v<=2.20)return .95;if(v<=2.30)return .90;if(v<=2.50)return .75;if(v<=3.00)return .50;return 0; }
+function negReviewScale(v: number)   { if(v<=0)return 0;if(v<0.55)return 1;if(v<=0.80)return .90;if(v<=0.90)return .75;if(v<=1.30)return .50;if(v<=1.60)return .25;return 0; }
 function operativeScale(v: number)   { if(v>=100)return 1;if(v>=80)return .75;if(v>=60)return .50;if(v>=40)return .25;return 0; }
 
 // finalScore: 0–100 (Coverage 80pts + Additional 20pts)
@@ -321,6 +322,104 @@ export default function StrategyDashboard() {
   const [invMonth, setInvMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   });
+
+  // ── Sample product analysis (TikTok export uploads) ────────────────────────
+  const [inventorySubView, setInventorySubView] = useState<"cupos"|"analisis">("cupos");
+  const [analysisPeriods, setAnalysisPeriods] = useState<SampleAnalysisPeriod[]>([]);
+  const [analysisRows, setAnalysisRows] = useState<SampleAnalysisRow[]>([]);
+  const loadAnalysis = useCallback(async () => {
+    const [p, r] = await Promise.all([getSampleAnalysisPeriods(), getSampleAnalysisRows()]);
+    setAnalysisPeriods(p); setAnalysisRows(r);
+  }, []);
+  useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
+
+  const analysisFileRef = useRef<HTMLInputElement>(null);
+  const [analysisParsed, setAnalysisParsed] = useState<{
+    filename: string; periodStart: string; periodEnd: string;
+    rows: Omit<SampleAnalysisRow,"id"|"periodId">[];
+  } | null>(null);
+  const [analysisSaving, setAnalysisSaving] = useState(false);
+  const [analysisErr, setAnalysisErr] = useState("");
+  const [analysisFilterMode, setAnalysisFilterMode] = useState<"month"|"range">("month");
+  const [analysisFilterMonth, setAnalysisFilterMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  });
+  const [analysisFilterFrom, setAnalysisFilterFrom] = useState("");
+  const [analysisFilterTo, setAnalysisFilterTo] = useState("");
+
+  const parseAnalysisNum = (v: any): number | null => {
+    if (v === null || v === undefined) return null;
+    const s = String(v).replace(/[$,]/g,"").trim();
+    if (s === "" || s === "--") return null;
+    const n = Number(s);
+    return isNaN(n) ? null : n;
+  };
+
+  const handleAnalysisFileSelected = async (file: File) => {
+    setAnalysisErr("");
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const json = XLSX.utils.sheet_to_json<Record<string,any>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      const rows: Omit<SampleAnalysisRow,"id"|"periodId">[] = [];
+      for (const row of json) {
+        const productId = String(row["Product ID"] ?? "").trim();
+        const productName = String(row["Product name"] ?? "").trim();
+        if (!productId || !productName) continue; // skips the blank description row
+        rows.push({
+          productName, productId,
+          productCategory: String(row["Product category"] ?? "").trim(),
+          contentGmv: parseAnalysisNum(row["Content GMV"]),
+          refunds: parseAnalysisNum(row["Refunds"]),
+          samplesRequested: parseAnalysisNum(row["Samples requested"]),
+          samplesShipped: parseAnalysisNum(row["Samples shipped"]),
+          status: String(row["Status"] ?? "").trim(),
+          videosWithSamples: parseAnalysisNum(row["Videos with samples"]),
+          liveStreamsWithSamples: parseAnalysisNum(row["LIVE streams with samples"]),
+          roi45d: parseAnalysisNum(row["45-day ROI"]),
+          roi90d: parseAnalysisNum(row["90-day ROI"]),
+          creatorsMetRefundCriteria: parseAnalysisNum(row["Creators met refund criteria"]),
+          targetRoi: parseAnalysisNum(row["Target ROI"]),
+          refundedOrders: parseAnalysisNum(row["Refunded orders"]),
+          estRefundableGmv: parseAnalysisNum(row["Est. refundable GMV"]),
+          ordersNeededForRefund: parseAnalysisNum(row["Orders needed for refund"]),
+        });
+      }
+      if (rows.length === 0) { setAnalysisErr("No se detectaron productos en el archivo."); return; }
+      const m = file.name.match(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/);
+      const periodStart = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+      const periodEnd   = m ? `${m[4]}-${m[5]}-${m[6]}` : "";
+      setAnalysisParsed({ filename: file.name, periodStart, periodEnd, rows });
+    } catch { setAnalysisErr("No se pudo leer el archivo. Verifica que sea el export de TikTok."); }
+  };
+
+  const confirmAnalysisUpload = async () => {
+    if (!analysisParsed || !analysisParsed.periodStart || !analysisParsed.periodEnd) { setAnalysisErr("Falta el rango de fechas."); return; }
+    setAnalysisSaving(true);
+    try {
+      await createSampleAnalysisPeriod(analysisParsed.filename, analysisParsed.periodStart, analysisParsed.periodEnd, analysisParsed.rows);
+      setAnalysisParsed(null);
+      await loadAnalysis();
+    } catch (err: any) { setAnalysisErr(err?.message ?? "Error al guardar el documento."); }
+    finally { setAnalysisSaving(false); }
+  };
+
+  const removeAnalysisPeriod = async (p: SampleAnalysisPeriod) => {
+    if (!confirm(`¿Eliminar "${p.filename}" (${p.periodStart} – ${p.periodEnd}) y sus datos?`)) return;
+    await deleteSampleAnalysisPeriod(p.id);
+    await loadAnalysis();
+  };
+
+  const analysisMatchingPeriods = useMemo(() => {
+    if (analysisFilterMode === "month") {
+      const [y, m] = analysisFilterMonth.split("-").map(Number);
+      const monthStart = `${analysisFilterMonth}-01`;
+      const monthEnd = new Date(y, m, 0).toISOString().slice(0,10);
+      return analysisPeriods.filter(p => p.periodStart <= monthEnd && p.periodEnd >= monthStart);
+    }
+    if (!analysisFilterFrom || !analysisFilterTo) return analysisPeriods;
+    return analysisPeriods.filter(p => p.periodStart <= analysisFilterTo && p.periodEnd >= analysisFilterFrom);
+  }, [analysisPeriods, analysisFilterMode, analysisFilterMonth, analysisFilterFrom, analysisFilterTo]);
 
   // ── Incident log state ────────────────────────────────────────────────────────
   type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
@@ -1287,6 +1386,14 @@ export default function StrategyDashboard() {
             {/* ── INVENTORY TAB ─────────────────────────────────────────────── */}
             {samplesTab==="inventory" && (
               <div>
+                <div style={{display:"flex",gap:"0.4rem",marginBottom:"1.25rem"}}>
+                  {([["cupos","Cupos mensuales"],["analisis","Análisis de producto (TikTok)"]] as const).map(([k,l])=>(
+                    <button key={k} style={{...qBtn,borderColor:inventorySubView===k?"#0891b2":"#e2e8f0",color:inventorySubView===k?C.samples:"#64748b"}}
+                      onClick={()=>setInventorySubView(k)}>{l}</button>
+                  ))}
+                </div>
+
+                {inventorySubView==="cupos" && (<>
                 <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap",justifyContent:"space-between"}}>
                   <div style={{display:"flex",alignItems:"center",gap:"1rem",flexWrap:"wrap"}}>
                     <div>
@@ -1392,6 +1499,103 @@ export default function StrategyDashboard() {
                       </table>
                     </div>
                 }
+                </>)}
+
+                {inventorySubView==="analisis" && (
+                  <div>
+                    <input ref={analysisFileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}}
+                      onChange={e=>{const f=e.target.files?.[0]; if(f) handleAnalysisFileSelected(f); e.target.value="";}} />
+
+                    {!analysisParsed && (
+                      <div style={{marginBottom:"1rem"}}>
+                        <button className="btn btn-primary" onClick={()=>analysisFileRef.current?.click()}>+ Subir documento</button>
+                        {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{analysisErr}</p>}
+                      </div>
+                    )}
+
+                    {analysisParsed && (
+                      <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                        <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{analysisParsed.filename}</h4>
+                        <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{analysisParsed.rows.length} productos detectados.</p>
+                        <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
+                          <div><label style={lbl}>Desde</label>
+                            <input type="date" className="form-control" value={analysisParsed.periodStart}
+                              onChange={e=>setAnalysisParsed({...analysisParsed,periodStart:e.target.value})} /></div>
+                          <div><label style={lbl}>Hasta</label>
+                            <input type="date" className="form-control" value={analysisParsed.periodEnd}
+                              onChange={e=>setAnalysisParsed({...analysisParsed,periodEnd:e.target.value})} /></div>
+                        </div>
+                        {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{analysisErr}</p>}
+                        <div style={{display:"flex",gap:"0.5rem"}}>
+                          <button className="btn btn-primary btn-sm" disabled={analysisSaving} onClick={confirmAnalysisUpload}>{analysisSaving?"...":"Confirmar y guardar"}</button>
+                          <button className="btn btn-secondary btn-sm" onClick={()=>{setAnalysisParsed(null);setAnalysisErr("");}}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
+                      <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
+                        <button style={{...qBtn,borderColor:analysisFilterMode==="month"?"#0891b2":"#e2e8f0",color:analysisFilterMode==="month"?C.samples:"#64748b"}}
+                          onClick={()=>setAnalysisFilterMode("month")}>Por mes</button>
+                        <button style={{...qBtn,borderColor:analysisFilterMode==="range"?"#0891b2":"#e2e8f0",color:analysisFilterMode==="range"?C.samples:"#64748b"}}
+                          onClick={()=>setAnalysisFilterMode("range")}>Por rango de fechas</button>
+                      </div>
+                      {analysisFilterMode==="month" ? (
+                        <div><label style={lbl}>Mes</label>
+                          <input type="month" className="form-control" style={{maxWidth:170}} value={analysisFilterMonth} onChange={e=>setAnalysisFilterMonth(e.target.value)} />
+                        </div>
+                      ) : (
+                        <div style={{display:"flex",gap:"0.75rem"}}>
+                          <div><label style={lbl}>Desde</label>
+                            <input type="date" className="form-control" value={analysisFilterFrom} onChange={e=>setAnalysisFilterFrom(e.target.value)} /></div>
+                          <div><label style={lbl}>Hasta</label>
+                            <input type="date" className="form-control" value={analysisFilterTo} onChange={e=>setAnalysisFilterTo(e.target.value)} /></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {analysisMatchingPeriods.length === 0 ? (
+                      <EmptyCard msg="No hay documentos subidos para este filtro." />
+                    ) : analysisMatchingPeriods.map(period => {
+                      const rows = analysisRows.filter(r => r.periodId === period.id);
+                      return (
+                        <div key={period.id} className="card" style={{marginBottom:"1rem",overflowX:"auto"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.75rem"}}>
+                            <div>
+                              <h4 style={{margin:0}}>{period.periodStart} → {period.periodEnd}</h4>
+                              <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0.2rem 0 0"}}>{period.filename}</p>
+                            </div>
+                            <button className="btn btn-sm btn-danger" onClick={()=>removeAnalysisPeriod(period)}>Eliminar</button>
+                          </div>
+                          <table className="data-table">
+                            <thead><tr>
+                              <th>Producto</th><th>Categoría</th><th>Content GMV</th><th>Refunds</th>
+                              <th>Solicitados</th><th>Enviados</th><th>Status</th><th>Videos</th><th>LIVEs</th>
+                              <th>ROI 45d</th><th>ROI 90d</th>
+                            </tr></thead>
+                            <tbody>
+                              {rows.map(r => (
+                                <tr key={r.id}>
+                                  <td style={{maxWidth:280,fontSize:"0.8rem"}}>{r.productName}</td>
+                                  <td style={{fontSize:"0.8rem",color:"var(--text-muted)"}}>{r.productCategory}</td>
+                                  <td>{r.contentGmv!=null?`$${r.contentGmv.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}</td>
+                                  <td>{r.refunds!=null?`$${r.refunds.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}</td>
+                                  <td>{r.samplesRequested ?? "—"}</td>
+                                  <td>{r.samplesShipped ?? "—"}</td>
+                                  <td>{r.status || "—"}</td>
+                                  <td>{r.videosWithSamples ?? "—"}</td>
+                                  <td>{r.liveStreamsWithSamples ?? "—"}</td>
+                                  <td>{r.roi45d ?? "—"}</td>
+                                  <td>{r.roi90d ?? "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1917,7 +2121,8 @@ export default function StrategyDashboard() {
                         {r:"4.3–4.49",p:"80%",  setVal:4.3},
                         {r:"4.2–4.29",p:"40%",  setVal:4.2},
                         {r:"4.1–4.19",p:"30%",  setVal:4.1},
-                        {r:"< 4.1",   p:"0%",   setVal:4.0},
+                        {r:"3.5–4.09",p:"15%",  setVal:3.5},
+                        {r:"< 3.5",   p:"0%",   setVal:3.4},
                       ]}
                       onSetVal={v=>setF(ag.id,"productScore",v)}>
                       <input type="number" min={0} max={5} step={0.01} className="form-control"
@@ -1926,10 +2131,11 @@ export default function StrategyDashboard() {
                     <SubMetric color={C.health} label="B. Non-Buyer Fault Rate" sublabel="Meta: ≤ 2.10% · Peso: 50%" scalePct={pB}
                       scales={[
                         {r:"≤ 2.10%",    p:"100%", setVal:2.10},
-                        {r:"2.11–2.20%", p:"80%",  setVal:2.15},
-                        {r:"2.21–2.30%", p:"60%",  setVal:2.25},
-                        {r:"2.31–2.50%", p:"50%",  setVal:2.40},
-                        {r:"> 2.50%",    p:"0%",   setVal:2.60},
+                        {r:"2.11–2.20%", p:"95%",  setVal:2.15},
+                        {r:"2.21–2.30%", p:"90%",  setVal:2.25},
+                        {r:"2.31–2.50%", p:"75%",  setVal:2.40},
+                        {r:"2.51–3.00%", p:"50%",  setVal:2.75},
+                        {r:"> 3.00%",    p:"0%",   setVal:3.10},
                       ]}
                       onSetVal={v=>setF(ag.id,"nonBuyerFaultRate",v)}
                       incidentCount={(incidents[`${ag.id}-non_buyer`]??[]).length}
@@ -1943,7 +2149,8 @@ export default function StrategyDashboard() {
                     <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 0.55% · Peso: 45%" scalePct={pC}
                       scales={[
                         {r:"< 0.55%",    p:"100%", setVal:0.40},
-                        {r:"0.55–0.90%", p:"75%",  setVal:0.70},
+                        {r:"0.55–0.80%", p:"90%",  setVal:0.65},
+                        {r:"0.81–0.90%", p:"75%",  setVal:0.85},
                         {r:"0.91–1.30%", p:"50%",  setVal:1.10},
                         {r:"1.31–1.60%", p:"25%",  setVal:1.45},
                         {r:"> 1.60%",    p:"0%",   setVal:1.70},
