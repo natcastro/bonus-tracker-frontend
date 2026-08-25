@@ -449,8 +449,12 @@ export default function StrategyDashboard() {
   };
 
   const updateAnalysisRowCatalog = async (rowId: number, catalogId: number | null) => {
-    await setSampleAnalysisRowCatalog(rowId, catalogId);
-    await loadAnalysis();
+    try {
+      await setSampleAnalysisRowCatalog(rowId, catalogId);
+      await loadAnalysis();
+    } catch (err: any) {
+      alert(err?.message ?? "No se pudo vincular el cupo.");
+    }
   };
 
   const removeAnalysisPeriod = async (p: SampleAnalysisPeriod) => {
