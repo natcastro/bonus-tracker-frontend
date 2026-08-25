@@ -12,7 +12,7 @@ import {
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
   deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
-  addVideoLogEntriesBulk,
+  addVideoLogEntriesBulk, replaceVideoLogForPeriod,
   getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod, setSampleAnalysisRowCatalog,
 } from "../services/api";
 import {
@@ -847,6 +847,62 @@ export default function StrategyDashboard() {
     if (!confirm("¿Eliminar esta solicitud sin respuesta? Lleva más de 7 días sin actualizarse.")) return;
     await deleteStrategySample(id);
     await loadSamples();
+  };
+
+  // ── Creator activity import (username + videos → advance stage to Entregado) ──
+  const activityFileRef = useRef<HTMLInputElement>(null);
+  const [activityImporting, setActivityImporting] = useState(false);
+  const [activityParsed, setActivityParsed] = useState<{
+    filename: string; periodStart: string; periodEnd: string;
+    rows: { username: string; videos: number }[];
+  } | null>(null);
+  const [activityErr, setActivityErr] = useState("");
+  const [activityResult, setActivityResult] = useState<{matched:number; unmatched:number} | null>(null);
+
+  const ACTIVITY_NAME_HINTS = /creator_name|username|nombre/i;
+  const ACTIVITY_VIDEOS_HINTS = /videos_posted|videos/i;
+
+  const handleActivityFileSelected = async (file: File) => {
+    setActivityErr("");
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const json = XLSX.utils.sheet_to_json<Record<string,any>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      if (json.length === 0) { setActivityErr("El archivo no tiene filas."); return; }
+      const columns = Object.keys(json[0]);
+      const nameCol = columns.find(c => ACTIVITY_NAME_HINTS.test(c)) ?? columns[0];
+      const videosCol = columns.find(c => ACTIVITY_VIDEOS_HINTS.test(c)) ?? columns[1];
+      const rows = json.map(row => ({
+        username: String(row[nameCol] ?? "").trim(),
+        videos: Number(row[videosCol] ?? 0),
+      })).filter(r => r.username);
+      const m = file.name.match(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/);
+      const periodStart = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+      const periodEnd   = m ? `${m[4]}-${m[5]}-${m[6]}` : "";
+      setActivityParsed({ filename: file.name, periodStart, periodEnd, rows });
+    } catch { setActivityErr("No se pudo leer el archivo."); }
+  };
+
+  const confirmActivityImport = async () => {
+    if (!activityParsed || !activityParsed.periodStart || !activityParsed.periodEnd) { setActivityErr("Falta el rango de fechas."); return; }
+    setActivityImporting(true);
+    try {
+      let matched = 0, unmatched = 0;
+      for (const row of activityParsed.rows) {
+        const key = row.username.toLowerCase();
+        const candidates = allSamples.filter(s => s.username.trim().toLowerCase() === key);
+        if (candidates.length === 0) { unmatched++; continue; }
+        const target = candidates.reduce((a,b) => a.sentDate >= b.sentDate ? a : b);
+        if (target.deliveryStatus !== "delivered") await updateStrategySample(target.id, { deliveryStatus: "delivered" });
+        await replaceVideoLogForPeriod(target.id, activityParsed.periodStart, activityParsed.periodEnd, row.videos, activityParsed.periodEnd);
+        matched++;
+      }
+      setActivityResult({ matched, unmatched });
+      setActivityParsed(null);
+      await loadSamples();
+    } catch (err: any) {
+      setActivityErr(err?.message ?? "Error al importar.");
+    } finally { setActivityImporting(false); }
   };
 
   // ── Historical CSV import (TikTok order export → samples pipeline) ────────
@@ -1735,6 +1791,42 @@ export default function StrategyDashboard() {
                 <button className="btn btn-secondary" disabled={historyImporting} onClick={()=>historyFileRef.current?.click()}>
                   {historyImporting?"Importando...":"⇪ Importar historial (CSV)"}
                 </button>
+                <input ref={activityFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
+                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleActivityFileSelected(f); e.target.value="";}} />
+                <button className="btn btn-secondary" disabled={activityImporting} onClick={()=>activityFileRef.current?.click()}>
+                  {activityImporting?"Importando...":"⇪ Importar actividad de creadores"}
+                </button>
+              </div>
+            )}
+            {activityParsed && (
+              <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{activityParsed.filename}</h4>
+                <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>
+                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado" y su conteo de videos se reemplaza para este rango de fechas.
+                </p>
+                <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
+                  <div><label style={lbl}>Desde</label>
+                    <input type="date" className="form-control" value={activityParsed.periodStart}
+                      onChange={e=>setActivityParsed({...activityParsed,periodStart:e.target.value})} /></div>
+                  <div><label style={lbl}>Hasta</label>
+                    <input type="date" className="form-control" value={activityParsed.periodEnd}
+                      onChange={e=>setActivityParsed({...activityParsed,periodEnd:e.target.value})} /></div>
+                </div>
+                {activityErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{activityErr}</p>}
+                <div style={{display:"flex",gap:"0.5rem"}}>
+                  <button className="btn btn-primary btn-sm" disabled={activityImporting} onClick={confirmActivityImport}>{activityImporting?"...":"Confirmar y aplicar"}</button>
+                  <button className="btn btn-secondary btn-sm" onClick={()=>{setActivityParsed(null);setActivityErr("");}}>Cancelar</button>
+                </div>
+              </div>
+            )}
+            {activityResult && (
+              <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <p style={{fontSize:"0.82rem",color:"#166534",margin:0}}>
+                    {activityResult.matched} creador{activityResult.matched!==1?"es":""} actualizado{activityResult.matched!==1?"s":""} a Entregado · {activityResult.unmatched} sin match
+                  </p>
+                  <button className="btn btn-sm btn-secondary" onClick={()=>setActivityResult(null)}>Cerrar</button>
+                </div>
               </div>
             )}
             {historyResult && (
