@@ -50,6 +50,14 @@ const IND3_MAX  = 130_000;
 const IND4_MAX  =  65_000;
 
 function roiScale(v: number) { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
+// Below 4% ROI the bonus isn't a percentage of IND1_MAX — it's small fixed
+// amounts to reward early-stage traction instead of paying nothing until 4%.
+function roiBonusAmount(v: number): number {
+  if (v >= 1 && v < 2) return 10_000;
+  if (v >= 2 && v < 3) return 20_000;
+  if (v >= 3 && v < 4) return 30_000;
+  return IND1_MAX * roiScale(v);
+}
 function productScoreScale(v: number){ if(v<=0)return 0;if(v>=4.5)return 1;if(v>=4.3)return .80;if(v>=4.2)return .40;if(v>=4.1)return .30;if(v>=3.5)return .15;return 0; }
 function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2.10)return 1;if(v<=2.20)return .95;if(v<=2.30)return .90;if(v<=2.50)return .75;if(v<=3.00)return .50;return 0; }
 function negReviewScale(v: number)   { if(v<=0)return 0;if(v<0.55)return 1;if(v<=0.80)return .90;if(v<=0.90)return .75;if(v<=1.30)return .50;if(v<=1.60)return .25;return 0; }
@@ -57,7 +65,7 @@ function operativeScale(v: number)   { if(v>=100)return 1;if(v>=80)return .75;if
 
 // finalScore: 0–100 (Coverage 80pts + Additional 20pts)
 function calcBonus(e: StrategyEntry, finalScore: number) {
-  const ind1 = IND1_MAX * roiScale(e.roiPct);
+  const ind1 = roiBonusAmount(e.roiPct);
   const ind2 = Math.round(finalScore / 100 * IND2_MAX);
   const pA = productScoreScale(e.productScore);
   const pB = nonBuyerScale(e.nonBuyerFaultRate);
@@ -156,7 +164,10 @@ function roiLabel(v: number) {
   if(v>=6)  return { text:"Desempeño aceptable",  color:"#ca8a04" };
   if(v>=5)  return { text:"Desempeño bajo",       color:"#d97706" };
   if(v>=4)  return { text:"Muy bajo",             color:"#dc2626" };
-  return    { text:"Sin bono (< 4%)",             color:"#9ca3af" };
+  if(v>=3)  return { text:"Inicial",              color:"#b45309" };
+  if(v>=2)  return { text:"Inicial",              color:"#b45309" };
+  if(v>=1)  return { text:"Inicial",              color:"#b45309" };
+  return    { text:"Sin bono (< 1%)",             color:"#9ca3af" };
 }
 
 function parseDateParts(s: string) { const [y, m] = s.split("-"); return { year: y, month: Number(m) }; }
@@ -1172,7 +1183,7 @@ export default function StrategyDashboard() {
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
                       <IndSummaryCard num="1" weight="40%" label="ROI Programa Afiliados" earned={b!.ind1} max={IND1_MAX} color={C.roi}
-                        scalePct={roiScale(entry.roiPct)}
+                        scalePct={roiBonusAmount(entry.roiPct)/IND1_MAX}
                         detail={`ROI del ciclo: ${entry.roiPct}%`} />
                       <IndSummaryCard num="2" weight="30%" label="Samples con Contenido" earned={b!.ind2} max={IND2_MAX} color={C.samples}
                         scalePct={stats.finalScore/100}
@@ -1209,7 +1220,9 @@ export default function StrategyDashboard() {
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.5rem"}}>
                 {[{r:"≥ 10%",d:"Dos dígitos",p:"100%",b:"$260.000",c:"#15803d"},{r:"8–9.99%",d:"Buen desempeño",p:"70%",b:"$182.000",c:"#16a34a"},
                   {r:"6–7.99%",d:"Aceptable",p:"40%",b:"$104.000",c:"#ca8a04"},{r:"5–5.99%",d:"Bajo",p:"30%",b:"$78.000",c:"#d97706"},
-                  {r:"4–4.99%",d:"Muy bajo",p:"20%",b:"$52.000",c:"#dc2626"},{r:"1–3.99%",d:"Sin bono",p:"0%",b:"$0",c:"#9ca3af"},
+                  {r:"4–4.99%",d:"Muy bajo",p:"20%",b:"$52.000",c:"#dc2626"},{r:"3–3.99%",d:"Inicial",p:"monto fijo",b:"$30.000",c:"#b45309"},
+                  {r:"2–2.99%",d:"Inicial",p:"monto fijo",b:"$20.000",c:"#b45309"},{r:"1–1.99%",d:"Inicial",p:"monto fijo",b:"$10.000",c:"#b45309"},
+                  {r:"< 1%",d:"Sin bono",p:"0%",b:"$0",c:"#9ca3af"},
                 ].map(t=>(
                   <div key={t.r} style={{border:`1px solid ${t.c}30`,borderLeft:`3px solid ${t.c}`,borderRadius:8,padding:"0.55rem 0.75rem"}}>
                     <div style={{fontWeight:800,fontSize:"0.9rem",color:t.c}}>{t.r}</div>
@@ -1232,7 +1245,7 @@ export default function StrategyDashboard() {
                     <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:"0.7rem",color:rl.color,fontWeight:700,textTransform:"uppercase"}}>{rl.text}</div>
-                        <div style={{fontSize:"1.15rem",fontWeight:800,color:C.roi}}>${cop(IND1_MAX*roiScale(d.roiPct))} COP</div>
+                        <div style={{fontSize:"1.15rem",fontWeight:800,color:C.roi}}>${cop(roiBonusAmount(d.roiPct))} COP</div>
                       </div>
                       <button className="btn btn-primary btn-sm" onClick={()=>saveEntry(ag.id)} disabled={saving}>{saving?"...":"Guardar"}</button>
                     </div>
@@ -1247,7 +1260,7 @@ export default function StrategyDashboard() {
                       <div style={{height:10,background:"#e2e8f0",borderRadius:5,overflow:"hidden",marginBottom:"0.5rem"}}>
                         <div style={{width:`${Math.min(100,(d.roiPct/10)*100)}%`,height:"100%",background:rl.color,transition:"width 0.3s",borderRadius:5}} />
                       </div>
-                      <div style={{fontSize:"0.75rem",color:"#64748b"}}>{pct(roiScale(d.roiPct))} del bono máximo · Máx ${cop(IND1_MAX)} COP</div>
+                      <div style={{fontSize:"0.75rem",color:"#64748b"}}>{pct(roiBonusAmount(d.roiPct)/IND1_MAX)} del bono máximo · Máx ${cop(IND1_MAX)} COP</div>
                     </div>
                   </div>
                 </div>
