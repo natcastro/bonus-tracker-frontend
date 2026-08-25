@@ -12,7 +12,7 @@ import {
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
   deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
-  addVideoLogEntriesBulk, replaceVideoLogForPeriod,
+  addVideoLogEntriesBulk,
   getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod, setSampleAnalysisRowCatalog,
 } from "../services/api";
 import {
@@ -928,13 +928,17 @@ export default function StrategyDashboard() {
             notes: `Agregado desde importar documento — ${activityParsed.filename}`,
             deliveryStatus: "delivered", catalogId: undefined,
           });
-          await replaceVideoLogForPeriod(sample.id, periodStart, periodEnd, row.videos, periodEnd);
+          if (row.videos > 0) await addVideoLogEntriesBulk(sample.id, periodEnd, row.videos);
           created++;
           continue;
         }
         const target = candidates.reduce((a,b) => a.sentDate >= b.sentDate ? a : b);
         if (target.deliveryStatus !== "delivered") await updateStrategySample(target.id, { deliveryStatus: "delivered" });
-        await replaceVideoLogForPeriod(target.id, periodStart, periodEnd, row.videos, periodEnd);
+        // Never reduces an existing count — only tops it up to match the document
+        // if the document reports more than what's already logged.
+        const currentCount = videoCountOf(target);
+        const delta = Math.max(0, row.videos - currentCount);
+        if (delta > 0) await addVideoLogEntriesBulk(target.id, periodEnd, delta);
         matched++;
       }
       setActivityResult({ matched, created });
@@ -1872,7 +1876,7 @@ export default function StrategyDashboard() {
               <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                 <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{activityParsed.filename}</h4>
                 <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>
-                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado" y su conteo de videos se reemplaza para este rango de fechas. Los que no existan todavía se agregan como nuevos.
+                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado". Si el video count del documento es mayor al que ya tiene, se suma la diferencia; si es igual o menor, no se toca. Los que no existan todavía se agregan como nuevos.
                 </p>
                 <label style={lbl}>¿Este documento es de un mes completo o de un período específico?</label>
                 <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
