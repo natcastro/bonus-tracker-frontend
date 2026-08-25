@@ -823,6 +823,10 @@ export default function StrategyDashboard() {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   });
   const [videoFilter, setVideoFilter] = useState<"all"|"withVideo"|"noVideo">("all");
+  const [sampleSort, setSampleSort] = useState<{col:"videos"|"username"|"sentDate"; dir:"asc"|"desc"} | null>(null);
+  const toggleSampleSort = (col:"videos"|"username"|"sentDate") => {
+    setSampleSort(prev => prev && prev.col===col ? { col, dir: prev.dir==="asc"?"desc":"asc" } : { col, dir: col==="videos"?"desc":"asc" });
+  };
   useEffect(() => { setTrackingFrom(officialPeriod.from); setTrackingTo(officialPeriod.to); }, [officialPeriod.from, officialPeriod.to]);
   const [addVideoPopoverId, setAddVideoPopoverId] = useState<number|null>(null);
   const [addVideoDate, setAddVideoDate] = useState("");
@@ -867,7 +871,11 @@ export default function StrategyDashboard() {
     rows: { username: string; videos: number }[];
   } | null>(null);
   const [activityErr, setActivityErr] = useState("");
-  const [activityResult, setActivityResult] = useState<{matched:number; unmatched:number} | null>(null);
+  const [activityResult, setActivityResult] = useState<{matched:number; created:number} | null>(null);
+  const [activityScope, setActivityScope] = useState<"month"|"period">("period");
+  const [activityMonth, setActivityMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  });
 
   const ACTIVITY_NAME_HINTS = /creator_name|username|nombre/i;
   const ACTIVITY_VIDEOS_HINTS = /videos_posted|videos/i;
@@ -894,20 +902,42 @@ export default function StrategyDashboard() {
   };
 
   const confirmActivityImport = async () => {
-    if (!activityParsed || !activityParsed.periodStart || !activityParsed.periodEnd) { setActivityErr("Falta el rango de fechas."); return; }
+    if (!activityParsed) return;
+    let periodStart = activityParsed.periodStart, periodEnd = activityParsed.periodEnd;
+    if (activityScope === "month") {
+      const [y, m] = activityMonth.split("-").map(Number);
+      periodStart = `${activityMonth}-01`;
+      periodEnd = new Date(y, m, 0).toISOString().slice(0,10);
+    }
+    if (!periodStart || !periodEnd) { setActivityErr("Falta el rango de fechas."); return; }
+    const agentId = agents[0]?.id;
+    if (!agentId) { setActivityErr("No hay agentes. Ve a Settings primero."); return; }
     setActivityImporting(true);
     try {
-      let matched = 0, unmatched = 0;
+      let matched = 0, created = 0;
+      const { year, month } = parseDateParts(periodEnd);
       for (const row of activityParsed.rows) {
         const key = row.username.toLowerCase();
         const candidates = allSamples.filter(s => s.username.trim().toLowerCase() === key);
-        if (candidates.length === 0) { unmatched++; continue; }
+        if (candidates.length === 0) {
+          // Not tracked yet anywhere — add it directly, since showing up in this
+          // report means the sample was delivered regardless of video count.
+          const sample = await createStrategySample({
+            agentId, username: row.username.trim(), sku: "", sentDate: periodEnd,
+            videosPublished: 0, year, month,
+            notes: `Agregado desde importar documento — ${activityParsed.filename}`,
+            deliveryStatus: "delivered", catalogId: undefined,
+          });
+          await replaceVideoLogForPeriod(sample.id, periodStart, periodEnd, row.videos, periodEnd);
+          created++;
+          continue;
+        }
         const target = candidates.reduce((a,b) => a.sentDate >= b.sentDate ? a : b);
         if (target.deliveryStatus !== "delivered") await updateStrategySample(target.id, { deliveryStatus: "delivered" });
-        await replaceVideoLogForPeriod(target.id, activityParsed.periodStart, activityParsed.periodEnd, row.videos, activityParsed.periodEnd);
+        await replaceVideoLogForPeriod(target.id, periodStart, periodEnd, row.videos, periodEnd);
         matched++;
       }
-      setActivityResult({ matched, unmatched });
+      setActivityResult({ matched, created });
       setActivityParsed(null);
       await loadSamples();
     } catch (err: any) {
@@ -1047,6 +1077,15 @@ export default function StrategyDashboard() {
     .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()))
     .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()))
     .filter(s => videoFilter === "all" || (videoFilter === "withVideo" ? videoCountOf(s) > 0 : videoCountOf(s) === 0));
+  if (sampleSort) {
+    const { col, dir } = sampleSort;
+    const mul = dir === "asc" ? 1 : -1;
+    tableRows.sort((a,b) => {
+      if (col === "videos") return (videoCountOf(a) - videoCountOf(b)) * mul;
+      if (col === "username") return a.username.localeCompare(b.username) * mul;
+      return a.sentDate.localeCompare(b.sentDate) * mul;
+    });
+  }
   const stageCounts = {
     requested: stageBase.filter(s => s.deliveryStatus === "requested").length,
     pending:   stageBase.filter(s => s.deliveryStatus === "pending").length,
@@ -1833,16 +1872,30 @@ export default function StrategyDashboard() {
               <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                 <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{activityParsed.filename}</h4>
                 <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>
-                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado" y su conteo de videos se reemplaza para este rango de fechas.
+                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado" y su conteo de videos se reemplaza para este rango de fechas. Los que no existan todavía se agregan como nuevos.
                 </p>
-                <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
-                  <div><label style={lbl}>Desde</label>
-                    <input type="date" className="form-control" value={activityParsed.periodStart}
-                      onChange={e=>setActivityParsed({...activityParsed,periodStart:e.target.value})} /></div>
-                  <div><label style={lbl}>Hasta</label>
-                    <input type="date" className="form-control" value={activityParsed.periodEnd}
-                      onChange={e=>setActivityParsed({...activityParsed,periodEnd:e.target.value})} /></div>
+                <label style={lbl}>¿Este documento es de un mes completo o de un período específico?</label>
+                <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
+                  <button type="button" style={{...qBtn,borderColor:activityScope==="month"?"#0891b2":"#e2e8f0",color:activityScope==="month"?C.samples:"#64748b"}}
+                    onClick={()=>setActivityScope("month")}>Mes completo</button>
+                  <button type="button" style={{...qBtn,borderColor:activityScope==="period"?"#0891b2":"#e2e8f0",color:activityScope==="period"?C.samples:"#64748b"}}
+                    onClick={()=>setActivityScope("period")}>Período específico</button>
                 </div>
+                {activityScope==="month" ? (
+                  <div style={{marginBottom:"1rem"}}>
+                    <label style={lbl}>Mes</label>
+                    <input type="month" className="form-control" style={{maxWidth:170}} value={activityMonth} onChange={e=>setActivityMonth(e.target.value)} />
+                  </div>
+                ) : (
+                  <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
+                    <div><label style={lbl}>Desde</label>
+                      <input type="date" className="form-control" value={activityParsed.periodStart}
+                        onChange={e=>setActivityParsed({...activityParsed,periodStart:e.target.value})} /></div>
+                    <div><label style={lbl}>Hasta</label>
+                      <input type="date" className="form-control" value={activityParsed.periodEnd}
+                        onChange={e=>setActivityParsed({...activityParsed,periodEnd:e.target.value})} /></div>
+                  </div>
+                )}
                 {activityErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{activityErr}</p>}
                 <div style={{display:"flex",gap:"0.5rem"}}>
                   <button className="btn btn-primary btn-sm" disabled={activityImporting} onClick={confirmActivityImport}>{activityImporting?"...":"Confirmar y aplicar"}</button>
@@ -1854,7 +1907,7 @@ export default function StrategyDashboard() {
               <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <p style={{fontSize:"0.82rem",color:"#166534",margin:0}}>
-                    {activityResult.matched} creador{activityResult.matched!==1?"es":""} actualizado{activityResult.matched!==1?"s":""} a Entregado · {activityResult.unmatched} sin match
+                    {activityResult.matched} creador{activityResult.matched!==1?"es":""} actualizado{activityResult.matched!==1?"s":""} a Entregado · {activityResult.created} nuevo{activityResult.created!==1?"s":""} agregado{activityResult.created!==1?"s":""}
                   </p>
                   <button className="btn btn-sm btn-secondary" onClick={()=>setActivityResult(null)}>Cerrar</button>
                 </div>
@@ -2040,7 +2093,14 @@ export default function StrategyDashboard() {
                   <EmptyCard msg="No hay samples para este período." />
                 ) : (
                   <table className="data-table">
-                    <thead><tr><th>Estado</th><th>Username</th><th>SKU</th><th>Fecha envío</th><th>Videos</th><th>Aporte al bono</th><th>Notas</th><th>Acciones</th></tr></thead>
+                    <thead><tr>
+                      <th>Estado</th>
+                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("username")}>Username {sampleSort?.col==="username"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
+                      <th>SKU</th>
+                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("sentDate")}>Fecha envío {sampleSort?.col==="sentDate"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
+                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("videos")}>Videos {sampleSort?.col==="videos"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
+                      <th>Aporte al bono</th><th>Notas</th><th>Acciones</th>
+                    </tr></thead>
                     <tbody>
                       {tableRows.map(s => {
                         const totalForCreator = stats.byCreator[s.username] ?? 0;
