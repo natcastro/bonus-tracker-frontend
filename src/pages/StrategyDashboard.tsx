@@ -802,7 +802,7 @@ export default function StrategyDashboard() {
   // ── Samples local state ────────────────────────────────────────────────────
   const [filterUser,   setFilterUser]   = useState("");
   const [filterSku,    setFilterSku]    = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all"|"requested"|"pending"|"delivered">("pending");
+  const [filterStatus, setFilterStatus] = useState<"all"|"requested"|"pending"|"delivered">("requested");
   const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
   const [showBanner,   setShowBanner]   = useState(true);
   const [trackingFilterMode, setTrackingFilterMode] = useState<"period"|"month"|"all">("period");
@@ -850,7 +850,6 @@ export default function StrategyDashboard() {
   };
 
   // ── Creator activity import (username + videos → advance stage to Entregado) ──
-  const activityFileRef = useRef<HTMLInputElement>(null);
   const [activityImporting, setActivityImporting] = useState(false);
   const [activityParsed, setActivityParsed] = useState<{
     filename: string; periodStart: string; periodEnd: string;
@@ -906,7 +905,6 @@ export default function StrategyDashboard() {
   };
 
   // ── Historical CSV import (TikTok order export → samples pipeline) ────────
-  const historyFileRef = useRef<HTMLInputElement>(null);
   const [historyImporting, setHistoryImporting] = useState(false);
   const [historyResult, setHistoryResult] = useState<{
     total:number; imported:number; skippedCancelled:number; skippedUnrecognized:number; skippedNoUsername:number; reconciled:number;
@@ -981,6 +979,24 @@ export default function StrategyDashboard() {
     } finally { setHistoryImporting(false); }
   };
 
+  // One button, two possible document shapes: TikTok order exports (Order ID /
+  // Order Status columns) create new samples via the historial flow; creator
+  // activity exports (username + videos) update existing samples' stage/videos.
+  const unifiedFileRef = useRef<HTMLInputElement>(null);
+  const handleUnifiedImport = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const json = XLSX.utils.sheet_to_json<Record<string,any>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      const columns = json.length ? Object.keys(json[0]) : [];
+      const isOrderExport = columns.includes("Order Status") && columns.includes("Order ID");
+      if (isOrderExport) await handleHistoryCsvSelected(file);
+      else await handleActivityFileSelected(file);
+    } catch {
+      setActivityErr("No se pudo leer el archivo.");
+    }
+  };
+
   const [showAdd,  setShowAdd]  = useState(false);
   const [editing,  setEditing]  = useState<StrategySample | null>(null);
   const [sErr,     setSErr]     = useState("");
@@ -1002,9 +1018,16 @@ export default function StrategyDashboard() {
     return { start: `${trackingMonth}-01`, end: new Date(y, m, 0).toISOString().slice(0,10) };
   };
 
+  // A sample counts toward a date range if it was sent in that range OR has
+  // video activity dated in that range — otherwise a creator-activity upload
+  // for a past month never shows up under that month's filter, since the
+  // sample's original sentDate can be from a totally different month.
+  const inDateRange = (s: StrategySample, start: string, end: string) =>
+    (s.sentDate >= start && s.sentDate <= end) || (s.videoLog ?? []).some(d => d >= start && d <= end);
+
   const stageBase = trackingFilterMode === "all" ? allSamples
-    : trackingFilterMode === "month" ? (() => { const {start,end} = trackingMonthBounds(); return allSamples.filter(s => s.sentDate >= start && s.sentDate <= end); })()
-    : allSamples.filter(s => (!trackingFrom || s.sentDate >= trackingFrom) && (!trackingTo || s.sentDate <= trackingTo));
+    : trackingFilterMode === "month" ? (() => { const {start,end} = trackingMonthBounds(); return allSamples.filter(s => inDateRange(s,start,end)); })()
+    : allSamples.filter(s => inDateRange(s, trackingFrom || "0000-01-01", trackingTo || "9999-12-31"));
 
   const videoCountOf = (s: StrategySample) => s.videoLog?.length ?? s.videosPublished;
 
@@ -1786,15 +1809,10 @@ export default function StrategyDashboard() {
             {!showAdd && !editing && (
               <div style={{marginBottom:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
                 <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setSErr("");}}>+ Agregar Sample</button>
-                <input ref={historyFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
-                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleHistoryCsvSelected(f); e.target.value="";}} />
-                <button className="btn btn-secondary" disabled={historyImporting} onClick={()=>historyFileRef.current?.click()}>
-                  {historyImporting?"Importando...":"⇪ Importar historial (CSV)"}
-                </button>
-                <input ref={activityFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
-                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleActivityFileSelected(f); e.target.value="";}} />
-                <button className="btn btn-secondary" disabled={activityImporting} onClick={()=>activityFileRef.current?.click()}>
-                  {activityImporting?"Importando...":"⇪ Importar actividad de creadores"}
+                <input ref={unifiedFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
+                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleUnifiedImport(f); e.target.value="";}} />
+                <button className="btn btn-secondary" disabled={historyImporting||activityImporting} onClick={()=>unifiedFileRef.current?.click()}>
+                  {historyImporting||activityImporting?"Importando...":"⇪ Importar documento"}
                 </button>
               </div>
             )}
@@ -1915,7 +1933,6 @@ export default function StrategyDashboard() {
             <div style={{display:"flex",gap:"0.5rem",marginBottom:"1rem",flexWrap:"wrap"}}>
               {([
                 {key:"requested", label:"📩 Solicitud enviada", count:stageCounts.requested, color:"#6366f1"},
-                {key:"pending",   label:"📦 Enviado",           count:stageCounts.pending,   color:"#d97706"},
                 {key:"delivered", label:"✓ Entregado",          count:stageCounts.delivered, color:"#16a34a"},
                 {key:"all",       label:"Todos",                count:stageBase.length, color:"#64748b"},
               ] as const).map(t => (
