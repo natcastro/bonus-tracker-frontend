@@ -10,6 +10,7 @@ import type {
   StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
 } from "../types";
+import type { MarketingBrief, MarketingNotification } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1411,4 +1412,80 @@ function mapStrategySample(r: any): StrategySample {
     catalogId: r.catalog_id ?? undefined,
     videoLog: Array.isArray(r.video_log) ? r.video_log : [],
   };
+}
+
+// ── Marketing module ────────────────────────────────────────────────────────
+
+function mapMarketingBrief(r: any): MarketingBrief {
+  return {
+    id: r.id,
+    reference: r.reference,
+    startDate: r.start_date,
+    currentStage: r.current_stage,
+    status: r.status,
+    stages: Array.isArray(r.stages) ? r.stages : [],
+    shiftDays: r.shift_days ?? 0,
+    lauraDelayDays: r.laura_delay_days ?? 0,
+    designDelayCount: r.design_delay_count ?? 0,
+    extraRevisionRounds: r.extra_revision_rounds ?? 0,
+    completedAt: r.completed_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function mapMarketingNotification(r: any): MarketingNotification {
+  return {
+    id: r.id, briefId: r.brief_id, message: r.message, createdAt: r.created_at,
+    readLaura: r.read_laura ?? false, readDiseno: r.read_diseno ?? false,
+  };
+}
+
+export async function getMarketingBriefs(): Promise<MarketingBrief[]> {
+  const { data, error } = await supabase.from("marketing_briefs").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapMarketingBrief);
+}
+
+export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "createdAt" | "updatedAt">): Promise<MarketingBrief> {
+  const { data, error } = await supabase.from("marketing_briefs").insert({
+    reference: b.reference, start_date: b.startDate, current_stage: b.currentStage,
+    status: b.status, stages: b.stages, shift_days: b.shiftDays,
+    laura_delay_days: b.lauraDelayDays, design_delay_count: b.designDelayCount,
+    extra_revision_rounds: b.extraRevisionRounds, completed_at: b.completedAt,
+  }).select().single();
+  if (error) throw error;
+  return mapMarketingBrief(data);
+}
+
+export async function updateMarketingBrief(id: number, patch: Partial<Omit<MarketingBrief, "id"|"createdAt"|"updatedAt">>): Promise<void> {
+  const dbPatch: any = { updated_at: new Date().toISOString() };
+  if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.stages !== undefined) dbPatch.stages = patch.stages;
+  if (patch.shiftDays !== undefined) dbPatch.shift_days = patch.shiftDays;
+  if (patch.lauraDelayDays !== undefined) dbPatch.laura_delay_days = patch.lauraDelayDays;
+  if (patch.designDelayCount !== undefined) dbPatch.design_delay_count = patch.designDelayCount;
+  if (patch.extraRevisionRounds !== undefined) dbPatch.extra_revision_rounds = patch.extraRevisionRounds;
+  if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
+  const { error } = await supabase.from("marketing_briefs").update(dbPatch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function getMarketingNotifications(): Promise<MarketingNotification[]> {
+  const { data, error } = await supabase.from("marketing_notifications").select("*").order("created_at", { ascending: false }).limit(100);
+  if (error) throw error;
+  return (data ?? []).map(mapMarketingNotification);
+}
+
+export async function createMarketingNotification(briefId: number | null, message: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").insert({ brief_id: briefId, message });
+  if (error) throw error;
+}
+
+export async function markMarketingNotificationsRead(role: "laura"|"diseno", ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const field = role === "laura" ? "read_laura" : "read_diseno";
+  const { error } = await supabase.from("marketing_notifications").update({ [field]: true }).in("id", ids);
+  if (error) throw error;
 }

@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 
-type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS";
+type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING";
 type View = "hub" | "ftc-usa" | "ops-tools";
 
 const ROUTES: Record<Team, string> = {
   MEX: "/mexico", OPS: "/operations",
   APT: "/strategy", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
-  MGMT: "/management", LOGISTICS: "/logistics",
+  MGMT: "/management", LOGISTICS: "/logistics", MARKETING: "/marketing",
 };
 
 const MANAGEMENT_PASSWORD = "123456";
@@ -255,6 +255,14 @@ export default function Landing() {
             color="#b45309"
             tags={["Envíos", "Inventario"]}
             onClick={() => directGo("LOGISTICS")}
+          />
+          <HubCard
+            icon="🎨"
+            title="Marketing"
+            subtitle="Briefs de producto — Laura & Diseño"
+            color="#3E6B45"
+            tags={["Briefs", "Diseño"]}
+            onClick={() => directGo("MARKETING")}
           />
         </div>
 
