@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MT, formatDateHuman } from "../theme";
+import { MT, formatDateHuman, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
 import Timeline from "../components/Timeline";
 import DeadlineBadge from "../components/DeadlineBadge";
+import Avatar from "../components/Avatar";
+import StatusPill from "../components/StatusPill";
 import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
@@ -44,37 +46,46 @@ export default function BriefDetailPage() {
   };
 
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.5rem", fontFamily: MT.font }}>
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <button onClick={() => navigate("/marketing/dashboard")} style={{
-        background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 13, marginBottom: 14, padding: 0,
+        background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
       }}>← Volver al dashboard</button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: "0.5rem" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
-          <p style={{ margin: "0.25rem 0 0", fontSize: 13, color: MT.text2 }}>
-            Inicio: {formatDateHuman(brief.startDate)} · Estado: {brief.status === "completed" ? "Completado" : stageLabel(brief.currentStage)}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
+            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
+            <StatusPill
+              solid
+              color={brief.status === "completed" ? MT.primary : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
+              label={brief.status === "completed" ? "✓ Completado" : stageLabel(brief.currentStage)}
+            />
+          </div>
+          <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>Inicio: {formatDateHuman(brief.startDate)}</p>
         </div>
         {brief.shiftDays > 0 && (
-          <div style={{ fontSize: 12, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.4rem 0.7rem", fontWeight: 600 }}>
+          <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
             ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
           </div>
         )}
       </div>
 
-      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.25rem", marginBottom: "1.25rem" }}>
+      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
         <Timeline brief={brief} />
       </div>
 
       {/* Stage links history */}
-      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.25rem", marginBottom: "1.25rem" }}>
-        <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>Enlaces por etapa</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
+        <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Enlaces por etapa</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {brief.stages.map(s => (
-            <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0.7rem", background: MT.surfaceAlt, borderRadius: 8, gap: 10 }}>
-              <div style={{ fontSize: 12.5, color: MT.text1, fontWeight: 600, minWidth: 110 }}>{s.label}</div>
-              <div style={{ fontSize: 12, color: MT.text3, minWidth: 90 }}>{s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : `Deadline ${formatDateHuman(s.deadline)}`}</div>
+            <div key={s.key} style={{ display: "flex", alignItems: "center", padding: "0.4rem 0.6rem", background: MT.surfaceAlt, borderRadius: 8, gap: 10 }}>
+              <Avatar role={s.role} size={18} />
+              <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
+              <StatusPill
+                color={s.status === "done" ? MT.primary : MT.text3}
+                label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
+              />
               {s.link ? (
                 <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: MT.primary, fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                   {s.link}
@@ -89,18 +100,21 @@ export default function BriefDetailPage() {
 
       {/* Action panel */}
       {brief.status === "completed" ? (
-        <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1.25rem", textAlign: "center" }}>
-          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 15 }}>✓ Brief completado</p>
-          <p style={{ margin: "0.35rem 0 0", fontSize: 12.5, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
+        <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
+          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
+          <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
         </div>
       ) : !canAct ? (
-        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.25rem", textAlign: "center", color: MT.text2, fontSize: 13 }}>
-          <div>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></div>
+        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            {currentStage && <Avatar role={currentStage.role} size={18} />}
+            <span>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></span>
+          </div>
           {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
         </div>
       ) : (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1.25rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 14, color: MT.text1, margin: "0 0 10px" }}>
+        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — {stageLabel(brief.currentStage)}
           </p>
           {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
