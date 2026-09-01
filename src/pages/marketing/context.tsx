@@ -234,19 +234,19 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed") return;
     const today = todayIso();
-    const adjustmentsGap = brief.stages.find(s => s.key === "adjustments")!.gapDays;
-    const adjustmentsDeadline = addWorkDaysIso(today, adjustmentsGap);
+    const adjustments2Gap = brief.stages.find(s => s.key === "adjustments2")!.gapDays;
+    const adjustments2Deadline = addWorkDaysIso(today, adjustments2Gap);
     const newStages = brief.stages.map(s => {
-      if (s.key === "adjustments") {
-        return { ...s, status: "pending" as const, completedAt: null, link: null, decision: undefined, deadline: adjustmentsDeadline };
+      if (s.key === "adjustments2") {
+        return { ...s, status: "pending" as const, completedAt: null, link: null, decision: undefined, deadline: adjustments2Deadline };
       }
-      if (s.key === "review2" || s.key === "final") {
+      if (s.key === "final") {
         return { ...s, status: "pending" as const, completedAt: null, decision: undefined, deadline: null };
       }
       return s;
     });
     await updateMarketingBrief(briefId, {
-      stages: newStages, currentStage: "adjustments",
+      stages: newStages, currentStage: "adjustments2",
       extraRevisionRounds: brief.extraRevisionRounds + 1,
     });
     await notify(briefId, `Laura solicitó una revisión adicional en ${brief.reference}.`);
@@ -256,8 +256,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       emailHtml({
         intro: "Laura solicitó una revisión adicional sobre el cierre final.",
         reference: brief.reference,
-        nextTask: stageLabel("adjustments"),
-        deadline: adjustmentsDeadline,
+        nextTask: stageLabel("adjustments2"),
+        deadline: adjustments2Deadline,
         note,
       }),
     );

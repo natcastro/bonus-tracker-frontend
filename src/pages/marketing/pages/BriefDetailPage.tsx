@@ -11,8 +11,13 @@ import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
 import type { StageKey } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
-const DESIGN_STAGES = new Set(["proposal", "adjustments"]);
-const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "review1", "adjustments", "review2"]);
+const DESIGN_STAGES = new Set(["proposal", "adjustments", "adjustments2"]);
+const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "review1", "adjustments", "review2", "adjustments2"]);
+const UPLOAD_LABELS: Record<string, string> = {
+  proposal: "de la propuesta",
+  adjustments: "de los ajustes",
+  adjustments2: "de los ajustes (ronda 2)",
+};
 
 export default function BriefDetailPage() {
   const { id } = useParams();
@@ -228,7 +233,7 @@ export default function BriefDetailPage() {
           {DESIGN_STAGES.has(brief.currentStage) && (
             <>
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
-                Link de SharePoint {brief.currentStage === "proposal" ? "de la propuesta" : "de los ajustes"}
+                Link de SharePoint {UPLOAD_LABELS[brief.currentStage] ?? ""}
               </label>
               <input style={{ ...fieldStyle, marginBottom: 12 }} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
               {noteField}
