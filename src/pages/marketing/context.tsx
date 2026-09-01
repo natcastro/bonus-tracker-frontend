@@ -31,7 +31,7 @@ interface MarketingCtx {
   requestExtraRevision: (briefId: number) => Promise<void>;
 
   unreadCount: number;
-  markNotificationsSeen: () => Promise<void>;
+  markNotificationRead: (id: number) => Promise<void>;
 }
 
 const Ctx = createContext<MarketingCtx | null>(null);
@@ -188,12 +188,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return notifications.filter(n => !n[field]).length;
   }, [notifications, authedUser]);
 
-  const markNotificationsSeen = async () => {
+  const markNotificationRead = async (id: number) => {
     if (!authedUser) return;
     const field = authedUser.role === "laura" ? "readLaura" : "readDiseno";
-    const ids = notifications.filter(n => !n[field]).map(n => n.id);
-    if (ids.length === 0) return;
-    await markMarketingNotificationsRead(authedUser.role, ids);
+    const notif = notifications.find(n => n.id === id);
+    if (!notif || notif[field]) return;
+    await markMarketingNotificationsRead(authedUser.role, [id]);
     await reload();
   };
 
@@ -201,7 +201,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       authedUser, login, logout, briefs, notifications, loading, reload,
       createBrief, submitDesignStage, lauraReview, requestExtraRevision,
-      unreadCount, markNotificationsSeen,
+      unreadCount, markNotificationRead,
     }}>
       {children}
     </Ctx.Provider>

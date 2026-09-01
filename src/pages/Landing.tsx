@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { verifyPassword } from "../services/api";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
@@ -13,8 +12,6 @@ const ROUTES: Record<Team, string> = {
   APT: "/strategy", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
   MGMT: "/management", LOGISTICS: "/logistics", MARKETING: "/marketing",
 };
-
-const MANAGEMENT_PASSWORD = "123456";
 
 const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
   { key: "OPS",  label: "Operations Team",  desc: "Handling Time & TikTok",  color: "#7c3aed" },
@@ -89,33 +86,13 @@ function HubCard({
   );
 }
 
-// ── Password form ─────────────────────────────────────────────────────────────
-function PasswordForm({
-  team, label, color, onBack,
+// ── Role selector (no password — just pick which role to enter as) ───────────
+function RoleSelector({
+  label, color, roles, onSelect, onBack,
 }: {
-  team: Team; label: string; color: string; onBack: () => void;
+  label: string; color: string; roles: { value: string; label: string; desc: string }[];
+  onSelect: (role: string) => void; onBack: () => void;
 }) {
-  const navigate = useNavigate();
-  const [pw, setPw] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const role = await verifyPassword(team, pw);
-      sessionStorage.setItem("team", team);
-      sessionStorage.setItem("role", role);
-      navigate(ROUTES[team]);
-    } catch {
-      setError("Contraseña incorrecta.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div style={{
       background: "#fff",
@@ -127,34 +104,29 @@ function PasswordForm({
       width: "100%",
     }}>
       <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "1rem", color: "#111827" }}>
-        🔒 {label}
+        {label} — ¿con qué rol entras?
       </div>
-      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <input
-          type="password"
-          className="form-control"
-          placeholder="Contraseña"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          autoFocus
-          required
-          style={{ borderColor: color + "60" }}
-        />
-        {error && <p className="error-msg">{error}</p>}
-        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
-            Cancelar
-          </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+        {roles.map((r) => (
           <button
-            type="submit"
-            className="btn btn-primary btn-sm"
-            style={{ background: color }}
-            disabled={loading}
+            key={r.value}
+            onClick={() => onSelect(r.value)}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+              padding: "0.75rem 1rem", borderRadius: 10, border: `1px solid ${color}40`,
+              background: color + "0c", cursor: "pointer", textAlign: "left",
+            }}
           >
-            {loading ? "..." : "Entrar"}
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>{r.label}</span>
+            <span style={{ fontSize: "0.75rem", color: "#6B7280" }}>{r.desc}</span>
           </button>
-        </div>
-      </form>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }
@@ -166,13 +138,11 @@ export default function Landing() {
   const { hasTeam, loading: accessLoading, access, email, name } = useHubAccess();
   const [view, setView] = useState<View>("hub");
   const [csSelected, setCsSelected] = useState<Team | null>(null);
-  const [mgmtPw, setMgmtPw] = useState("");
-  const [mgmtPwError, setMgmtPwError] = useState("");
   const [showAdminPanel, setShowAdminPanel] = useState(false);
 
-  const directGo = (team: Team) => {
+  const directGo = (team: Team, role: string = "admin") => {
     sessionStorage.setItem("team", team);
-    sessionStorage.setItem("role", "admin");
+    sessionStorage.setItem("role", role);
     navigate(ROUTES[team]);
   };
 
@@ -197,15 +167,6 @@ export default function Landing() {
       </div>
     );
   }
-
-  const submitMgmt = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mgmtPw === MANAGEMENT_PASSWORD) {
-      directGo("MGMT");
-    } else {
-      setMgmtPwError("Contraseña incorrecta.");
-    }
-  };
 
   // ── Hub view ──────────────────────────────────────────────────────────────
   if (view === "hub") {
@@ -296,8 +257,7 @@ export default function Landing() {
               subtitle="Historial y datos del equipo"
               color="#64748b"
               tags={["Historial", "Datos"]}
-              onClick={() => setCsSelected(csSelected === "MGMT" ? null : "MGMT")}
-              active={csSelected === "MGMT"}
+              onClick={() => directGo("MGMT")}
             />
           )}
           {hasTeam("LOGISTICS") && (
@@ -325,55 +285,19 @@ export default function Landing() {
           <p style={{ color: "#6B7280", marginTop: "1.5rem" }}>No tienes ningún equipo asignado todavía.</p>
         )}
 
-        {/* México password inline */}
+        {/* México role picker inline */}
         {csSelected === "MEX" && (
           <div style={{ marginTop: "2rem" }}>
-            <PasswordForm
-              team="MEX"
+            <RoleSelector
               label="FTC México"
               color="#15803d"
+              roles={[
+                { value: "admin", label: "Administrador", desc: "Acceso completo al panel de México" },
+                { value: "staff", label: "Staff", desc: "Vista de trabajo diario del equipo" },
+              ]}
+              onSelect={(role) => directGo("MEX", role)}
               onBack={() => setCsSelected(null)}
             />
-          </div>
-        )}
-
-        {/* Management password inline */}
-        {csSelected === "MGMT" && (
-          <div style={{ marginTop: "2rem" }}>
-            <div style={{
-              background: "#fff",
-              border: "1px solid #E5E7EB",
-              borderLeft: "4px solid #64748b",
-              borderRadius: 12,
-              padding: "1.5rem",
-              maxWidth: 380,
-              width: "100%",
-            }}>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "1rem", color: "#111827" }}>
-                🔒 Management
-              </div>
-              <form onSubmit={submitMgmt} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <input
-                  type="password"
-                  className="form-control"
-                  placeholder="Contraseña"
-                  value={mgmtPw}
-                  onChange={(e) => { setMgmtPw(e.target.value); setMgmtPwError(""); }}
-                  autoFocus
-                  required
-                  style={{ borderColor: "#94a3b860" }}
-                />
-                {mgmtPwError && <p className="error-msg">{mgmtPwError}</p>}
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCsSelected(null)}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary btn-sm" style={{ background: "#64748b" }}>
-                    Entrar
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
 
@@ -438,42 +362,30 @@ export default function Landing() {
           )}
         </div>
 
-        {/* CS team picker */}
+        {/* CS team picker — click a team to go straight in, no password */}
         {csSelected && csSelected !== "TKLIVES" && (
           <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", width: "100%" }}>
-            {csSelected === "USA" || csSelected === "OPS" || csSelected === "APT" ? (
-              <>
-                {/* Team selector pills */}
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {CS_TEAMS.filter((t) => hasTeam(t.key)).map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => setCsSelected(t.key)}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        borderRadius: 9999,
-                        border: `2px solid ${csSelected === t.key ? t.color : "#E5E7EB"}`,
-                        background: csSelected === t.key ? t.color + "12" : "#fff",
-                        color: csSelected === t.key ? t.color : "#374151",
-                        fontWeight: 600,
-                        fontSize: "0.85rem",
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                {/* Password form for the selected CS team */}
-                <PasswordForm
-                  team={csSelected as Team}
-                  label={CS_TEAMS.find((t) => t.key === csSelected)?.label ?? ""}
-                  color={CS_TEAMS.find((t) => t.key === csSelected)?.color ?? "#1e40af"}
-                  onBack={() => setCsSelected(null)}
-                />
-              </>
-            ) : null}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+              {CS_TEAMS.filter((t) => hasTeam(t.key)).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => directGo(t.key)}
+                  style={{
+                    padding: "0.5rem 1.25rem",
+                    borderRadius: 9999,
+                    border: `2px solid ${t.color}`,
+                    background: t.color + "12",
+                    color: t.color,
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

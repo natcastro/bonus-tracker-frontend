@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatRelative } from "../theme";
 import { useMarketing } from "../context";
+import type { MarketingNotification } from "../types";
 
 export default function NotificationBell() {
-  const { notifications, unreadCount, markNotificationsSeen } = useMarketing();
+  const { notifications, unreadCount, markNotificationRead, authedUser } = useMarketing();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -16,15 +19,20 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    if (next && unreadCount > 0) markNotificationsSeen();
+  const isUnread = (n: MarketingNotification) => {
+    if (!authedUser) return false;
+    return authedUser.role === "laura" ? !n.readLaura : !n.readDiseno;
+  };
+
+  const handleClick = (n: MarketingNotification) => {
+    if (isUnread(n)) markNotificationRead(n.id);
+    setOpen(false);
+    if (n.briefId) navigate(`/marketing/brief/${n.briefId}`);
   };
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={toggle} style={{
+      <button onClick={() => setOpen(o => !o)} style={{
         position: "relative", width: 38, height: 38, borderRadius: 999,
         border: `1px solid ${MT.border}`, background: MT.surface, cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
@@ -52,12 +60,29 @@ export default function NotificationBell() {
               Sin notificaciones todavía.
             </div>
           ) : (
-            notifications.map(n => (
-              <div key={n.id} style={{ padding: "0.7rem 1rem", borderBottom: `1px solid ${MT.border}`, fontSize: 12.5, color: MT.text1, lineHeight: 1.5 }}>
-                <div>{n.message}</div>
-                <div style={{ fontSize: 11, color: MT.text3, marginTop: 3 }}>{formatRelative(n.createdAt)}</div>
-              </div>
-            ))
+            notifications.map(n => {
+              const unread = isUnread(n);
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => handleClick(n)}
+                  style={{
+                    padding: "0.7rem 1rem", borderBottom: `1px solid ${MT.border}`, fontSize: 12.5,
+                    color: MT.text1, lineHeight: 1.5, cursor: "pointer",
+                    background: unread ? MT.mossSoft : "transparent",
+                    display: "flex", gap: "0.5rem", alignItems: "flex-start",
+                  }}
+                >
+                  {unread && (
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: MT.moss, marginTop: 5, flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: unread ? 700 : 400 }}>{n.message}</div>
+                    <div style={{ fontSize: 11, color: MT.text3, marginTop: 3 }}>{formatRelative(n.createdAt)}</div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       )}
