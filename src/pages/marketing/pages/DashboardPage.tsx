@@ -73,11 +73,12 @@ export default function DashboardPage() {
     tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const kpi = (label: string, value: string | number, color: string, onClick?: () => void) => (
+  const kpi = (label: string, value: string | number, color: string, onClick?: () => void, last?: boolean) => (
     <div
       onClick={onClick}
       style={{
-        display: "flex", flexDirection: "column", gap: 2, padding: "0.55rem 0.9rem", borderRight: `1px solid ${MT.border}`,
+        display: "flex", flexDirection: "column", gap: 2, padding: "0.6rem 0.9rem", flex: 1, minWidth: 110,
+        borderRight: last ? "none" : `1px solid ${MT.border}`,
         cursor: onClick ? "pointer" : "default",
       }}
     >
@@ -113,10 +114,7 @@ export default function DashboardPage() {
         {kpi("Completados", `${completedThisMonth.length}/${MONTHLY_GOAL}`, MT.primary, () => focusGroups(["completed"], "completed"))}
         {kpi("En proceso", inProgress, MT.info, () => focusGroups(["overdue", "active"], "in_progress"))}
         {kpi("A tiempo", `${onTimePct}%`, MT.moss, () => focusGroups(["completed"], "completed"))}
-        <div onClick={() => focusGroups(["overdue"], "in_progress")} style={{ padding: "0.55rem 0.9rem", cursor: "pointer" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Retrasos Diseño</div>
-          <div style={{ fontSize: 16.5, fontWeight: 800, color: designDelays > 0 ? MT.danger : MT.text1 }}>{designDelays}</div>
-        </div>
+        {kpi("Retrasos Diseño", designDelays, designDelays > 0 ? MT.danger : MT.text1, () => focusGroups(["overdue"], "in_progress"), true)}
       </div>
 
       {/* Toolbar: search + filters */}
