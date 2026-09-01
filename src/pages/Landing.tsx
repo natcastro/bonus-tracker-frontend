@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
+import { useHubAccess } from "../auth/HubAccessContext";
+import { useMsal } from "@azure/msal-react";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING";
 type View = "hub" | "ftc-usa" | "ops-tools";
@@ -159,6 +161,8 @@ function PasswordForm({
 // ── Main Landing ──────────────────────────────────────────────────────────────
 export default function Landing() {
   const navigate = useNavigate();
+  const { instance } = useMsal();
+  const { hasTeam, loading: accessLoading, access, email, name } = useHubAccess();
   const [view, setView] = useState<View>("hub");
   const [csSelected, setCsSelected] = useState<Team | null>(null);
   const [mgmtPw, setMgmtPw] = useState("");
@@ -169,6 +173,28 @@ export default function Landing() {
     sessionStorage.setItem("role", "admin");
     navigate(ROUTES[team]);
   };
+
+  const logout = () => instance.logoutRedirect();
+
+  if (accessLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#F8F9FA", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280" }}>
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!access) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0F172A", marginBottom: "0.5rem" }}>Sin acceso todavía</h1>
+        <p style={{ color: "#6B7280", maxWidth: 420, marginBottom: "1.5rem" }}>
+          Tu cuenta <strong>{email}</strong> inició sesión correctamente, pero todavía no tiene un equipo asignado en FTC Hub. Pide a un administrador que te dé acceso.
+        </p>
+        <button onClick={logout} className="btn btn-secondary btn-sm">Cerrar sesión</button>
+      </div>
+    );
+  }
 
   const submitMgmt = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +216,12 @@ export default function Landing() {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1.5rem",
+        position: "relative",
       }}>
+        <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span style={{ fontSize: "0.8rem", color: "#6B7280" }}>{name}</span>
+          <button onClick={logout} className="btn btn-secondary btn-sm">Salir</button>
+        </div>
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
           <div style={{
@@ -215,56 +246,71 @@ export default function Landing() {
 
         {/* 3 main cards */}
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
-          <HubCard
-            icon="🇺🇸"
-            title="FTC USA"
-            subtitle="Customer Service & TikTok Lives"
-            color="#1e40af"
-            tags={["Customer Service", "Lives"]}
-            onClick={() => setView("ftc-usa")}
-          />
-          <HubCard
-            icon="🇲🇽"
-            title="FTC México"
-            subtitle="Ventas, Asistencia & Horarios"
-            color="#15803d"
-            tags={["Ventas", "Asistencia", "Horarios"]}
-            onClick={() => setCsSelected(csSelected === "MEX" ? null : "MEX")}
-          />
-          <HubCard
-            icon="⚙️"
-            title="Operational Tools"
-            subtitle="Herramientas internas del equipo"
-            color="#475569"
-            tags={["CS Quality Dictionary"]}
-            onClick={() => setView("ops-tools")}
-          />
-          <HubCard
-            icon="📊"
-            title="Management"
-            subtitle="Historial y datos del equipo"
-            color="#64748b"
-            tags={["Historial", "Datos"]}
-            onClick={() => setCsSelected(csSelected === "MGMT" ? null : "MGMT")}
-            active={csSelected === "MGMT"}
-          />
-          <HubCard
-            icon="📦"
-            title="Logística"
-            subtitle="Gestión de envíos y productos"
-            color="#b45309"
-            tags={["Envíos", "Inventario"]}
-            onClick={() => directGo("LOGISTICS")}
-          />
-          <HubCard
-            icon="🎨"
-            title="Marketing"
-            subtitle="Briefs de producto — Laura & Diseño"
-            color="#3E6B45"
-            tags={["Briefs", "Diseño"]}
-            onClick={() => directGo("MARKETING")}
-          />
+          {(hasTeam("OPS") || hasTeam("APT") || hasTeam("TKLIVES")) && (
+            <HubCard
+              icon="🇺🇸"
+              title="FTC USA"
+              subtitle="Customer Service & TikTok Lives"
+              color="#1e40af"
+              tags={["Customer Service", "Lives"]}
+              onClick={() => setView("ftc-usa")}
+            />
+          )}
+          {hasTeam("MEX") && (
+            <HubCard
+              icon="🇲🇽"
+              title="FTC México"
+              subtitle="Ventas, Asistencia & Horarios"
+              color="#15803d"
+              tags={["Ventas", "Asistencia", "Horarios"]}
+              onClick={() => setCsSelected(csSelected === "MEX" ? null : "MEX")}
+            />
+          )}
+          {hasTeam("CSQUALITY") && (
+            <HubCard
+              icon="⚙️"
+              title="Operational Tools"
+              subtitle="Herramientas internas del equipo"
+              color="#475569"
+              tags={["CS Quality Dictionary"]}
+              onClick={() => setView("ops-tools")}
+            />
+          )}
+          {hasTeam("MGMT") && (
+            <HubCard
+              icon="📊"
+              title="Management"
+              subtitle="Historial y datos del equipo"
+              color="#64748b"
+              tags={["Historial", "Datos"]}
+              onClick={() => setCsSelected(csSelected === "MGMT" ? null : "MGMT")}
+              active={csSelected === "MGMT"}
+            />
+          )}
+          {hasTeam("LOGISTICS") && (
+            <HubCard
+              icon="📦"
+              title="Logística"
+              subtitle="Gestión de envíos y productos"
+              color="#b45309"
+              tags={["Envíos", "Inventario"]}
+              onClick={() => directGo("LOGISTICS")}
+            />
+          )}
+          {hasTeam("MARKETING") && (
+            <HubCard
+              icon="🎨"
+              title="Marketing"
+              subtitle="Briefs de producto — Laura & Diseño"
+              color="#3E6B45"
+              tags={["Briefs", "Diseño"]}
+              onClick={() => directGo("MARKETING")}
+            />
+          )}
         </div>
+        {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && (
+          <p style={{ color: "#6B7280", marginTop: "1.5rem" }}>No tienes ningún equipo asignado todavía.</p>
+        )}
 
         {/* México password inline */}
         {csSelected === "MEX" && (
@@ -356,23 +402,27 @@ export default function Landing() {
 
         {/* 2 sub-cards */}
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
-          <HubCard
-            icon="🎧"
-            title="Customer Service"
-            subtitle="Operations · Strategy"
-            color="#1e40af"
-            tags={["Operations", "Strategy"]}
-            active={csSelected !== null && csSelected !== "TKLIVES"}
-            onClick={() => setCsSelected(csSelected && csSelected !== "TKLIVES" ? null : "OPS")}
-          />
-          <HubCard
-            icon="🎵"
-            title="Lives"
-            subtitle="TikTok Lives USA — Horarios y turnos"
-            color="#e91e8c"
-            tags={["TikTok Lives"]}
-            onClick={() => directGo("TKLIVES")}
-          />
+          {(hasTeam("OPS") || hasTeam("APT")) && (
+            <HubCard
+              icon="🎧"
+              title="Customer Service"
+              subtitle="Operations · Strategy"
+              color="#1e40af"
+              tags={["Operations", "Strategy"]}
+              active={csSelected !== null && csSelected !== "TKLIVES"}
+              onClick={() => setCsSelected(csSelected && csSelected !== "TKLIVES" ? null : "OPS")}
+            />
+          )}
+          {hasTeam("TKLIVES") && (
+            <HubCard
+              icon="🎵"
+              title="Lives"
+              subtitle="TikTok Lives USA — Horarios y turnos"
+              color="#e91e8c"
+              tags={["TikTok Lives"]}
+              onClick={() => directGo("TKLIVES")}
+            />
+          )}
         </div>
 
         {/* CS team picker */}
@@ -382,7 +432,7 @@ export default function Landing() {
               <>
                 {/* Team selector pills */}
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {CS_TEAMS.map((t) => (
+                  {CS_TEAMS.filter((t) => hasTeam(t.key)).map((t) => (
                     <button
                       key={t.key}
                       onClick={() => setCsSelected(t.key)}

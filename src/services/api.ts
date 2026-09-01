@@ -1489,3 +1489,34 @@ export async function markMarketingNotificationsRead(role: "laura"|"diseno", ids
   const { error } = await supabase.from("marketing_notifications").update({ [field]: true }).in("id", ids);
   if (error) throw error;
 }
+
+// ── Hub access control (Microsoft login → who sees which team) ────────────────
+
+export interface HubAccessEntry {
+  email: string;
+  teams: string[];
+  isAdmin: boolean;
+}
+
+export async function getHubAccessForEmail(email: string): Promise<HubAccessEntry | null> {
+  const { data, error } = await supabase.from("hub_access").select("*").ilike("email", email).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { email: data.email, teams: data.teams ?? [], isAdmin: data.is_admin ?? false };
+}
+
+export async function getAllHubAccess(): Promise<HubAccessEntry[]> {
+  const { data, error } = await supabase.from("hub_access").select("*").order("email");
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({ email: r.email, teams: r.teams ?? [], isAdmin: r.is_admin ?? false }));
+}
+
+export async function upsertHubAccess(email: string, teams: string[], isAdmin: boolean): Promise<void> {
+  const { error } = await supabase.from("hub_access").upsert({ email: email.toLowerCase().trim(), teams, is_admin: isAdmin });
+  if (error) throw error;
+}
+
+export async function deleteHubAccess(email: string): Promise<void> {
+  const { error } = await supabase.from("hub_access").delete().eq("email", email);
+  if (error) throw error;
+}

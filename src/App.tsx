@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { ReactElement } from "react";
+import { MsalProvider } from "@azure/msal-react";
+import { msalInstance } from "./auth/msalInstance";
+import AuthGate from "./auth/AuthGate";
 import Landing from "./pages/Landing";
 import MexicoDashboard from "./pages/MexicoDashboard";
 import OperationsDashboard from "./pages/OperationsDashboard";
@@ -28,41 +31,45 @@ function ProtectedRoute({ team, children }: { team: string; children: ReactEleme
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/mexico" element={
-          <ProtectedRoute team="MEX"><MexicoDashboard /></ProtectedRoute>
-        } />
-        <Route path="/operations" element={
-          <ProtectedRoute team="OPS"><OperationsDashboard /></ProtectedRoute>
-        } />
-        <Route path="/strategy" element={
-          <ProtectedRoute team="APT"><StrategyDashboard /></ProtectedRoute>
-        } />
-        <Route path="/tiktok-lives" element={
-          <ProtectedRoute team="TKLIVES"><TikTokLivesDashboard /></ProtectedRoute>
-        } />
-        <Route path="/cs-quality" element={
-          <ProtectedRoute team="CSQUALITY"><CSQualityDashboard /></ProtectedRoute>
-        } />
-        <Route path="/management" element={
-          <ProtectedRoute team="MGMT"><ManagementDashboard /></ProtectedRoute>
-        } />
-        <Route path="/logistics" element={
-          <ProtectedRoute team="LOGISTICS"><LogisticsSelector /></ProtectedRoute>
-        } />
-        <Route path="/logistics/current" element={
-          <ProtectedRoute team="LOGISTICS"><LogisticsDashboard /></ProtectedRoute>
-        } />
-        <Route path="/logistics/hub/*" element={
-          <ProtectedRoute team="LOGISTICS"><LogisticsHubApp /></ProtectedRoute>
-        } />
-        <Route path="/marketing/*" element={
-          <ProtectedRoute team="MARKETING"><MarketingApp /></ProtectedRoute>
-        } />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <MsalProvider instance={msalInstance}>
+      <AuthGate>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/mexico" element={
+              <ProtectedRoute team="MEX"><MexicoDashboard /></ProtectedRoute>
+            } />
+            <Route path="/operations" element={
+              <ProtectedRoute team="OPS"><OperationsDashboard /></ProtectedRoute>
+            } />
+            <Route path="/strategy" element={
+              <ProtectedRoute team="APT"><StrategyDashboard /></ProtectedRoute>
+            } />
+            <Route path="/tiktok-lives" element={
+              <ProtectedRoute team="TKLIVES"><TikTokLivesDashboard /></ProtectedRoute>
+            } />
+            <Route path="/cs-quality" element={
+              <ProtectedRoute team="CSQUALITY"><CSQualityDashboard /></ProtectedRoute>
+            } />
+            <Route path="/management" element={
+              <ProtectedRoute team="MGMT"><ManagementDashboard /></ProtectedRoute>
+            } />
+            <Route path="/logistics" element={
+              <ProtectedRoute team="LOGISTICS"><LogisticsSelector /></ProtectedRoute>
+            } />
+            <Route path="/logistics/current" element={
+              <ProtectedRoute team="LOGISTICS"><LogisticsDashboard /></ProtectedRoute>
+            } />
+            <Route path="/logistics/hub/*" element={
+              <ProtectedRoute team="LOGISTICS"><LogisticsHubApp /></ProtectedRoute>
+            } />
+            <Route path="/marketing/*" element={
+              <ProtectedRoute team="MARKETING"><MarketingApp /></ProtectedRoute>
+            } />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthGate>
+    </MsalProvider>
   );
 }
