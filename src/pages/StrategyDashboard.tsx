@@ -366,19 +366,44 @@ export default function StrategyDashboard() {
     return isNaN(n) ? null : n;
   };
 
-  // Match a "Sample Analysis" product name to a catalog item by the trailing
-  // SKU code in parentheses (e.g. "...(LUXBBL-293)") — the numeric TikTok
-  // Product ID isn't reliable here since it's shared across several distinct
-  // catalog SKUs. Returns the catalog id only when exactly one candidate matches.
-  const trailingSkuCode = (name: string): string | null => {
-    const m = name.trim().match(/\(([^()]*)\)\s*$/);
-    return m ? m[1].trim().toUpperCase() : null;
-  };
-  const matchCatalogIdByName = (productName: string): number | null => {
-    const code = trailingSkuCode(productName);
-    if (!code) return null;
-    const candidates = catalog.filter(c => trailingSkuCode(c.productName) === code);
-    return candidates.length === 1 ? candidates[0].id : null;
+  // Match a "Sample Analysis" row to a catalog item automatically, in two passes:
+  //  1) Same TikTok Product ID already linked in a previous upload -> reuse that link.
+  //     (TikTok's numeric Product ID is stable across re-exports even when the
+  //     product name text changes slightly.)
+  //  2) Otherwise, extract every SKU-code-shaped token (e.g. "C-073", "LUXI-213")
+  //     from anywhere in the name — not just a trailing parenthetical, since real
+  //     TikTok exports put "Ref." prefixes, multiple codes joined by "/", trailing
+  //     descriptive text after the parens, or no parens at all — and match against
+  //     the catalog item(s) sharing the most SKU codes. Only auto-links when there's
+  //     a single best match; ties or zero matches are left for manual linking.
+  const SKU_CODE_PATTERN = /[A-Z]{1,12}-\d{2,4}/g;
+  const extractSkuCodes = (name: string): string[] =>
+    Array.from(new Set(name.toUpperCase().match(SKU_CODE_PATTERN) ?? []));
+
+  const matchCatalogIdByName = (productName: string, productId: string): number | null => {
+    const remembered = new Set(
+      analysisRows.filter(r => r.productId === productId && r.catalogId != null).map(r => r.catalogId as number)
+    );
+    if (remembered.size === 1) return [...remembered][0];
+
+    const codes = extractSkuCodes(productName);
+    if (codes.length === 0) return null;
+    const scored = catalog
+      .map(c => {
+        const cCodes = extractSkuCodes(c.productName);
+        return { id: c.id, overlap: cCodes.filter(code => codes.includes(code)).length, totalCodes: cCodes.length };
+      })
+      .filter(x => x.overlap > 0);
+    if (scored.length === 0) return null;
+    const maxOverlap = Math.max(...scored.map(x => x.overlap));
+    let best = scored.filter(x => x.overlap === maxOverlap);
+    if (best.length > 1) {
+      // Tie-break toward the more specific catalog entry (fewer total SKU codes) —
+      // e.g. a single-item listing over a "Bundle" that happens to include the same code.
+      const minCodes = Math.min(...best.map(x => x.totalCodes));
+      best = best.filter(x => x.totalCodes === minCodes);
+    }
+    return best.length === 1 ? best[0].id : null;
   };
 
   const handleAnalysisFileSelected = async (file: File) => {
@@ -409,7 +434,7 @@ export default function StrategyDashboard() {
           refundedOrders: parseAnalysisNum(row["Refunded orders"]),
           estRefundableGmv: parseAnalysisNum(row["Est. refundable GMV"]),
           ordersNeededForRefund: parseAnalysisNum(row["Orders needed for refund"]),
-          catalogId: matchCatalogIdByName(productName),
+          catalogId: matchCatalogIdByName(productName, productId),
         });
       }
       if (rows.length === 0) { setAnalysisErr("No se detectaron productos en el archivo."); return; }
@@ -422,6 +447,13 @@ export default function StrategyDashboard() {
 
   const confirmAnalysisUpload = async () => {
     if (!analysisParsed || !analysisParsed.periodStart || !analysisParsed.periodEnd) { setAnalysisErr("Falta el rango de fechas."); return; }
+    // Same exact date range as an already-saved document: it's the same period, so
+    // don't add it again (that would double-count "Enviados" for that month).
+    const duplicate = analysisPeriods.find(p => p.periodStart === analysisParsed.periodStart && p.periodEnd === analysisParsed.periodEnd);
+    if (duplicate) {
+      setAnalysisErr(`Ya subiste un documento con este mismo rango de fechas (${duplicate.periodStart} → ${duplicate.periodEnd}, "${duplicate.filename}"). No se volvió a sumar para evitar duplicados.`);
+      return;
+    }
     setAnalysisSaving(true);
     try {
       await createSampleAnalysisPeriod(analysisParsed.filename, analysisParsed.periodStart, analysisParsed.periodEnd, analysisParsed.rows);
