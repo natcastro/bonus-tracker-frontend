@@ -69,6 +69,18 @@ export function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Adds `days` counted from the given date, skipping Sundays entirely (no work happens on
+// Sunday, so it never counts toward the gap and a deadline never lands on one).
+export function addWorkDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00");
+  let remaining = days;
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0) remaining--;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 export function daysBetweenIso(fromIso: string, toIso: string): number {
   const a = new Date(fromIso + "T00:00:00").getTime();
   const b = new Date(toIso + "T00:00:00").getTime();

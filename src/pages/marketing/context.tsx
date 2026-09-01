@@ -7,7 +7,7 @@ import {
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser } from "./types";
-import { STAGE_DEFS, stageLabel, addDaysIso, todayIso, isPastDeadline } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Test-phase recipients — swap for the real Laura/Diseño addresses once confirmed.
 const NOTIFY_EMAILS: Record<MarketingRole, string> = {
@@ -86,7 +86,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         return { ...def, deadline: startDate, link: briefLink || null, completedAt: startDate, status: "done" as const };
       }
       if (i === 1) {
-        return { ...def, deadline: addDaysIso(startDate, def.gapDays), link: null, completedAt: null, status: "pending" as const };
+        return { ...def, deadline: addWorkDaysIso(startDate, def.gapDays), link: null, completedAt: null, status: "pending" as const };
       }
       return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
     });
@@ -108,7 +108,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
     const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
     const nextStage = brief.stages[stageIdx + 1];
-    const nextDeadline = nextStage ? addDaysIso(today, nextStage.gapDays) : null;
+    const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = brief.stages.map((s, i) => {
       if (i === stageIdx) return { ...s, link, completedAt: today, status: "done" as const, late: isLate };
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
@@ -164,7 +164,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     // never shrinks or balloons Diseño's next deadline, and Laura's own timing is never
     // counted as a Diseño delay.
     const nextStage = brief.stages[stageIdx + 1];
-    const nextDeadline = nextStage ? addDaysIso(today, nextStage.gapDays) : null;
+    const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = brief.stages.map((s, i) => {
       if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const };
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
@@ -195,7 +195,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (!brief || brief.status === "completed") return;
     const today = todayIso();
     const adjustmentsGap = brief.stages.find(s => s.key === "adjustments")!.gapDays;
-    const adjustmentsDeadline = addDaysIso(today, adjustmentsGap);
+    const adjustmentsDeadline = addWorkDaysIso(today, adjustmentsGap);
     const newStages = brief.stages.map(s => {
       if (s.key === "adjustments") {
         return { ...s, status: "pending" as const, completedAt: null, link: null, decision: undefined, deadline: adjustmentsDeadline };
