@@ -1,8 +1,10 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
+import { GlobeIcon, ToolsIcon, ChartIcon, PackageIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon } from "../components/icons";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING";
 type View = "hub" | "ftc-usa" | "ops-tools";
@@ -22,7 +24,7 @@ const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
 function HubCard({
   icon, eyebrow, title, subtitle, color, onClick, active,
 }: {
-  icon: string; eyebrow: string; title: string; subtitle: string;
+  icon: ReactNode; eyebrow: string; title: string; subtitle: string;
   color: string; onClick: () => void; active?: boolean;
 }) {
   return (
@@ -59,7 +61,6 @@ function HubCard({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span style={{
-          fontSize: "1.5rem",
           width: 42, height: 42,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: color + "12",
@@ -149,9 +150,9 @@ export default function Landing() {
               onClick={() => setShowAdminPanel(true)}
               title="Administrar accesos"
               className="btn btn-secondary btn-sm"
-              style={{ fontSize: "1rem", lineHeight: 1, padding: "0.4rem 0.6rem" }}
+              style={{ display: "flex", alignItems: "center", padding: "0.4rem 0.6rem" }}
             >
-              ⚙️
+              <GearIcon size={16} />
             </button>
           )}
           <button onClick={logout} className="btn btn-secondary btn-sm">Salir</button>
@@ -183,7 +184,7 @@ export default function Landing() {
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100, position: "relative", zIndex: 1 }}>
           {(hasTeam("OPS") || hasTeam("APT") || hasTeam("TKLIVES")) && (
             <HubCard
-              icon="🇺🇸"
+              icon={<GlobeIcon color="#1e40af" />}
               eyebrow="Región"
               title="FTC USA"
               subtitle="Customer Service & TikTok Lives"
@@ -193,7 +194,7 @@ export default function Landing() {
           )}
           {hasTeam("MEX") && (
             <HubCard
-              icon="🇲🇽"
+              icon={<GlobeIcon color="#15803d" />}
               eyebrow="Región"
               title="FTC México"
               subtitle="Ventas, Asistencia & Horarios"
@@ -203,7 +204,7 @@ export default function Landing() {
           )}
           {hasTeam("CSQUALITY") && (
             <HubCard
-              icon="⚙️"
+              icon={<ToolsIcon color="#475569" />}
               eyebrow="Herramientas"
               title="Operational Tools"
               subtitle="Herramientas internas del equipo"
@@ -213,7 +214,7 @@ export default function Landing() {
           )}
           {hasTeam("MGMT") && (
             <HubCard
-              icon="📊"
+              icon={<ChartIcon color="#64748b" />}
               eyebrow="Gestión"
               title="Management"
               subtitle="Historial y datos del equipo"
@@ -223,7 +224,7 @@ export default function Landing() {
           )}
           {hasTeam("LOGISTICS") && (
             <HubCard
-              icon="📦"
+              icon={<PackageIcon color="#b45309" />}
               eyebrow="Operaciones"
               title="Logística"
               subtitle="Gestión de envíos y productos"
@@ -233,7 +234,7 @@ export default function Landing() {
           )}
           {hasTeam("MARKETING") && (
             <HubCard
-              icon="🎨"
+              icon={<PaletteIcon color="#3E6B45" />}
               eyebrow="Equipo"
               title="Marketing"
               subtitle="Briefs de producto — Laura & Diseño"
@@ -286,7 +287,7 @@ export default function Landing() {
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
           {(hasTeam("OPS") || hasTeam("APT")) && (
             <HubCard
-              icon="🎧"
+              icon={<HeadsetIcon color="#1e40af" />}
               eyebrow="Agentes"
               title="Customer Service"
               subtitle="Operations · Strategy"
@@ -297,7 +298,7 @@ export default function Landing() {
           )}
           {hasTeam("TKLIVES") && (
             <HubCard
-              icon="🎵"
+              icon={<WaveIcon color="#e91e8c" />}
               eyebrow="Equipo"
               title="Lives"
               subtitle="TikTok Lives USA — Horarios y turnos"
@@ -369,7 +370,7 @@ export default function Landing() {
 
       <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center" }}>
         <HubCard
-          icon="📖"
+          icon={<BookIcon color="#475569" />}
           eyebrow="Herramienta"
           title="CS Quality Dictionary"
           subtitle="Casos de calidad y categorías"
