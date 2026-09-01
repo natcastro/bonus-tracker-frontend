@@ -6,6 +6,7 @@ import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
+import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
 
@@ -119,13 +120,18 @@ export default function DashboardPage() {
 
       {/* Toolbar: search + filters */}
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.7rem", alignItems: "center" }}>
-        <input
-          value={search} onChange={e => setSearch(e.target.value)} placeholder="🔎 Buscar referencia..."
-          style={{
-            fontFamily: MT.font, fontSize: 12.5, padding: "7px 11px", flex: "1 1 180px", maxWidth: 240,
-            border: `1px solid ${MT.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box",
-          }}
-        />
+        <div style={{ position: "relative", flex: "1 1 180px", maxWidth: 240 }}>
+          <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", display: "flex", pointerEvents: "none" }}>
+            <SearchIcon size={14} color={MT.text3} />
+          </span>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar referencia..."
+            style={{
+              fontFamily: MT.font, fontSize: 12.5, padding: "7px 11px 7px 30px", width: "100%",
+              border: `1px solid ${MT.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box",
+            }}
+          />
+        </div>
         <div style={{ display: "flex", gap: 4 }}>
           {segButton(statusFilter === "all", () => setStatusFilter("all"), "Todos", "st-all")}
           {segButton(statusFilter === "in_progress", () => setStatusFilter("in_progress"), "En proceso", "st-ip")}

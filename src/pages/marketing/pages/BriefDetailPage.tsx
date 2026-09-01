@@ -6,6 +6,7 @@ import Timeline from "../components/Timeline";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
+import { TrashIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
@@ -81,7 +82,8 @@ export default function BriefDetailPage() {
             <button onClick={handleDelete} disabled={busy} style={{
               fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
               background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",
-            }}>🗑 Eliminar</button>
+              display: "flex", alignItems: "center", gap: 5,
+            }}><TrashIcon size={14} color={MT.danger} /> Eliminar</button>
           )}
         </div>
       </div>

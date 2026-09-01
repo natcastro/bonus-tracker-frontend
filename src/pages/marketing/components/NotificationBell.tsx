@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatRelative } from "../theme";
 import { useMarketing } from "../context";
+import { BellIcon } from "../../../components/icons";
 import type { MarketingNotification } from "../types";
 
 export default function NotificationBell() {
@@ -35,9 +36,9 @@ export default function NotificationBell() {
       <button onClick={() => setOpen(o => !o)} style={{
         position: "relative", width: 38, height: 38, borderRadius: 999,
         border: `1px solid ${MT.border}`, background: MT.surface, cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        🔔
+        <BellIcon size={18} color={MT.text2} />
         {unreadCount > 0 && (
           <span style={{
             position: "absolute", top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 999,

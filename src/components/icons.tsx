@@ -80,6 +80,33 @@ export function BookIcon({ size, color }: IconProps) {
   );
 }
 
+export function BellIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z" />
+      <path d="M10 21a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13.5A1.5 1.5 0 0 0 8.5 22h7a1.5 1.5 0 0 0 1.5-1.5L18 7" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+export function SearchIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
 export function GearIcon({ size, color }: IconProps) {
   return (
     <svg {...base(size, color)}>

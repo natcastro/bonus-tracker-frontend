@@ -5,8 +5,8 @@ export interface MarketingStage {
   key: StageKey;
   label: string;
   role: MarketingRole;
-  plannedDay: number;
-  deadline: string; // yyyy-mm-dd
+  gapDays: number; // days allotted for this stage, counted from the previous stage's actual completion
+  deadline: string | null; // yyyy-mm-dd — null until the previous stage is done and this one becomes current
   link: string | null;
   completedAt: string | null; // yyyy-mm-dd
   status: "pending" | "done";
@@ -45,13 +45,15 @@ export interface MarketingUser {
   name: string;
 }
 
-export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; plannedDay: number }[] = [
-  { key: "brief",       label: "Brief",        role: "laura",  plannedDay: 1  },
-  { key: "proposal",    label: "Propuesta",    role: "diseno", plannedDay: 3  },
-  { key: "review1",     label: "Revisión 1",   role: "laura",  plannedDay: 5  },
-  { key: "adjustments", label: "Ajustes",      role: "diseno", plannedDay: 7  },
-  { key: "review2",     label: "Revisión 2",   role: "laura",  plannedDay: 8  },
-  { key: "final",       label: "Final",        role: "laura",  plannedDay: 10 },
+// gapDays is always counted from the previous stage's actual completion date — never from the
+// brief's original start date — so a fast (or slow) turnaround never shrinks or balloons the next deadline.
+export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; gapDays: number }[] = [
+  { key: "brief",       label: "Brief",        role: "laura",  gapDays: 0 },
+  { key: "proposal",    label: "Propuesta",    role: "diseno", gapDays: 3 },
+  { key: "review1",     label: "Revisión 1",   role: "laura",  gapDays: 3 },
+  { key: "adjustments", label: "Ajustes",      role: "diseno", gapDays: 3 },
+  { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 1 },
+  { key: "final",       label: "Final",        role: "laura",  gapDays: 2 },
 ];
 
 export const STAGE_ORDER: StageKey[] = STAGE_DEFS.map(s => s.key);

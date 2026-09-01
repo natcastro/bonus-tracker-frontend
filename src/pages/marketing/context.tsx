@@ -6,8 +6,8 @@ import {
 } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
-import { STAGE_DEFS, stageLabel, addDaysIso, daysBetweenIso, todayIso, isPastDeadline } from "./types";
+import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser } from "./types";
+import { STAGE_DEFS, stageLabel, addDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Test-phase recipients — swap for the real Laura/Diseño addresses once confirmed.
 const NOTIFY_EMAILS: Record<MarketingRole, string> = {
@@ -15,7 +15,7 @@ const NOTIFY_EMAILS: Record<MarketingRole, string> = {
   diseno: "marketplaces@formatucuerpo.com",
 };
 
-function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string }): string {
+function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null }): string {
   const { intro, reference, nextTask, deadline } = opts;
   return `
     <div style="font-family: -apple-system, sans-serif; color: #2C2A20;">
@@ -81,12 +81,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   };
 
   const createBrief = async (reference: string, startDate: string, briefLink: string) => {
-    const stages = STAGE_DEFS.map(def => {
-      const deadline = addDaysIso(startDate, def.plannedDay);
-      if (def.key === "brief") {
-        return { ...def, deadline, link: briefLink || null, completedAt: startDate, status: "done" as const };
+    const stages = STAGE_DEFS.map((def, i) => {
+      if (i === 0) {
+        return { ...def, deadline: startDate, link: briefLink || null, completedAt: startDate, status: "done" as const };
       }
-      return { ...def, deadline, link: null, completedAt: null, status: "pending" as const };
+      if (i === 1) {
+        return { ...def, deadline: addDaysIso(startDate, def.gapDays), link: null, completedAt: null, status: "pending" as const };
+      }
+      return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
     });
     await createMarketingBrief({
       reference, startDate, currentStage: "proposal", status: "in_progress",
@@ -104,9 +106,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (stageIdx === -1) return;
     const stage = brief.stages[stageIdx];
     const today = todayIso();
-    const isLate = isPastDeadline(stage.deadline);
-    const newStages = brief.stages.map((s, i) => i === stageIdx ? { ...s, link, completedAt: today, status: "done" as const, late: isLate } : s);
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
     const nextStage = brief.stages[stageIdx + 1];
+    const nextDeadline = nextStage ? addDaysIso(today, nextStage.gapDays) : null;
+    const newStages = brief.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, link, completedAt: today, status: "done" as const, late: isLate };
+      if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+      return s;
+    });
     await updateMarketingBrief(briefId, {
       stages: newStages,
       currentStage: nextStage ? nextStage.key : brief.currentStage,
@@ -122,7 +129,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           intro: `Diseño subió ${label}. Te toca revisar.`,
           reference: brief.reference,
           nextTask: stageLabel(nextStage.key),
-          deadline: nextStage.deadline,
+          deadline: nextDeadline,
         }),
       );
     }
@@ -152,24 +159,20 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // request_changes: mark this review stage done, compute overrun vs the previous stage's
-    // completion, and shift every still-pending stage's deadline forward by that overrun —
-    // Design's later deadlines move, but this is never counted as a Design delay.
-    const prevStage = brief.stages[stageIdx - 1];
-    const allottedDays = prevStage ? stage.plannedDay - prevStage.plannedDay : 0;
-    const actualDays = prevStage?.completedAt ? daysBetweenIso(prevStage.completedAt, today) : 0;
-    const overrun = Math.max(0, actualDays - allottedDays);
-
-    let newStages = brief.stages.map((s, i) => i === stageIdx ? { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const } : s);
-    if (overrun > 0) {
-      newStages = newStages.map((s, i) => i > stageIdx && s.status === "pending" ? { ...s, deadline: addDaysIso(s.deadline, overrun) } : s);
-    }
+    // request_changes: mark this review stage done. The next stage's deadline is always
+    // `today + gapDays`, counted from Laura's actual completion — so a fast or slow review
+    // never shrinks or balloons Diseño's next deadline, and Laura's own timing is never
+    // counted as a Diseño delay.
     const nextStage = brief.stages[stageIdx + 1];
+    const nextDeadline = nextStage ? addDaysIso(today, nextStage.gapDays) : null;
+    const newStages = brief.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const };
+      if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+      return s;
+    });
     await updateMarketingBrief(briefId, {
       stages: newStages,
       currentStage: nextStage ? nextStage.key : brief.currentStage,
-      shiftDays: brief.shiftDays + overrun,
-      lauraDelayDays: brief.lauraDelayDays + overrun,
     });
     await notify(briefId, `Laura solicitó ajustes en ${brief.reference}.`);
     if (nextStage) {
@@ -180,7 +183,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           intro: "Laura solicitó ajustes en la última entrega.",
           reference: brief.reference,
           nextTask: stageLabel(nextStage.key),
-          deadline: nextStage.deadline,
+          deadline: nextDeadline,
         }),
       );
     }
@@ -191,13 +194,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed") return;
     const today = todayIso();
-    const newDeadlines: Record<StageKey, string> = {
-      brief: "", proposal: "", review1: "",
-      adjustments: addDaysIso(today, 2), review2: addDaysIso(today, 3), final: addDaysIso(today, 4),
-    };
+    const adjustmentsGap = brief.stages.find(s => s.key === "adjustments")!.gapDays;
+    const adjustmentsDeadline = addDaysIso(today, adjustmentsGap);
     const newStages = brief.stages.map(s => {
-      if (s.key === "adjustments" || s.key === "review2" || s.key === "final") {
-        return { ...s, status: "pending" as const, completedAt: null, link: s.key === "adjustments" ? null : s.link, decision: undefined, deadline: newDeadlines[s.key] };
+      if (s.key === "adjustments") {
+        return { ...s, status: "pending" as const, completedAt: null, link: null, decision: undefined, deadline: adjustmentsDeadline };
+      }
+      if (s.key === "review2" || s.key === "final") {
+        return { ...s, status: "pending" as const, completedAt: null, decision: undefined, deadline: null };
       }
       return s;
     });
@@ -213,7 +217,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         intro: "Laura solicitó una revisión adicional sobre el cierre final.",
         reference: brief.reference,
         nextTask: stageLabel("adjustments"),
-        deadline: newDeadlines.adjustments,
+        deadline: adjustmentsDeadline,
       }),
     );
     await reload();
