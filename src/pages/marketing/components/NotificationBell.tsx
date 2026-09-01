@@ -7,10 +7,11 @@ import { BellIcon } from "../../../components/icons";
 import type { MarketingNotification } from "../types";
 
 export default function NotificationBell() {
-  const { notifications, unreadCount, markNotificationRead, authedUser } = useMarketing();
+  const { notifications, unreadCount, markNotificationRead, deleteNotification, clearAllNotifications, authedUser } = useMarketing();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const canManage = authedUser?.role === "laura";
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -29,6 +30,16 @@ export default function NotificationBell() {
     if (isUnread(n)) markNotificationRead(n.id);
     setOpen(false);
     if (n.briefId) navigate(`/marketing/brief/${n.briefId}`);
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    deleteNotification(id);
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("¿Eliminar todas las notificaciones?")) clearAllNotifications();
   };
 
   return (
@@ -53,8 +64,16 @@ export default function NotificationBell() {
           background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius,
           boxShadow: MT.shadowLg, zIndex: 100,
         }}>
-          <div style={{ padding: "0.75rem 1rem", borderBottom: `1px solid ${MT.border}`, fontWeight: 700, fontSize: 13, color: MT.text1 }}>
-            Notificaciones
+          <div style={{
+            padding: "0.75rem 1rem", borderBottom: `1px solid ${MT.border}`,
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: MT.text1 }}>Notificaciones</span>
+            {canManage && notifications.length > 0 && (
+              <button onClick={handleClearAll} style={{
+                background: "none", border: "none", cursor: "pointer", color: MT.text3, fontSize: 11, fontWeight: 600,
+              }}>Borrar todas</button>
+            )}
           </div>
           {notifications.length === 0 ? (
             <div style={{ padding: "1.5rem 1rem", textAlign: "center", color: MT.text3, fontSize: 12.5 }}>
@@ -81,6 +100,12 @@ export default function NotificationBell() {
                     <div style={{ fontWeight: unread ? 700 : 400 }}>{n.message}</div>
                     <div style={{ fontSize: 11, color: MT.text3, marginTop: 3 }}>{formatRelative(n.createdAt)}</div>
                   </div>
+                  {canManage && (
+                    <button onClick={e => handleDelete(e, n.id)} title="Eliminar" style={{
+                      background: "none", border: "none", cursor: "pointer", color: MT.text3,
+                      fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0,
+                    }}>×</button>
+                  )}
                 </div>
               );
             })

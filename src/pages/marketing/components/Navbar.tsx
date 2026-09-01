@@ -1,16 +1,22 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
+import { useHubAccess } from "../../../auth/HubAccessContext";
 import NotificationBell from "./NotificationBell";
 import Avatar from "./Avatar";
+import { GearIcon } from "../../../components/icons";
+import MarketingSettingsPanel from "./MarketingSettingsPanel";
 
 export default function Navbar() {
   const { authedUser } = useMarketing();
+  const { access } = useHubAccess();
   const navigate = useNavigate();
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <div style={{
-      background: MT.surface, borderBottom: `1px solid ${MT.border}`,
+      background: MT.surface, boxShadow: "0 1px 0 rgba(17,24,39,0.06)",
       padding: "0.6rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between",
       position: "sticky", top: 0, zIndex: 50, fontFamily: MT.font,
     }}>
@@ -22,6 +28,14 @@ export default function Navbar() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
         <NotificationBell />
+        {access?.isAdmin && (
+          <button onClick={() => setShowSettings(true)} title="Configurar correos de notificación" style={{
+            display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30,
+            background: "transparent", border: `1px solid ${MT.border}`, borderRadius: 7, cursor: "pointer", color: MT.text2,
+          }}>
+            <GearIcon size={15} />
+          </button>
+        )}
         {authedUser && (
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Avatar role={authedUser.role} size={22} />
@@ -33,6 +47,7 @@ export default function Navbar() {
           background: "transparent", border: `1px solid ${MT.border}`, color: MT.text2, borderRadius: 7, padding: "0.35rem 0.7rem",
         }}>← FTC Hub</button>
       </div>
+      {showSettings && <MarketingSettingsPanel onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

@@ -1507,6 +1507,34 @@ export async function markMarketingNotificationsRead(role: "laura"|"diseno", ids
   if (error) throw error;
 }
 
+export async function deleteMarketingNotification(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAllMarketingNotifications(): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").delete().gte("id", 0);
+  if (error) throw error;
+}
+
+export interface MarketingNotifyEmails {
+  laura: string;
+  diseno: string;
+}
+
+export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
+  const { data, error } = await supabase.from("marketing_notify_emails").select("*");
+  if (error) throw error;
+  const map: MarketingNotifyEmails = { laura: "", diseno: "" };
+  (data ?? []).forEach((r: any) => { if (r.role === "laura" || r.role === "diseno") map[r.role as "laura" | "diseno"] = r.email; });
+  return map;
+}
+
+export async function setMarketingNotifyEmail(role: "laura" | "diseno", email: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
+  if (error) throw error;
+}
+
 // ── Hub access control (Microsoft login → who sees which team) ────────────────
 
 export interface HubAccessEntry {
