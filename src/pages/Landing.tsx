@@ -20,67 +20,60 @@ const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
 
 // ── Card component ────────────────────────────────────────────────────────────
 function HubCard({
-  icon, title, subtitle, color, tags, onClick, active,
+  icon, eyebrow, title, subtitle, color, onClick, active,
 }: {
-  icon: string; title: string; subtitle: string;
-  color: string; tags: string[]; onClick: () => void; active?: boolean;
+  icon: string; eyebrow: string; title: string; subtitle: string;
+  color: string; onClick: () => void; active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
         background: "#fff",
-        border: `1px solid ${active ? color : "#E5E7EB"}`,
-        borderLeft: `4px solid ${color}`,
-        borderRadius: "12px",
-        padding: "1.5rem",
+        border: `1px solid ${active ? color : "#EEEEEE"}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: "10px",
+        padding: "1.75rem",
         cursor: "pointer",
         textAlign: "left",
         transition: "box-shadow 0.2s, transform 0.15s",
-        boxShadow: active ? `0 4px 16px ${color}22` : "0 1px 3px rgba(0,0,0,0.06)",
+        boxShadow: active ? `0 4px 16px ${color}1a` : "0 1px 2px rgba(0,0,0,0.04)",
         display: "flex",
         flexDirection: "column",
-        gap: "0.5rem",
+        gap: "0.9rem",
         minWidth: 260,
         maxWidth: 360,
         flex: "1 1 260px",
+        position: "relative",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 20px ${color}28`;
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 24px ${color}22`;
         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.boxShadow = active
-          ? `0 4px 16px ${color}22`
-          : "0 1px 3px rgba(0,0,0,0.06)";
+          ? `0 4px 16px ${color}1a`
+          : "0 1px 2px rgba(0,0,0,0.04)";
         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span style={{
-          fontSize: "1.75rem",
-          width: 44, height: 44,
+          fontSize: "1.5rem",
+          width: 42, height: 42,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: color + "14",
-          borderRadius: "10px",
+          background: color + "12",
+          borderRadius: "8px",
           flexShrink: 0,
         }}>{icon}</span>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>{title}</div>
-          <div style={{ fontSize: "0.8rem", color: "#6B7280", marginTop: 2 }}>{subtitle}</div>
-        </div>
+        <span style={{
+          fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: color,
+        }}>{eyebrow}</span>
       </div>
-      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
-        {tags.map((t) => (
-          <span key={t} style={{
-            fontSize: "0.7rem", fontWeight: 600,
-            padding: "0.2rem 0.6rem",
-            borderRadius: 9999,
-            background: color + "14",
-            color: color,
-            border: `1px solid ${color}30`,
-          }}>{t}</span>
-        ))}
+      <div>
+        <div style={{ fontWeight: 700, fontSize: "1.15rem", color: "#111827", letterSpacing: "-0.01em" }}>{title}</div>
+        <div style={{ fontSize: "0.85rem", color: "#6B7280", marginTop: 6, lineHeight: 1.5 }}>{subtitle}</div>
       </div>
     </button>
   );
@@ -128,15 +121,28 @@ export default function Landing() {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "#F8F9FA",
+        background: "#FFFFFF",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1.5rem",
         position: "relative",
+        overflow: "hidden",
       }}>
-        <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        {/* Soft brand-colored accents — kept out of the content area, which stays white */}
+        <div aria-hidden style={{
+          position: "fixed", top: "-12%", left: "-10%", width: 480, height: 480, borderRadius: "50%",
+          background: "radial-gradient(circle, #3E8C5433 0%, transparent 70%)",
+          filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
+        }} />
+        <div aria-hidden style={{
+          position: "fixed", bottom: "-15%", right: "-10%", width: 560, height: 560, borderRadius: "50%",
+          background: "radial-gradient(circle, #D4A02733 0%, transparent 70%)",
+          filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
+        }} />
+
+        <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem", zIndex: 1 }}>
           <span style={{ fontSize: "0.8rem", color: "#6B7280" }}>{name}</span>
           {access.isAdmin && !viewAs && (
             <button
@@ -152,7 +158,7 @@ export default function Landing() {
         </div>
         {showAdminPanel && <AccessAdminPanel onClose={() => setShowAdminPanel(false)} />}
         {/* Logo + title */}
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+        <div style={{ textAlign: "center", marginBottom: "3rem", position: "relative", zIndex: 1 }}>
           <div style={{
             fontSize: "0.8rem",
             fontWeight: 700,
@@ -174,70 +180,70 @@ export default function Landing() {
         </div>
 
         {/* 3 main cards */}
-        <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
+        <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100, position: "relative", zIndex: 1 }}>
           {(hasTeam("OPS") || hasTeam("APT") || hasTeam("TKLIVES")) && (
             <HubCard
               icon="🇺🇸"
+              eyebrow="Región"
               title="FTC USA"
               subtitle="Customer Service & TikTok Lives"
               color="#1e40af"
-              tags={["Customer Service", "Lives"]}
               onClick={() => setView("ftc-usa")}
             />
           )}
           {hasTeam("MEX") && (
             <HubCard
               icon="🇲🇽"
+              eyebrow="Región"
               title="FTC México"
               subtitle="Ventas, Asistencia & Horarios"
               color="#15803d"
-              tags={["Ventas", "Asistencia", "Horarios"]}
               onClick={() => directGo("MEX", getRole("MEX") ?? "staff")}
             />
           )}
           {hasTeam("CSQUALITY") && (
             <HubCard
               icon="⚙️"
+              eyebrow="Herramientas"
               title="Operational Tools"
               subtitle="Herramientas internas del equipo"
               color="#475569"
-              tags={["CS Quality Dictionary"]}
               onClick={() => setView("ops-tools")}
             />
           )}
           {hasTeam("MGMT") && (
             <HubCard
               icon="📊"
+              eyebrow="Gestión"
               title="Management"
               subtitle="Historial y datos del equipo"
               color="#64748b"
-              tags={["Historial", "Datos"]}
               onClick={() => directGo("MGMT")}
             />
           )}
           {hasTeam("LOGISTICS") && (
             <HubCard
               icon="📦"
+              eyebrow="Operaciones"
               title="Logística"
               subtitle="Gestión de envíos y productos"
               color="#b45309"
-              tags={["Envíos", "Inventario"]}
               onClick={() => directGo("LOGISTICS")}
             />
           )}
           {hasTeam("MARKETING") && (
             <HubCard
               icon="🎨"
+              eyebrow="Equipo"
               title="Marketing"
               subtitle="Briefs de producto — Laura & Diseño"
               color="#3E6B45"
-              tags={["Briefs", "Diseño"]}
               onClick={() => directGo("MARKETING")}
             />
           )}
         </div>
         {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && (
-          <p style={{ color: "#6B7280", marginTop: "1.5rem" }}>No tienes ningún equipo asignado todavía.</p>
+          <p style={{ color: "#6B7280", marginTop: "1.5rem", position: "relative", zIndex: 1 }}>No tienes ningún equipo asignado todavía.</p>
         )}
 
       </div>
@@ -281,10 +287,10 @@ export default function Landing() {
           {(hasTeam("OPS") || hasTeam("APT")) && (
             <HubCard
               icon="🎧"
+              eyebrow="Agentes"
               title="Customer Service"
               subtitle="Operations · Strategy"
               color="#1e40af"
-              tags={["Operations", "Strategy"]}
               active={csSelected !== null && csSelected !== "TKLIVES"}
               onClick={() => setCsSelected(csSelected && csSelected !== "TKLIVES" ? null : "OPS")}
             />
@@ -292,10 +298,10 @@ export default function Landing() {
           {hasTeam("TKLIVES") && (
             <HubCard
               icon="🎵"
+              eyebrow="Equipo"
               title="Lives"
               subtitle="TikTok Lives USA — Horarios y turnos"
               color="#e91e8c"
-              tags={["TikTok Lives"]}
               onClick={() => directGo("TKLIVES")}
             />
           )}
@@ -364,10 +370,10 @@ export default function Landing() {
       <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center" }}>
         <HubCard
           icon="📖"
+          eyebrow="Herramienta"
           title="CS Quality Dictionary"
           subtitle="Casos de calidad y categorías"
           color="#475569"
-          tags={["Quality", "Dictionary"]}
           onClick={() => directGo("CSQUALITY")}
         />
       </div>
