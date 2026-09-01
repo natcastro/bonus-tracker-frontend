@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MT, formatDateHuman } from "../theme";
 import { useMarketing } from "../context";
 import Timeline from "../components/Timeline";
-import { stageLabel, todayIso, normalizeUrl } from "../types";
+import DeadlineBadge from "../components/DeadlineBadge";
+import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
 const DESIGN_STAGES = new Set(["proposal", "adjustments"]);
@@ -94,16 +95,15 @@ export default function BriefDetailPage() {
         </div>
       ) : !canAct ? (
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.25rem", textAlign: "center", color: MT.text2, fontSize: 13 }}>
-          Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong> · deadline {currentStage ? formatDateHuman(currentStage.deadline) : "—"}
+          <div>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></div>
+          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
         </div>
       ) : (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1.25rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 14, color: MT.text1, margin: "0 0 4px" }}>
+          <p style={{ fontWeight: 800, fontSize: 14, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — {stageLabel(brief.currentStage)}
           </p>
-          <p style={{ fontSize: 12.5, color: MT.text2, margin: "0 0 1rem" }}>
-            Deadline: {currentStage ? formatDateHuman(currentStage.deadline) : "—"}
-          </p>
+          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
 
           {DESIGN_STAGES.has(brief.currentStage) && (
             <>
@@ -152,7 +152,7 @@ export default function BriefDetailPage() {
         </div>
       )}
 
-      {brief.status === "in_progress" && currentStage && todayIso() > currentStage.deadline && (
+      {brief.status === "in_progress" && currentStage && isPastDeadline(currentStage.deadline) && (
         <p style={{ marginTop: 12, fontSize: 12, color: MT.danger, fontWeight: 600 }}>
           ⚠ Esta etapa está atrasada — venció el {formatDateHuman(currentStage.deadline)}.
         </p>

@@ -4,7 +4,8 @@ import { MT } from "../theme";
 import { formatDateHuman } from "../theme";
 import { useMarketing } from "../context";
 import NewBriefModal from "../components/NewBriefModal";
-import { stageLabel, todayIso, daysBetweenIso } from "../types";
+import DeadlineBadge from "../components/DeadlineBadge";
+import { stageLabel, todayIso, isPastDeadline } from "../types";
 import type { MarketingBrief, StageKey } from "../types";
 
 const MONTHLY_GOAL = 8;
@@ -18,19 +19,10 @@ const ACTION_TEXT: Record<StageKey, string> = {
   final: "cerrar el brief",
 };
 
-function deadlinePhrase(deadline: string): string {
-  const today = todayIso();
-  const diff = daysBetweenIso(today, deadline);
-  if (diff === 0) return "vence hoy";
-  if (diff === 1) return "vence mañana";
-  if (diff < 0) return `venció hace ${Math.abs(diff)} día${Math.abs(diff) !== 1 ? "s" : ""}`;
-  return `vence el ${formatDateHuman(deadline)}`;
-}
-
 function isOverdue(brief: MarketingBrief): boolean {
   if (brief.status === "completed") return false;
   const stage = brief.stages.find(s => s.key === brief.currentStage);
-  return !!stage && todayIso() > stage.deadline;
+  return !!stage && isPastDeadline(stage.deadline);
 }
 
 export default function DashboardPage() {
@@ -68,8 +60,9 @@ export default function DashboardPage() {
   }, [briefs, myRole]);
 
   const nextActionBrief = myPending[0];
+  const nextActionStage = nextActionBrief?.stages.find(s => s.key === nextActionBrief.currentStage);
   const nextActionText = nextActionBrief
-    ? `Tu próxima acción: ${ACTION_TEXT[nextActionBrief.currentStage as StageKey]} de ${nextActionBrief.reference} · ${deadlinePhrase(nextActionBrief.stages.find(s => s.key === nextActionBrief.currentStage)!.deadline)}.`
+    ? `Tu próxima acción: ${ACTION_TEXT[nextActionBrief.currentStage as StageKey]} de ${nextActionBrief.reference}`
     : "No tienes acciones pendientes en este momento.";
 
   const filtered = briefs.filter(b => {
@@ -110,9 +103,10 @@ export default function DashboardPage() {
       <div style={{
         background: nextActionBrief ? MT.claySoft : MT.mossSoft, border: `1px solid ${nextActionBrief ? MT.clay : MT.moss}30`,
         borderRadius: MT.radius, padding: "0.9rem 1.1rem", marginBottom: "1.25rem",
-        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14,
       }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, color: nextActionBrief ? MT.clay : MT.moss }}>{nextActionText}</div>
+        {nextActionStage && <DeadlineBadge deadline={nextActionStage.deadline} />}
         {nextActionBrief && (
           <button onClick={() => navigate(`/marketing/brief/${nextActionBrief.id}`)} style={{
             fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
@@ -139,17 +133,15 @@ export default function DashboardPage() {
           <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
             {myPending.map(b => {
               const stage = b.stages.find(s => s.key === b.currentStage)!;
-              const overdue = todayIso() > stage.deadline;
+              const overdue = isPastDeadline(stage.deadline);
               return (
                 <div key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{
                   cursor: "pointer", background: MT.surface, border: `1px solid ${overdue ? MT.danger : MT.border}`,
                   borderRadius: 10, padding: "0.7rem 0.9rem", minWidth: 180,
                 }}>
                   <div style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1 }}>{b.reference}</div>
-                  <div style={{ fontSize: 11.5, color: MT.text2, marginTop: 2 }}>{stageLabel(b.currentStage)}</div>
-                  <div style={{ fontSize: 11, color: overdue ? MT.danger : MT.text3, marginTop: 3, fontWeight: overdue ? 700 : 400 }}>
-                    {overdue ? "⚠ " : ""}{deadlinePhrase(stage.deadline)}
-                  </div>
+                  <div style={{ fontSize: 11.5, color: MT.text2, marginTop: 2, marginBottom: 5 }}>{stageLabel(b.currentStage)}</div>
+                  <DeadlineBadge deadline={stage.deadline} compact />
                 </div>
               );
             })}
@@ -227,10 +219,10 @@ export default function DashboardPage() {
                   <td style={{ padding: "0.65rem 1rem", fontSize: 12.5, color: MT.text2 }}>
                     {stage ? (stage.role === "laura" ? "Laura" : "Diseño") : "—"}
                   </td>
-                  <td style={{ padding: "0.65rem 1rem", fontSize: 12.5, color: MT.text2 }}>{stage ? formatDateHuman(stage.deadline) : "—"}</td>
+                  <td style={{ padding: "0.65rem 1rem" }}>{stage ? <DeadlineBadge deadline={stage.deadline} compact /> : "—"}</td>
                   <td style={{ padding: "0.65rem 1rem" }}>
                     {overdue ? (
-                      <span style={{ fontSize: 11.5, fontWeight: 800, color: MT.danger, background: MT.dangerSoft, borderRadius: 999, padding: "0.15rem 0.6rem" }}>⚠ Atrasado</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: MT.danger, background: MT.dangerSoft, borderRadius: 999, padding: "0.15rem 0.6rem" }}>⚠ Urgente</span>
                     ) : b.status === "completed" ? (
                       <span style={{ fontSize: 11.5, color: MT.text3 }}>—</span>
                     ) : (

@@ -6,7 +6,7 @@ import {
 } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
-import { STAGE_DEFS, addDaysIso, daysBetweenIso, todayIso } from "./types";
+import { STAGE_DEFS, addDaysIso, daysBetweenIso, todayIso, isPastDeadline } from "./types";
 
 interface MarketingCtx {
   authedUser: MarketingUser | null;
@@ -83,7 +83,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (stageIdx === -1) return;
     const stage = brief.stages[stageIdx];
     const today = todayIso();
-    const isLate = today > stage.deadline;
+    const isLate = isPastDeadline(stage.deadline);
     const newStages = brief.stages.map((s, i) => i === stageIdx ? { ...s, link, completedAt: today, status: "done" as const, late: isLate } : s);
     const nextStage = brief.stages[stageIdx + 1];
     await updateMarketingBrief(briefId, {
