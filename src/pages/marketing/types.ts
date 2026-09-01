@@ -12,6 +12,7 @@ export interface MarketingStage {
   status: "pending" | "done";
   decision?: "approved" | "changes_requested" | "extra_revision";
   late?: boolean;
+  reminded24h?: boolean;
 }
 
 export interface MarketingBrief {
