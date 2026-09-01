@@ -6,7 +6,7 @@ import {
 } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser } from "./types";
+import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
 import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Test-phase recipients — swap for the real Laura/Diseño addresses once confirmed.
@@ -40,6 +40,8 @@ interface MarketingCtx {
   submitDesignStage: (briefId: number, link: string) => Promise<void>;
   lauraReview: (briefId: number, action: "approve" | "request_changes") => Promise<void>;
   requestExtraRevision: (briefId: number) => Promise<void>;
+  confirmPublish: (briefId: number) => Promise<void>;
+  updateStageLink: (briefId: number, stageKey: StageKey, link: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
 
   unreadCount: number;
@@ -145,15 +147,26 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
 
     if (action === "approve") {
-      const newStages = brief.stages.map((s, i) => i === stageIdx ? { ...s, completedAt: today, status: "done" as const, decision: "approved" as const } : s);
-      await updateMarketingBrief(briefId, {
-        stages: newStages, currentStage: "completed", status: "completed", completedAt: today,
+      // Approving at any review stage skips straight to the publish step — Diseño still
+      // has to confirm it went live, regardless of how early Laura approved.
+      const publishStage = brief.stages.find(s => s.key === "publish")!;
+      const publishDeadline = addWorkDaysIso(today, publishStage.gapDays);
+      const newStages = brief.stages.map(s => {
+        if (s.key === stage.key) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const };
+        if (s.key === "publish") return { ...s, deadline: publishDeadline };
+        return s;
       });
-      await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — brief completado.`);
+      await updateMarketingBrief(briefId, { stages: newStages, currentStage: "publish" });
+      await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — falta que Diseño confirme la publicación.`);
       await sendMarketingEmail(
         NOTIFY_EMAILS.diseno,
-        `Brief completado — ${brief.reference}`,
-        emailHtml({ intro: "Laura aprobó sin cambios. El brief quedó completado — no se requiere ninguna acción adicional.", reference: brief.reference }),
+        `Aprobado — confirma la publicación de ${brief.reference}`,
+        emailHtml({
+          intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.",
+          reference: brief.reference,
+          nextTask: stageLabel("publish"),
+          deadline: publishDeadline,
+        }),
       );
       await reload();
       return;
@@ -223,6 +236,31 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  const confirmPublish = async (briefId: number) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || brief.status === "completed" || brief.currentStage !== "publish") return;
+    const today = todayIso();
+    const newStages = brief.stages.map(s => s.key === "publish" ? { ...s, completedAt: today, status: "done" as const } : s);
+    await updateMarketingBrief(briefId, {
+      stages: newStages, currentStage: "completed", status: "completed", completedAt: today,
+    });
+    await notify(briefId, `Diseño confirmó la publicación de ${brief.reference} — brief completado.`);
+    await sendMarketingEmail(
+      NOTIFY_EMAILS.laura,
+      `Publicado — ${brief.reference}`,
+      emailHtml({ intro: "Diseño confirmó que ya se publicó. El brief quedó completado.", reference: brief.reference }),
+    );
+    await reload();
+  };
+
+  const updateStageLink = async (briefId: number, stageKey: StageKey, link: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief) return;
+    const newStages = brief.stages.map(s => s.key === stageKey ? { ...s, link } : s);
+    await updateMarketingBrief(briefId, { stages: newStages });
+    await reload();
+  };
+
   const deleteBrief = async (briefId: number) => {
     if (authedUser?.role !== "laura") throw new Error("Solo Laura puede eliminar briefs.");
     await deleteMarketingBrief(briefId);
@@ -247,7 +285,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, submitDesignStage, lauraReview, requestExtraRevision, deleteBrief,
+      createBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, deleteBrief,
       unreadCount, markNotificationRead,
     }}>
       {children}

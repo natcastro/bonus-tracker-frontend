@@ -6,21 +6,25 @@ import Timeline from "../components/Timeline";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
-import { TrashIcon } from "../../../components/icons";
+import { TrashIcon, PencilIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
+import type { StageKey } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
 const DESIGN_STAGES = new Set(["proposal", "adjustments"]);
+const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "adjustments"]);
 
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, deleteBrief } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [editingStage, setEditingStage] = useState<StageKey | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   if (!brief) {
     return (
@@ -34,6 +38,7 @@ export default function BriefDetailPage() {
   const myRole = authedUser?.role;
   const canAct = brief.status === "in_progress" && currentStage?.role === myRole;
   const isFinal = brief.currentStage === "final";
+  const isPublish = brief.currentStage === "publish";
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -47,6 +52,18 @@ export default function BriefDetailPage() {
     setBusy(true); setDeleteError("");
     try { await deleteBrief(brief.id); navigate("/marketing/home"); }
     catch (err: any) { setDeleteError(err?.message ?? "No se pudo eliminar."); setBusy(false); }
+  };
+
+  const startEdit = (stageKey: StageKey, currentLink: string | null) => {
+    setEditingStage(stageKey);
+    setEditValue(currentLink ?? "");
+  };
+
+  const saveEdit = async () => {
+    if (!editingStage) return;
+    setBusy(true);
+    try { await updateStageLink(brief.id, editingStage, editValue.trim()); setEditingStage(null); }
+    finally { setBusy(false); }
   };
 
   const fieldStyle: React.CSSProperties = {
@@ -98,23 +115,61 @@ export default function BriefDetailPage() {
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
         <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Enlaces por etapa</p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          {brief.stages.map(s => (
-            <div key={s.key} style={{ display: "flex", alignItems: "center", padding: "0.4rem 0.6rem", background: MT.surfaceAlt, borderRadius: 8, gap: 10 }}>
-              <Avatar role={s.role} size={18} />
-              <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
-              <StatusPill
-                color={s.status === "done" ? MT.primary : MT.text3}
-                label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
-              />
-              {s.link ? (
-                <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: MT.primary, fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {s.link}
-                </a>
-              ) : (
-                <span style={{ fontSize: 12, color: MT.text3, flex: 1 }}>Sin enlace todavía</span>
-              )}
-            </div>
-          ))}
+          {brief.stages.map(s => {
+            const isCurrent = brief.status === "in_progress" && s.key === brief.currentStage;
+            const canEdit = LINK_STAGES.has(s.key) && s.role === myRole;
+            const isEditing = editingStage === s.key;
+            return (
+              <div key={s.key} style={{
+                display: "flex", alignItems: "center", padding: "0.6rem 0.75rem",
+                background: isCurrent ? MT.mossSoft : MT.surfaceAlt,
+                border: isCurrent ? `1px solid ${MT.moss}50` : "1px solid transparent",
+                borderRadius: 8, gap: 10,
+              }}>
+                <Avatar role={s.role} size={18} />
+                <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
+                <StatusPill
+                  color={s.status === "done" ? MT.primary : isCurrent ? MT.moss : MT.text3}
+                  label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
+                />
+                {isEditing ? (
+                  <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
+                      placeholder="https://formatucuerpo.sharepoint.com/..."
+                      style={{ flex: 1, fontFamily: MT.font, fontSize: 12.5, padding: "5px 8px", border: `1px solid ${MT.border}`, borderRadius: 6, outline: "none" }}
+                    />
+                    <button disabled={busy} onClick={saveEdit} style={{
+                      fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+                      background: MT.primary, color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px",
+                    }}>Guardar</button>
+                    <button onClick={() => setEditingStage(null)} style={{
+                      fontFamily: MT.font, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                      background: "none", color: MT.text2, border: "none", padding: "5px 4px",
+                    }}>Cancelar</button>
+                  </div>
+                ) : (
+                  <>
+                    {s.link ? (
+                      <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: MT.primary, fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                        {s.link}
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: 12, color: MT.text3, flex: 1 }}>Sin enlace todavía</span>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => startEdit(s.key, s.link)} title="Editar enlace" style={{
+                        background: "none", border: "none", cursor: "pointer", color: MT.text3, padding: 4,
+                        display: "flex", alignItems: "center", flexShrink: 0,
+                      }}>
+                        <PencilIcon size={14} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -130,14 +185,29 @@ export default function BriefDetailPage() {
             {currentStage && <Avatar role={currentStage.role} size={18} />}
             <span>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></span>
           </div>
-          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
+          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+        </div>
+      ) : isPublish ? (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
+            Tu turno — Confirmar publicación
+          </p>
+          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+          <button disabled={busy} onClick={() => run(() => confirmPublish(brief.id))} style={{
+            fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+          }}>✓ Confirmar que ya se publicó</button>
+          <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
+            Laura ya aprobó — esto cierra el brief como completado.
+          </p>
         </div>
       ) : (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — {stageLabel(brief.currentStage)}
           </p>
-          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
+          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
 
           {DESIGN_STAGES.has(brief.currentStage) && (
             <>
@@ -160,7 +230,7 @@ export default function BriefDetailPage() {
                 <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve"))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                   background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-                }}>✓ Aprobar sin cambios / Completar</button>
+                }}>✓ Aprobar sin cambios</button>
 
                 {!isFinal && (
                   <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "request_changes"))} style={{
@@ -178,15 +248,15 @@ export default function BriefDetailPage() {
               </div>
               <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
                 {isFinal
-                  ? "Completar cierra el brief. Solicitar revisión adicional reabre otra ronda de ajustes."
-                  : "Aprobar sin cambios cierra el brief directamente. Solicitar ajustes lo envía de vuelta a Diseño."}
+                  ? "Aprobar envía a Diseño para confirmar la publicación. Solicitar revisión adicional reabre otra ronda de ajustes."
+                  : "Aprobar sin cambios envía directo a Diseño para confirmar la publicación. Solicitar ajustes lo envía de vuelta a Diseño."}
               </p>
             </>
           )}
         </div>
       )}
 
-      {brief.status === "in_progress" && currentStage && isPastDeadline(currentStage.deadline) && (
+      {brief.status === "in_progress" && currentStage?.deadline && isPastDeadline(currentStage.deadline) && (
         <p style={{ marginTop: 12, fontSize: 12, color: MT.danger, fontWeight: 600 }}>
           ⚠ Esta etapa está atrasada — venció el {formatDateHuman(currentStage.deadline)}.
         </p>

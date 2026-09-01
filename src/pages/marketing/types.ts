@@ -1,5 +1,5 @@
 export type MarketingRole = "laura" | "diseno";
-export type StageKey = "brief" | "proposal" | "review1" | "adjustments" | "review2" | "final";
+export type StageKey = "brief" | "proposal" | "review1" | "adjustments" | "review2" | "final" | "publish";
 
 export interface MarketingStage {
   key: StageKey;
@@ -53,7 +53,8 @@ export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; ga
   { key: "review1",     label: "Revisión 1",   role: "laura",  gapDays: 3 },
   { key: "adjustments", label: "Ajustes",      role: "diseno", gapDays: 3 },
   { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 1 },
-  { key: "final",       label: "Final",        role: "laura",  gapDays: 2 },
+  { key: "final",       label: "Final",        role: "laura",  gapDays: 1 },
+  { key: "publish",     label: "Publicación",  role: "diseno", gapDays: 1 },
 ];
 
 export const STAGE_ORDER: StageKey[] = STAGE_DEFS.map(s => s.key);

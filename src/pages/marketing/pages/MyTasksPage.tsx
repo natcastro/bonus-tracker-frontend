@@ -6,9 +6,6 @@ import NewBriefModal from "../components/NewBriefModal";
 import DeadlineBadge from "../components/DeadlineBadge";
 import { PencilIcon, EyeIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline } from "../types";
-import type { StageKey } from "../types";
-
-const DESIGN_STAGES = new Set<StageKey>(["proposal", "adjustments"]);
 
 export default function MyTasksPage() {
   const { authedUser, briefs } = useMarketing();
@@ -66,7 +63,7 @@ export default function MyTasksPage() {
             const stage = b.stages.find(s => s.key === b.currentStage)!;
             const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
             const color = overdue ? MT.danger : myRole === "laura" ? MT.primary : MT.clay;
-            const Icon = DESIGN_STAGES.has(stage.key) ? PencilIcon : EyeIcon;
+            const Icon = stage.role === "diseno" ? PencilIcon : EyeIcon;
             return (
               <button
                 key={b.id}
