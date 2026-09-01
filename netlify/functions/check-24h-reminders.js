@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 const NOTIFY_EMAILS = {
   laura: "amazonassistant@formatucuerpo.com",
   diseno: "marketplaces@formatucuerpo.com",
@@ -7,6 +5,28 @@ const NOTIFY_EMAILS = {
 
 function deadlineTimestamp(dateIso) {
   return new Date(`${dateIso}T17:00:00-05:00`).getTime();
+}
+
+function supabaseHeaders() {
+  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+}
+
+async function getInProgressBriefs() {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_briefs?status=eq.in_progress&select=*`;
+  const resp = await fetch(url, { headers: supabaseHeaders() });
+  if (!resp.ok) throw new Error(`Supabase fetch failed: ${resp.status} ${await resp.text()}`);
+  return resp.json();
+}
+
+async function updateBriefStages(id, stages) {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_briefs?id=eq.${id}`;
+  const resp = await fetch(url, {
+    method: "PATCH",
+    headers: { ...supabaseHeaders(), Prefer: "return=minimal" },
+    body: JSON.stringify({ stages }),
+  });
+  if (!resp.ok) throw new Error(`Supabase update failed: ${resp.status} ${await resp.text()}`);
 }
 
 async function getGraphToken() {
@@ -64,9 +84,12 @@ export const handler = async (event) => {
     return { statusCode: 401, body: "Unauthorized" };
   }
 
-  const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
-  const { data: briefs, error } = await supabase.from("marketing_briefs").select("*").eq("status", "in_progress");
-  if (error) return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+  let briefs;
+  try {
+    briefs = await getInProgressBriefs();
+  } catch (err) {
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
 
   const now = Date.now();
   const in24h = now + 24 * 3600 * 1000;
@@ -99,7 +122,7 @@ export const handler = async (event) => {
       );
       sent++;
       const newStages = stages.map((s, i) => (i === idx ? { ...s, reminded24h: true } : s));
-      await supabase.from("marketing_briefs").update({ stages: newStages }).eq("id", brief.id);
+      await updateBriefStages(brief.id, newStages);
     } catch (err) {
       console.error(`Failed to send reminder for brief ${brief.id}:`, err.message);
     }
