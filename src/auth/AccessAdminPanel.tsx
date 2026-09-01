@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAllHubAccess, upsertHubAccess, deleteHubAccess } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
+import { useHubAccess } from "./HubAccessContext";
+import type { TeamRole } from "./HubAccessContext";
 
 const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "OPS",        label: "FTC USA — Operations" },
@@ -10,6 +13,8 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "MGMT",       label: "Management" },
   { key: "LOGISTICS",  label: "Logística" },
 ];
+
+const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];
 
 // Teams where access also needs a role — stored in hub_access as "TEAM:role" (e.g. "MEX:admin").
 const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string }[] = [
@@ -141,11 +146,64 @@ function EntryForm({
   );
 }
 
+function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => void }) {
+  const [team, setTeam] = useState("OPS");
+  const [role, setRole] = useState<TeamRole>("admin");
+  const isRoleTeam = ROLE_TEAMS.some((rt) => rt.key === team);
+  const roleTeam = ROLE_TEAMS.find((rt) => rt.key === team);
+
+  return (
+    <div style={{ background: "#FFF7ED", border: "1px solid #FDE0B0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
+      <div style={{ fontWeight: 700, fontSize: 13, color: "#7C2D12", marginBottom: 8 }}>👀 Ver el Hub como otra persona</div>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+        <select
+          value={team}
+          onChange={(e) => { setTeam(e.target.value); setRole("admin"); }}
+          className="form-control"
+          style={{ width: "auto", flex: "1 1 200px" }}
+        >
+          {ALL_TEAMS_FOR_PREVIEW.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+        </select>
+        {isRoleTeam && roleTeam && (
+          <div style={{ display: "flex", gap: "0.3rem" }}>
+            {(["staff", "admin"] as TeamRole[]).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                style={{
+                  fontSize: 11.5, fontWeight: 600, padding: "0.3rem 0.6rem", borderRadius: 999, cursor: "pointer",
+                  border: `1px solid ${role === r ? "#7C2D12" : "#E5E7EB"}`,
+                  background: role === r ? "#7C2D12" : "#fff",
+                  color: role === r ? "#fff" : "#6B7280",
+                }}
+              >
+                {r === "staff" ? roleTeam.staffLabel : roleTeam.adminLabel}
+              </button>
+            ))}
+          </div>
+        )}
+        <button className="btn btn-sm" style={{ background: "#7C2D12", color: "#fff" }} onClick={() => onStart(team, role)}>
+          Ver así
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
+  const { startViewAs } = useHubAccess();
   const [entries, setEntries] = useState<HubAccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
+
+  const startPreview = (team: string, role: TeamRole) => {
+    startViewAs(team, role);
+    onClose();
+    navigate("/");
+  };
 
   const load = async () => {
     setLoading(true);
@@ -180,6 +238,8 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Accesos a FTC Hub</h2>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6B7280" }}>×</button>
         </div>
+
+        <ViewAsPicker onStart={startPreview} />
 
         {!adding && !editingEmail && (
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)} style={{ marginBottom: "1rem" }}>+ Agregar correo</button>

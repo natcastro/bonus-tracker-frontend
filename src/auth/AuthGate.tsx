@@ -2,7 +2,42 @@ import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from "@azure/
 import { InteractionStatus } from "@azure/msal-browser";
 import type { ReactNode } from "react";
 import { loginRequest } from "./msalConfig";
-import { HubAccessProvider } from "./HubAccessContext";
+import { HubAccessProvider, useHubAccess } from "./HubAccessContext";
+
+const TEAM_LABELS: Record<string, string> = {
+  MEX: "FTC México", OPS: "Operations", APT: "Strategy", TKLIVES: "TikTok Lives",
+  CSQUALITY: "Operational Tools", MGMT: "Management", LOGISTICS: "Logística", MARKETING: "Marketing",
+};
+
+function viewAsLabel(team: string, role: string): string {
+  const teamLabel = TEAM_LABELS[team] ?? team;
+  if (team === "MARKETING") return `${teamLabel} — ${role === "admin" ? "Laura" : "Diseño"}`;
+  return `${teamLabel} — ${role === "admin" ? "Administrador" : "Staff"}`;
+}
+
+function ViewAsBanner() {
+  const { viewAs, stopViewAs } = useHubAccess();
+  if (!viewAs) return null;
+  return (
+    <div style={{
+      position: "sticky", top: 0, zIndex: 9999, background: "#78350F", color: "#fff",
+      fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+      fontSize: "0.8rem", fontWeight: 600, padding: "0.5rem 1rem",
+      display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem",
+    }}>
+      <span>👀 Vista previa — viendo el Hub como: {viewAsLabel(viewAs.team, viewAs.role)}</span>
+      <button
+        onClick={stopViewAs}
+        style={{
+          background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.4)", color: "#fff",
+          borderRadius: 6, padding: "0.2rem 0.65rem", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer",
+        }}
+      >
+        Salir de vista previa
+      </button>
+    </div>
+  );
+}
 
 function LoginScreen() {
   const { instance, inProgress } = useMsal();
@@ -40,7 +75,10 @@ export default function AuthGate({ children }: { children: ReactNode }) {
         <LoginScreen />
       </UnauthenticatedTemplate>
       <AuthenticatedTemplate>
-        <HubAccessProvider>{children}</HubAccessProvider>
+        <HubAccessProvider>
+          <ViewAsBanner />
+          {children}
+        </HubAccessProvider>
       </AuthenticatedTemplate>
     </>
   );

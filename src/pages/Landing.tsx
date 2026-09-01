@@ -90,7 +90,7 @@ function HubCard({
 export default function Landing() {
   const navigate = useNavigate();
   const { instance } = useMsal();
-  const { hasTeam, getRole, loading: accessLoading, access, email, name } = useHubAccess();
+  const { hasTeam, getRole, loading: accessLoading, access, email, name, viewAs } = useHubAccess();
   const [view, setView] = useState<View>("hub");
   const [csSelected, setCsSelected] = useState<Team | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -138,7 +138,7 @@ export default function Landing() {
       }}>
         <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <span style={{ fontSize: "0.8rem", color: "#6B7280" }}>{name}</span>
-          {access.isAdmin && (
+          {access.isAdmin && !viewAs && (
             <button
               onClick={() => setShowAdminPanel(true)}
               title="Administrar accesos"
