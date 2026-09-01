@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CSQualityCase } from "../types";
 import { getCSCases, createCSCase, updateCSCase, approveCSCase, rejectCSCase, addCSPhoto, deleteCSPhoto } from "../services/api";
+import { useHubAccess } from "../auth/HubAccessContext";
 
-const ADMIN_PASSWORD = "Calidad2026!";
 const CATEGORY_COLORS = ["#7c3aed", "#0891b2", "#d97706", "#db2777", "#059669", "#dc2626", "#4f46e5", "#0ea5e9"];
 
 function catColor(cat: string): string {
@@ -20,6 +20,8 @@ const placeholderBg = (w: boolean) =>
 
 export default function CSQualityDashboard() {
   const navigate = useNavigate();
+  const { access } = useHubAccess();
+  const isAdmin = !!access?.isAdmin;
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const [cases, setCases] = useState<CSQualityCase[]>([]);
@@ -42,10 +44,6 @@ export default function CSQualityDashboard() {
   const submitFileRef = useRef<HTMLInputElement>(null);
 
   // ── Admin ──────────────────────────────────────────────────────────────────
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [adminPwInput, setAdminPwInput] = useState("");
-  const [adminPwError, setAdminPwError] = useState("");
   const [showPendingPanel, setShowPendingPanel] = useState(false);
 
   // Admin: approve flow
@@ -114,18 +112,6 @@ export default function CSQualityDashboard() {
     if (submitFileRef.current) submitFileRef.current.value = "";
   };
 
-  // ── Admin login ────────────────────────────────────────────────────────────
-  const handleAdminLogin = () => {
-    if (adminPwInput === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      setShowAdminLogin(false);
-      setAdminPwInput("");
-      setAdminPwError("");
-    } else {
-      setAdminPwError("Contraseña incorrecta.");
-    }
-  };
-
   // ── Admin: approve pending case ────────────────────────────────────────────
   const handleApprove = async (id: number) => {
     try {
@@ -181,10 +167,12 @@ export default function CSQualityDashboard() {
               ⏳ {pending.length} pendiente{pending.length > 1 ? "s" : ""}
             </button>
           )}
-          {isAdmin
-            ? <button className="btn btn-secondary btn-sm" onClick={() => { setIsAdmin(false); setPending([]); }}>🔓 Cerrar sesión admin</button>
-            : <button className="btn btn-secondary btn-sm" onClick={() => { setShowAdminLogin(true); setAdminPwInput(""); setAdminPwError(""); }}>🔑 Admin</button>
-          }
+          {isAdmin && (
+            <span style={{
+              fontSize: "0.7rem", fontWeight: 700, color: "#7c3aed", background: "#f1ebfe",
+              borderRadius: 999, padding: "3px 10px", letterSpacing: "0.03em",
+            }}>ADMIN</span>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Salir</button>
         </div>
       </nav>
@@ -556,21 +544,6 @@ ALTER TABLE cs_quality_cases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAU
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Admin login modal ─────────────────────────────────────────────────── */}
-      {showAdminLogin && (
-        <div className="modal-overlay active" style={{ zIndex: 3000 }}>
-          <div className="modal" style={{ maxWidth: 340 }}>
-            <div className="modal-header"><h3>🔑 Acceso Admin</h3></div>
-            <input type="password" className="form-control" placeholder="Contraseña" autoFocus value={adminPwInput} onChange={(e) => { setAdminPwInput(e.target.value); setAdminPwError(""); }} onKeyDown={(e) => { if (e.key === "Enter") handleAdminLogin(); }} style={{ marginBottom: "0.5rem" }} />
-            {adminPwError && <p style={{ color: "#dc2626", fontSize: "0.82rem", margin: "0 0 0.5rem" }}>{adminPwError}</p>}
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowAdminLogin(false)}>Cancelar</button>
-              <button className="btn btn-primary" style={{ background: "#7c3aed", borderColor: "#7c3aed" }} onClick={handleAdminLogin}>Entrar</button>
             </div>
           </div>
         </div>
