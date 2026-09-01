@@ -1,11 +1,11 @@
 :root {
   --primary: #3E8C54;
   --primary-hover: #2D7444;
-  --background: #F3F4F6;
+  --background: #FFFFFF;
   --surface: #FFFFFF;
   --text-main: #111827;
   --text-muted: #6B7280;
-  --border: #E5E7EB;
+  --border: #EEEEEE;
   --danger: #EF4444;
   --success: #10B981;
   --radius: 12px;
@@ -19,14 +19,33 @@ body {
   background-color: var(--background);
   color: var(--text-main);
   line-height: 1.5;
+  position: relative;
 }
 
-#root { min-height: 100vh; }
+/* Soft brand-colored accents behind every page, consistent with Marketing/Landing */
+body::before, body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  top: -12%; left: -10%; width: 460px; height: 460px;
+  background: radial-gradient(circle, rgba(62,140,84,0.14) 0%, transparent 70%);
+}
+body::after {
+  bottom: -14%; right: -10%; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(212,160,39,0.14) 0%, transparent 70%);
+}
+
+#root { min-height: 100vh; position: relative; z-index: 1; }
 
 /* Navigation */
 .top-nav {
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(17,24,39,0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;

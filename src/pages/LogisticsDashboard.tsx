@@ -10,7 +10,7 @@ import {
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
 const T = {
-  bg:        "#f5f5f7",
+  bg:        "#ffffff",
   surface:   "#ffffff",
   p1:        "#1d1d1f",
   p2:        "#6e6e73",
@@ -945,7 +945,7 @@ export default function LogisticsDashboard() {
       {/* Header */}
       <header style={{
         background: "rgba(255,255,255,0.85)", backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)", borderBottom: `1px solid ${T.sep}`, height: 52,
+        WebkitBackdropFilter: "blur(20px)", boxShadow: "0 1px 0 rgba(17,24,39,0.06)", height: 52,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px", position: "sticky", top: 0, zIndex: 100,
       }}>

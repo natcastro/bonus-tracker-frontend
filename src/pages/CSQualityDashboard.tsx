@@ -167,7 +167,7 @@ export default function CSQualityDashboard() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f7f5" }}>
+    <div style={{ minHeight: "100vh" }}>
       {/* ── Nav ──────────────────────────────────────────────────────────────── */}
       <nav className="top-nav">
         <div className="logo">Bonus Tracker — <span style={{ color: "#7c3aed" }}>CS Quality Dictionary</span></div>

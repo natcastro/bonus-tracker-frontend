@@ -125,6 +125,17 @@ export function EyeIcon({ size, color }: IconProps) {
   );
 }
 
+export function HubIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <circle cx="12" cy="5" r="2.2" />
+      <circle cx="5" cy="17" r="2.2" />
+      <circle cx="19" cy="17" r="2.2" />
+      <path d="M12 7.2v3.3M10.3 12.7 6.7 15M13.7 12.7l3.6 2.3" />
+    </svg>
+  );
+}
+
 export function GearIcon({ size, color }: IconProps) {
   return (
     <svg {...base(size, color)}>

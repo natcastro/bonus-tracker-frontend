@@ -99,7 +99,7 @@ export default function Landing() {
 
   if (accessLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F8F9FA", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280" }}>
+      <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280" }}>
         Cargando…
       </div>
     );
@@ -107,7 +107,7 @@ export default function Landing() {
 
   if (!access) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F8F9FA", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
+      <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0F172A", marginBottom: "0.5rem" }}>Sin acceso todavía</h1>
         <p style={{ color: "#6B7280", maxWidth: 420, marginBottom: "1.5rem" }}>
           Tu cuenta <strong>{email}</strong> inició sesión correctamente, pero todavía no tiene un equipo asignado en FTC Hub. Pide a un administrador que te dé acceso.
@@ -256,7 +256,7 @@ export default function Landing() {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "#F8F9FA",
+        background: "#FFFFFF",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -342,7 +342,7 @@ export default function Landing() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#F8F9FA",
+      background: "#FFFFFF",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",

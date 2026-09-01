@@ -1,7 +1,7 @@
 // Design tokens for Logistics Hub — its own visual identity (indigo/enterprise SaaS),
 // distinct from the legacy Logística dashboard so the two feel intentionally separate.
 export const HT = {
-  bg: "#F7F8FC",
+  bg: "#FFFFFF",
   surface: "#FFFFFF",
   surfaceAlt: "#F1F2F7",
   border: "rgba(15,23,42,0.08)",

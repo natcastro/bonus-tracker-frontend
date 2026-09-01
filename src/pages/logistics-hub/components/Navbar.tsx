@@ -41,7 +41,7 @@ export default function Navbar() {
   return (
     <div style={{
       position: "sticky", top: 0, zIndex: 40,
-      background: HT.surface, borderBottom: `1px solid ${HT.border}`,
+      background: HT.surface, boxShadow: "0 1px 0 rgba(17,24,39,0.06)",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "0 24px", height: 56,
     }}>
