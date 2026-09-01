@@ -107,6 +107,24 @@ export function SearchIcon({ size, color }: IconProps) {
   );
 }
 
+export function PencilIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M13.5 4.5 19.5 10.5 8 22H2v-6Z" />
+      <path d="M11.5 6.5l6 6" />
+    </svg>
+  );
+}
+
+export function EyeIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 export function GearIcon({ size, color }: IconProps) {
   return (
     <svg {...base(size, color)}>

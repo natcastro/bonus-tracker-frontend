@@ -1,15 +1,15 @@
-// Design tokens for the Marketing module — earthy, green-forward palette
-// aligned with the Forma Tu Cuerpo brand green, distinct from the other
-// hubs' cooler palettes (indigo Logistics Hub, etc).
+// Design tokens for the Marketing module — same clean white/neutral system as the
+// FTC Hub Landing screen, keeping only the brand green (Laura) / clay (Diseño)
+// role colors as accents.
 export const MT = {
-  bg: "#F6F3EA",
+  bg: "#FFFFFF",
   surface: "#FFFFFF",
-  surfaceAlt: "#EFE9DA",
-  border: "rgba(70,60,40,0.12)",
-  borderStrong: "rgba(70,60,40,0.22)",
-  text1: "#2C2A20",
-  text2: "#6B6350",
-  text3: "#9E9580",
+  surfaceAlt: "#F8F9FA",
+  border: "#EEEEEE",
+  borderStrong: "#E5E7EB",
+  text1: "#111827",
+  text2: "#6B7280",
+  text3: "#9CA3AF",
 
   primary: "#3E6B45",
   primaryDark: "#2E5033",
@@ -30,14 +30,14 @@ export const MT = {
   info: "#4F6D8C",
   infoSoft: "#E6EDF3",
 
-  shadow: "0 1px 2px rgba(44,42,32,0.05), 0 8px 24px rgba(44,42,32,0.06)",
-  shadowLg: "0 4px 16px rgba(44,42,32,0.10), 0 24px 48px rgba(44,42,32,0.12)",
+  shadow: "0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)",
+  shadowLg: "0 4px 16px rgba(17,24,39,0.08), 0 24px 48px rgba(17,24,39,0.10)",
 
   font: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`,
   mono: `"SF Mono", "Menlo", "Monaco", Consolas, monospace`,
 
-  radius: 12,
-  radiusLg: 16,
+  radius: 10,
+  radiusLg: 14,
 };
 
 export const ROLE_CFG: Record<string, { label: string; color: string; soft: string }> = {

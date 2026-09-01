@@ -109,7 +109,7 @@ export default function DashboardPage() {
       {/* KPI strip */}
       <div style={{
         display: "flex", flexWrap: "wrap", background: MT.surface, border: `1px solid ${MT.border}`,
-        borderRadius: 10, marginBottom: "1rem", overflow: "hidden",
+        borderRadius: MT.radius, marginBottom: "1.25rem", overflow: "hidden", boxShadow: MT.shadow,
       }}>
         {kpi("Meta mensual", MONTHLY_GOAL, MT.text2)}
         {kpi("Completados", `${completedThisMonth.length}/${MONTHLY_GOAL}`, MT.primary, () => focusGroups(["completed"], "completed"))}
@@ -151,7 +151,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Grouped table */}
-      <div ref={tableRef} style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden" }}>
+      <div ref={tableRef} style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden", boxShadow: MT.shadow }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
