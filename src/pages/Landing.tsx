@@ -86,56 +86,11 @@ function HubCard({
   );
 }
 
-// ── Role selector (no password — just pick which role to enter as) ───────────
-function RoleSelector({
-  label, color, roles, onSelect, onBack,
-}: {
-  label: string; color: string; roles: { value: string; label: string; desc: string }[];
-  onSelect: (role: string) => void; onBack: () => void;
-}) {
-  return (
-    <div style={{
-      background: "#fff",
-      border: `1px solid #E5E7EB`,
-      borderLeft: `4px solid ${color}`,
-      borderRadius: 12,
-      padding: "1.5rem",
-      maxWidth: 380,
-      width: "100%",
-    }}>
-      <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "1rem", color: "#111827" }}>
-        {label} — ¿con qué rol entras?
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        {roles.map((r) => (
-          <button
-            key={r.value}
-            onClick={() => onSelect(r.value)}
-            style={{
-              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
-              padding: "0.75rem 1rem", borderRadius: 10, border: `1px solid ${color}40`,
-              background: color + "0c", cursor: "pointer", textAlign: "left",
-            }}
-          >
-            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>{r.label}</span>
-            <span style={{ fontSize: "0.75rem", color: "#6B7280" }}>{r.desc}</span>
-          </button>
-        ))}
-      </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Landing ──────────────────────────────────────────────────────────────
 export default function Landing() {
   const navigate = useNavigate();
   const { instance } = useMsal();
-  const { hasTeam, loading: accessLoading, access, email, name } = useHubAccess();
+  const { hasTeam, getRole, loading: accessLoading, access, email, name } = useHubAccess();
   const [view, setView] = useState<View>("hub");
   const [csSelected, setCsSelected] = useState<Team | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -237,7 +192,7 @@ export default function Landing() {
               subtitle="Ventas, Asistencia & Horarios"
               color="#15803d"
               tags={["Ventas", "Asistencia", "Horarios"]}
-              onClick={() => setCsSelected(csSelected === "MEX" ? null : "MEX")}
+              onClick={() => directGo("MEX", getRole("MEX") ?? "staff")}
             />
           )}
           {hasTeam("CSQUALITY") && (
@@ -283,22 +238,6 @@ export default function Landing() {
         </div>
         {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && (
           <p style={{ color: "#6B7280", marginTop: "1.5rem" }}>No tienes ningún equipo asignado todavía.</p>
-        )}
-
-        {/* México role picker inline */}
-        {csSelected === "MEX" && (
-          <div style={{ marginTop: "2rem" }}>
-            <RoleSelector
-              label="FTC México"
-              color="#15803d"
-              roles={[
-                { value: "admin", label: "Administrador", desc: "Acceso completo al panel de México" },
-                { value: "staff", label: "Staff", desc: "Vista de trabajo diario del equipo" },
-              ]}
-              onSelect={(role) => directGo("MEX", role)}
-              onBack={() => setCsSelected(null)}
-            />
-          </div>
         )}
 
       </div>

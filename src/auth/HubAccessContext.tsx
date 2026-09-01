@@ -4,12 +4,15 @@ import { useMsal } from "@azure/msal-react";
 import { getHubAccessForEmail } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
 
+export type TeamRole = "admin" | "staff";
+
 interface HubAccessCtxShape {
   email: string;
   name: string;
   access: HubAccessEntry | null;
   loading: boolean;
   hasTeam: (team: string) => boolean;
+  getRole: (team: string) => TeamRole | null;
 }
 
 const Ctx = createContext<HubAccessCtxShape | null>(null);
@@ -37,8 +40,16 @@ export function HubAccessProvider({ children }: { children: ReactNode }) {
   const hasTeam = (team: string) => {
     if (!access) return false;
     if (access.isAdmin || access.teams.includes("ALL")) return true;
-    return access.teams.includes(team);
+    return access.teams.some((t) => t === team || t.startsWith(`${team}:`));
   };
 
-  return <Ctx.Provider value={{ email, name, access, loading, hasTeam }}>{children}</Ctx.Provider>;
+  const getRole = (team: string): TeamRole | null => {
+    if (!access) return null;
+    if (access.isAdmin || access.teams.includes("ALL")) return "admin";
+    const entry = access.teams.find((t) => t.startsWith(`${team}:`));
+    if (entry) return entry.split(":")[1] as TeamRole;
+    return access.teams.includes(team) ? "admin" : null;
+  };
+
+  return <Ctx.Provider value={{ email, name, access, loading, hasTeam, getRole }}>{children}</Ctx.Provider>;
 }

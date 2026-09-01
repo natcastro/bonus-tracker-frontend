@@ -4,21 +4,12 @@ import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead,
 } from "../../services/api";
+import { useHubAccess } from "../../auth/HubAccessContext";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
 import { STAGE_DEFS, addDaysIso, daysBetweenIso, todayIso } from "./types";
 
-const USERS: Record<string, { password: string; user: MarketingUser }> = {
-  "laura":  { password: "laura",  user: { role: "laura",  name: "Laura" } },
-  "diseño": { password: "diseño", user: { role: "diseno", name: "Diseño" } },
-  "diseno": { password: "diseño", user: { role: "diseno", name: "Diseño" } },
-};
-
-const SESSION_KEY = "marketing_user_role";
-
 interface MarketingCtx {
   authedUser: MarketingUser | null;
-  login: (username: string, password: string) => { ok: boolean; error?: string };
-  logout: () => void;
 
   briefs: MarketingBrief[];
   notifications: MarketingNotification[];
@@ -43,13 +34,13 @@ export function useMarketing() {
 }
 
 export function MarketingProvider({ children }: { children: ReactNode }) {
-  const [authedUser, setAuthedUser] = useState<MarketingUser | null>(() => {
-    const saved = sessionStorage.getItem(SESSION_KEY);
-    if (saved === "laura" || saved === "diseno") {
-      return USERS[saved === "laura" ? "laura" : "diseño"].user;
-    }
+  const { getRole } = useHubAccess();
+  const authedUser: MarketingUser | null = useMemo(() => {
+    const role = getRole("MARKETING");
+    if (role === "admin") return { role: "laura", name: "Laura" };
+    if (role === "staff") return { role: "diseno", name: "Diseño" };
     return null;
-  });
+  }, [getRole]);
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,20 +54,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     reload().finally(() => setLoading(false));
   }, [reload]);
-
-  const login = (username: string, password: string) => {
-    const key = username.trim().toLowerCase();
-    const entry = USERS[key];
-    if (!entry || entry.password !== password) return { ok: false, error: "Usuario o contraseña incorrectos." };
-    sessionStorage.setItem(SESSION_KEY, entry.user.role);
-    setAuthedUser(entry.user);
-    return { ok: true };
-  };
-
-  const logout = () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    setAuthedUser(null);
-  };
 
   const notify = async (briefId: number | null, message: string) => {
     await createMarketingNotification(briefId, message);
@@ -199,7 +176,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      authedUser, login, logout, briefs, notifications, loading, reload,
+      authedUser, briefs, notifications, loading, reload,
       createBrief, submitDesignStage, lauraReview, requestExtraRevision,
       unreadCount, markNotificationRead,
     }}>

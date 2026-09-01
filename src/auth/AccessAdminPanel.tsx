@@ -6,12 +6,37 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "OPS",        label: "FTC USA — Operations" },
   { key: "APT",        label: "FTC USA — Strategy" },
   { key: "TKLIVES",    label: "FTC USA — TikTok Lives" },
-  { key: "MEX",        label: "FTC México" },
   { key: "CSQUALITY",  label: "Operational Tools" },
   { key: "MGMT",       label: "Management" },
   { key: "LOGISTICS",  label: "Logística" },
-  { key: "MARKETING",  label: "Marketing" },
 ];
+
+// Teams where access also needs a role — stored in hub_access as "TEAM:role" (e.g. "MEX:admin").
+const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string }[] = [
+  { key: "MEX",       label: "FTC México", adminLabel: "Administrador", staffLabel: "Staff" },
+  { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño" },
+];
+
+type RoleValue = "admin" | "staff" | "";
+
+function parseTeams(teams: string[]) {
+  const plain = teams.filter((t) => t !== "ALL" && !ROLE_TEAMS.some((rt) => t.startsWith(`${rt.key}:`)));
+  const roles: Record<string, RoleValue> = {};
+  for (const rt of ROLE_TEAMS) {
+    const found = teams.find((t) => t.startsWith(`${rt.key}:`));
+    roles[rt.key] = found ? (found.split(":")[1] as RoleValue) : "";
+  }
+  return { plain, roles };
+}
+
+function formatTeamEntry(t: string): string {
+  const roleTeam = ROLE_TEAMS.find((rt) => t.startsWith(`${rt.key}:`));
+  if (roleTeam) {
+    const role = t.split(":")[1];
+    return `${roleTeam.label} (${role === "admin" ? roleTeam.adminLabel : roleTeam.staffLabel})`;
+  }
+  return TEAM_OPTIONS.find((o) => o.key === t)?.label ?? t;
+}
 
 function EntryForm({
   initial, onSave, onCancel,
@@ -20,8 +45,10 @@ function EntryForm({
   onSave: (email: string, teams: string[], isAdmin: boolean) => Promise<void>;
   onCancel: () => void;
 }) {
+  const parsed = parseTeams(initial?.teams ?? []);
   const [email, setEmail] = useState(initial?.email ?? "");
-  const [teams, setTeams] = useState<string[]>(initial?.teams.filter(t => t !== "ALL") ?? []);
+  const [teams, setTeams] = useState<string[]>(parsed.plain);
+  const [roles, setRoles] = useState<Record<string, RoleValue>>(parsed.roles);
   const [allAccess, setAllAccess] = useState(initial?.teams.includes("ALL") ?? false);
   const [isAdmin, setIsAdmin] = useState(initial?.isAdmin ?? false);
   const [saving, setSaving] = useState(false);
@@ -35,7 +62,9 @@ function EntryForm({
     if (!email.trim() || !email.includes("@")) { setError("Escribe un correo válido."); return; }
     setSaving(true); setError("");
     try {
-      await onSave(email.trim().toLowerCase(), allAccess ? ["ALL"] : teams, isAdmin);
+      const roleTeams = ROLE_TEAMS.filter(rt => roles[rt.key]).map(rt => `${rt.key}:${roles[rt.key]}`);
+      const finalTeams = allAccess ? ["ALL"] : [...teams, ...roleTeams];
+      await onSave(email.trim().toLowerCase(), finalTeams, isAdmin);
     } catch (err: any) {
       setError(err?.message ?? "No se pudo guardar.");
     } finally { setSaving(false); }
@@ -56,14 +85,45 @@ function EntryForm({
       </label>
 
       {!allAccess && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.75rem" }}>
-          {TEAM_OPTIONS.map(t => (
-            <label key={t.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#374151", cursor: "pointer" }}>
-              <input type="checkbox" checked={teams.includes(t.key)} onChange={() => toggleTeam(t.key)} />
-              {t.label}
-            </label>
-          ))}
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.75rem" }}>
+            {TEAM_OPTIONS.map(t => (
+              <label key={t.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#374151", cursor: "pointer" }}>
+                <input type="checkbox" checked={teams.includes(t.key)} onChange={() => toggleTeam(t.key)} />
+                {t.label}
+              </label>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            {ROLE_TEAMS.map(rt => (
+              <div key={rt.key} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "0.5rem 0.7rem" }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{rt.label}</div>
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                  {(["", "staff", "admin"] as RoleValue[]).map(r => {
+                    const label = r === "" ? "Sin acceso" : r === "staff" ? rt.staffLabel : rt.adminLabel;
+                    const active = roles[rt.key] === r || (r === "" && !roles[rt.key]);
+                    return (
+                      <button
+                        key={r || "none"}
+                        type="button"
+                        onClick={() => setRoles(prev => ({ ...prev, [rt.key]: r }))}
+                        style={{
+                          fontSize: 11.5, fontWeight: 600, padding: "0.3rem 0.6rem", borderRadius: 999, cursor: "pointer",
+                          border: `1px solid ${active ? "#374151" : "#E5E7EB"}`,
+                          background: active ? "#374151" : "#fff",
+                          color: active ? "#fff" : "#6B7280",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#374151", marginBottom: "0.75rem", cursor: "pointer" }}>
@@ -109,7 +169,7 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
 
   const teamLabels = (teams: string[]) => {
     if (teams.includes("ALL")) return "Todo";
-    return teams.map(k => TEAM_OPTIONS.find(t => t.key === k)?.label ?? k).join(", ") || "Sin equipos";
+    return teams.map(formatTeamEntry).join(", ") || "Sin equipos";
   };
 
   return (

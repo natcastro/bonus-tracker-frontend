@@ -4,7 +4,7 @@ import { useMarketing } from "../context";
 import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
-  const { authedUser, logout } = useMarketing();
+  const { authedUser } = useMarketing();
   const navigate = useNavigate();
   const roleCfg = authedUser ? ROLE_CFG[authedUser.role] : null;
 
@@ -30,10 +30,10 @@ export default function Navbar() {
             {roleCfg.label}
           </div>
         )}
-        <button onClick={() => { logout(); navigate("/marketing"); }} style={{
+        <button onClick={() => { sessionStorage.clear(); navigate("/"); }} style={{
           fontFamily: MT.font, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
           background: "transparent", border: `1px solid ${MT.border}`, color: MT.text2, borderRadius: 8, padding: "0.4rem 0.75rem",
-        }}>Salir</button>
+        }}>← FTC Hub</button>
       </div>
     </div>
   );
