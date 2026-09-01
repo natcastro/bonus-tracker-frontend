@@ -16,14 +16,15 @@ const DEFAULT_NOTIFY_EMAILS: Record<MarketingRole, string> = {
   diseno: "marketplaces@formatucuerpo.com",
 };
 
-function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null }): string {
-  const { intro, reference, nextTask, deadline } = opts;
+function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null; note?: string }): string {
+  const { intro, reference, nextTask, deadline, note } = opts;
   return `
     <div style="font-family: -apple-system, sans-serif; color: #2C2A20;">
       <p>${intro}</p>
       <p><strong>Referencia:</strong> ${reference}</p>
       ${nextTask ? `<p><strong>Próxima tarea:</strong> ${nextTask}</p>` : ""}
       ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 5:00 PM hora de Colombia</p>` : ""}
+      ${note ? `<p><strong>Nota:</strong> ${note}</p>` : ""}
       <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
     </div>
   `;
@@ -38,10 +39,10 @@ interface MarketingCtx {
   reload: () => Promise<void>;
 
   createBrief: (reference: string, startDate: string, briefLink: string) => Promise<void>;
-  submitDesignStage: (briefId: number, link: string) => Promise<void>;
-  lauraReview: (briefId: number, action: "approve" | "request_changes") => Promise<void>;
-  requestExtraRevision: (briefId: number) => Promise<void>;
-  confirmPublish: (briefId: number) => Promise<void>;
+  submitDesignStage: (briefId: number, link: string, note?: string) => Promise<void>;
+  lauraReview: (briefId: number, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => Promise<void>;
+  requestExtraRevision: (briefId: number, note?: string) => Promise<void>;
+  confirmPublish: (briefId: number, note?: string) => Promise<void>;
   updateStageLink: (briefId: number, stageKey: StageKey, link: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
 
@@ -119,7 +120,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
-  const submitDesignStage = async (briefId: number, link: string) => {
+  const submitDesignStage = async (briefId: number, link: string, note?: string) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed") return;
     const stageIdx = brief.stages.findIndex(s => s.key === brief.currentStage);
@@ -150,13 +151,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           reference: brief.reference,
           nextTask: stageLabel(nextStage.key),
           deadline: nextDeadline,
+          note,
         }),
       );
     }
     await reload();
   };
 
-  const lauraReview = async (briefId: number, action: "approve" | "request_changes") => {
+  const lauraReview = async (briefId: number, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed") return;
     const stageIdx = brief.stages.findIndex(s => s.key === brief.currentStage);
@@ -184,6 +186,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           reference: brief.reference,
           nextTask: stageLabel("publish"),
           deadline: publishDeadline,
+          note: opts?.note,
         }),
       );
       await reload();
@@ -197,7 +200,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const nextStage = brief.stages[stageIdx + 1];
     const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = brief.stages.map((s, i) => {
-      if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const };
+      if (i === stageIdx) {
+        return {
+          ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const,
+          link: opts?.link ? opts.link : s.link,
+        };
+      }
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
       return s;
     });
@@ -215,13 +223,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           reference: brief.reference,
           nextTask: stageLabel(nextStage.key),
           deadline: nextDeadline,
+          note: opts?.note,
         }),
       );
     }
     await reload();
   };
 
-  const requestExtraRevision = async (briefId: number) => {
+  const requestExtraRevision = async (briefId: number, note?: string) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed") return;
     const today = todayIso();
@@ -249,12 +258,13 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         reference: brief.reference,
         nextTask: stageLabel("adjustments"),
         deadline: adjustmentsDeadline,
+        note,
       }),
     );
     await reload();
   };
 
-  const confirmPublish = async (briefId: number) => {
+  const confirmPublish = async (briefId: number, note?: string) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status === "completed" || brief.currentStage !== "publish") return;
     const today = todayIso();
@@ -266,7 +276,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await sendMarketingEmail(
       notifyEmails.laura,
       `Publicado — ${brief.reference}`,
-      emailHtml({ intro: "Diseño confirmó que ya se publicó. El brief quedó completado.", reference: brief.reference }),
+      emailHtml({ intro: "Diseño confirmó que ya se publicó. El brief quedó completado.", reference: brief.reference, note }),
     );
     await reload();
   };

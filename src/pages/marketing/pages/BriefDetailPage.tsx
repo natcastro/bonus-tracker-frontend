@@ -12,7 +12,7 @@ import type { StageKey } from "../types";
 
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
 const DESIGN_STAGES = new Set(["proposal", "adjustments"]);
-const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "adjustments"]);
+const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "review1", "adjustments", "review2"]);
 
 export default function BriefDetailPage() {
   const { id } = useParams();
@@ -20,6 +20,8 @@ export default function BriefDetailPage() {
   const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [reviewLinkInput, setReviewLinkInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -42,7 +44,7 @@ export default function BriefDetailPage() {
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
-    try { await fn(); setLinkInput(""); }
+    try { await fn(); setLinkInput(""); setNoteInput(""); setReviewLinkInput(""); }
     catch (err: any) { setError(err?.message ?? "Ocurrió un error."); }
     finally { setBusy(false); }
   };
@@ -70,6 +72,19 @@ export default function BriefDetailPage() {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
     border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
   };
+
+  const noteField = (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>
+        Nota para el correo (opcional)
+      </label>
+      <textarea
+        value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={2}
+        placeholder="Algo que quieras que la otra persona vea en el correo..."
+        style={{ ...fieldStyle, resize: "vertical", fontFamily: MT.font }}
+      />
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
@@ -193,8 +208,9 @@ export default function BriefDetailPage() {
             Tu turno — Confirmar publicación
           </p>
           {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {noteField}
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <button disabled={busy} onClick={() => run(() => confirmPublish(brief.id))} style={{
+          <button disabled={busy} onClick={() => run(() => confirmPublish(brief.id, noteInput.trim() || undefined))} style={{
             fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
             background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
           }}>✓ Confirmar que ya se publicó</button>
@@ -214,10 +230,11 @@ export default function BriefDetailPage() {
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
                 Link de SharePoint {brief.currentStage === "proposal" ? "de la propuesta" : "de los ajustes"}
               </label>
-              <input style={fieldStyle} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              <input style={{ ...fieldStyle, marginBottom: 12 }} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              {noteField}
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginTop: 8 }}>{error}</p>}
-              <button disabled={busy || !linkInput.trim()} onClick={() => run(() => submitDesignStage(brief.id, linkInput.trim()))} style={{
-                marginTop: 12, fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+              <button disabled={busy || !linkInput.trim()} onClick={() => run(() => submitDesignStage(brief.id, linkInput.trim(), noteInput.trim() || undefined))} style={{
+                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                 background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
               }}>{busy ? "Enviando..." : "Subir y continuar"}</button>
             </>
@@ -225,22 +242,27 @@ export default function BriefDetailPage() {
 
           {REVIEW_STAGES.has(brief.currentStage) && (
             <>
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
+                Enlace con comentarios de ajuste (opcional)
+              </label>
+              <input style={{ ...fieldStyle, marginBottom: 12 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              {noteField}
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve"))} style={{
+                <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve", { note: noteInput.trim() || undefined }))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                   background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
                 }}>✓ Aprobar sin cambios</button>
 
                 {!isFinal && (
-                  <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "request_changes"))} style={{
+                  <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "request_changes", { link: reviewLinkInput.trim() || undefined, note: noteInput.trim() || undefined }))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                     background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 8, padding: "10px 18px",
                   }}>Solicitar ajustes / continuar</button>
                 )}
 
                 {isFinal && (
-                  <button disabled={busy} onClick={() => run(() => requestExtraRevision(brief.id))} style={{
+                  <button disabled={busy} onClick={() => run(() => requestExtraRevision(brief.id, noteInput.trim() || undefined))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                     background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 8, padding: "10px 18px",
                   }}>Solicitar revisión adicional</button>
