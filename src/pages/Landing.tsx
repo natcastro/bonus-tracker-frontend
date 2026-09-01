@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../services/api";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
+import AccessAdminPanel from "../auth/AccessAdminPanel";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING";
 type View = "hub" | "ftc-usa" | "ops-tools";
@@ -167,6 +168,7 @@ export default function Landing() {
   const [csSelected, setCsSelected] = useState<Team | null>(null);
   const [mgmtPw, setMgmtPw] = useState("");
   const [mgmtPwError, setMgmtPwError] = useState("");
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const directGo = (team: Team) => {
     sessionStorage.setItem("team", team);
@@ -220,8 +222,19 @@ export default function Landing() {
       }}>
         <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <span style={{ fontSize: "0.8rem", color: "#6B7280" }}>{name}</span>
+          {access.isAdmin && (
+            <button
+              onClick={() => setShowAdminPanel(true)}
+              title="Administrar accesos"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: "1rem", lineHeight: 1, padding: "0.4rem 0.6rem" }}
+            >
+              ⚙️
+            </button>
+          )}
           <button onClick={logout} className="btn btn-secondary btn-sm">Salir</button>
         </div>
+        {showAdminPanel && <AccessAdminPanel onClose={() => setShowAdminPanel(false)} />}
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
           <div style={{
