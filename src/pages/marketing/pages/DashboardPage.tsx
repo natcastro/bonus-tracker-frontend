@@ -42,13 +42,15 @@ export default function DashboardPage() {
   const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({ overdue: false, active: false, completed: true });
 
   const thisMonthKey = todayIso().slice(0, 7);
-  const monthBriefs = briefs.filter(b => b.startDate.slice(0, 7) === thisMonthKey);
-  const completedThisMonth = monthBriefs.filter(b => b.status === "completed");
-  const inProgress = briefs.filter(b => b.status === "in_progress").length;
+  // "This month" is based on when a brief was completed, not when it started — a brief that
+  // started in August and finished in September counts toward September's goal.
+  const completedThisMonth = briefs.filter(b => b.status === "completed" && !!b.completedAt && b.completedAt.slice(0, 7) === thisMonthKey);
+  const inProgressBriefs = briefs.filter(b => b.status === "in_progress");
+  const inProgress = inProgressBriefs.length;
   const onTimePct = completedThisMonth.length > 0
     ? Math.round(100 * completedThisMonth.filter(b => b.designDelayCount === 0).length / completedThisMonth.length)
     : 100;
-  const designDelays = monthBriefs.reduce((s, b) => s + b.designDelayCount, 0);
+  const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + b.designDelayCount, 0);
 
   const filtered = briefs.filter(b => {
     if (search && !b.reference.toLowerCase().includes(search.toLowerCase())) return false;
