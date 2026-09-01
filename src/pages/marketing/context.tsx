@@ -2,11 +2,31 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
-  getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead,
+  getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
 } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
+import { formatDateHuman } from "./theme";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
-import { STAGE_DEFS, addDaysIso, daysBetweenIso, todayIso, isPastDeadline } from "./types";
+import { STAGE_DEFS, stageLabel, addDaysIso, daysBetweenIso, todayIso, isPastDeadline } from "./types";
+
+// Test-phase recipients — swap for the real Laura/Diseño addresses once confirmed.
+const NOTIFY_EMAILS: Record<MarketingRole, string> = {
+  laura: "amazonassistant@formatucuerpo.com",
+  diseno: "marketplaces@formatucuerpo.com",
+};
+
+function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string }): string {
+  const { intro, reference, nextTask, deadline } = opts;
+  return `
+    <div style="font-family: -apple-system, sans-serif; color: #2C2A20;">
+      <p>${intro}</p>
+      <p><strong>Referencia:</strong> ${reference}</p>
+      ${nextTask ? `<p><strong>Próxima tarea:</strong> ${nextTask}</p>` : ""}
+      ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 5:00 PM hora de Colombia</p>` : ""}
+      <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
+    </div>
+  `;
+}
 
 interface MarketingCtx {
   authedUser: MarketingUser | null;
@@ -94,6 +114,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     });
     const label = stage.key === "proposal" ? "la primera propuesta" : "los ajustes de diseño";
     await notify(briefId, `Diseño subió ${label} de ${brief.reference}.`);
+    if (nextStage) {
+      await sendMarketingEmail(
+        NOTIFY_EMAILS.laura,
+        `Tienes una revisión pendiente — ${brief.reference}`,
+        emailHtml({
+          intro: `Diseño subió ${label}. Te toca revisar.`,
+          reference: brief.reference,
+          nextTask: stageLabel(nextStage.key),
+          deadline: nextStage.deadline,
+        }),
+      );
+    }
     await reload();
   };
 
@@ -111,6 +143,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         stages: newStages, currentStage: "completed", status: "completed", completedAt: today,
       });
       await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — brief completado.`);
+      await sendMarketingEmail(
+        NOTIFY_EMAILS.diseno,
+        `Brief completado — ${brief.reference}`,
+        emailHtml({ intro: "Laura aprobó sin cambios. El brief quedó completado — no se requiere ninguna acción adicional.", reference: brief.reference }),
+      );
       await reload();
       return;
     }
@@ -135,6 +172,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       lauraDelayDays: brief.lauraDelayDays + overrun,
     });
     await notify(briefId, `Laura solicitó ajustes en ${brief.reference}.`);
+    if (nextStage) {
+      await sendMarketingEmail(
+        NOTIFY_EMAILS.diseno,
+        `Ajustes solicitados — ${brief.reference}`,
+        emailHtml({
+          intro: "Laura solicitó ajustes en la última entrega.",
+          reference: brief.reference,
+          nextTask: stageLabel(nextStage.key),
+          deadline: nextStage.deadline,
+        }),
+      );
+    }
     await reload();
   };
 
@@ -157,6 +206,16 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       extraRevisionRounds: brief.extraRevisionRounds + 1,
     });
     await notify(briefId, `Laura solicitó una revisión adicional en ${brief.reference}.`);
+    await sendMarketingEmail(
+      NOTIFY_EMAILS.diseno,
+      `Revisión adicional solicitada — ${brief.reference}`,
+      emailHtml({
+        intro: "Laura solicitó una revisión adicional sobre el cierre final.",
+        reference: brief.reference,
+        nextTask: stageLabel("adjustments"),
+        deadline: newDeadlines.adjustments,
+      }),
+    );
     await reload();
   };
 

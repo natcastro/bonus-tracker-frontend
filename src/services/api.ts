@@ -1472,6 +1472,18 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (error) throw error;
 }
 
+export async function sendMarketingEmail(to: string, subject: string, html: string): Promise<void> {
+  try {
+    await fetch("/.netlify/functions/send-marketing-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, html }),
+    });
+  } catch {
+    // Email notifications are best-effort — never block the workflow action on a send failure.
+  }
+}
+
 export async function deleteMarketingBrief(id: number): Promise<void> {
   const { error } = await supabase.from("marketing_briefs").delete().eq("id", id);
   if (error) throw error;
