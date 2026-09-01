@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  getMarketingBriefs, createMarketingBrief, updateMarketingBrief,
+  getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead,
 } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
@@ -20,6 +20,7 @@ interface MarketingCtx {
   submitDesignStage: (briefId: number, link: string) => Promise<void>;
   lauraReview: (briefId: number, action: "approve" | "request_changes") => Promise<void>;
   requestExtraRevision: (briefId: number) => Promise<void>;
+  deleteBrief: (briefId: number) => Promise<void>;
 
   unreadCount: number;
   markNotificationRead: (id: number) => Promise<void>;
@@ -159,6 +160,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  const deleteBrief = async (briefId: number) => {
+    if (authedUser?.role !== "laura") throw new Error("Solo Laura puede eliminar briefs.");
+    await deleteMarketingBrief(briefId);
+    await reload();
+  };
+
   const unreadCount = useMemo(() => {
     if (!authedUser) return 0;
     const field = authedUser.role === "laura" ? "readLaura" : "readDiseno";
@@ -177,7 +184,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, submitDesignStage, lauraReview, requestExtraRevision,
+      createBrief, submitDesignStage, lauraReview, requestExtraRevision, deleteBrief,
       unreadCount, markNotificationRead,
     }}>
       {children}

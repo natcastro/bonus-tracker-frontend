@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { MT } from "./theme";
 import { MarketingProvider, useMarketing } from "./context";
 import Navbar from "./components/Navbar";
+import TabBar from "./components/TabBar";
+import MyTasksPage from "./pages/MyTasksPage";
 import DashboardPage from "./pages/DashboardPage";
 import BriefDetailPage from "./pages/BriefDetailPage";
 
@@ -30,11 +32,14 @@ function Shell() {
   return (
     <div style={{ minHeight: "100vh", background: MT.bg }}>
       <Navbar />
+      <TabBar />
       <Routes>
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
+        <Route index element={<Navigate to="tasks" replace />} />
+        <Route path="tasks" element={<MyTasksPage />} />
+        <Route path="home" element={<DashboardPage />} />
+        <Route path="dashboard" element={<Navigate to="/marketing/home" replace />} />
         <Route path="brief/:id" element={<BriefDetailPage />} />
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="*" element={<Navigate to="tasks" replace />} />
       </Routes>
     </div>
   );

@@ -14,16 +14,17 @@ const DESIGN_STAGES = new Set(["proposal", "adjustments"]);
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   if (!brief) {
     return (
       <div style={{ maxWidth: 900, margin: "3rem auto", textAlign: "center", fontFamily: MT.font, color: MT.text2 }}>
-        Brief no encontrado. <button onClick={() => navigate("/marketing/dashboard")} style={{ color: MT.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>Volver</button>
+        Brief no encontrado. <button onClick={() => navigate("/marketing/home")} style={{ color: MT.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>Volver</button>
       </div>
     );
   }
@@ -40,6 +41,13 @@ export default function BriefDetailPage() {
     finally { setBusy(false); }
   };
 
+  const handleDelete = async () => {
+    if (!confirm(`¿Eliminar el brief ${brief.reference}? Esta acción no se puede deshacer.`)) return;
+    setBusy(true); setDeleteError("");
+    try { await deleteBrief(brief.id); navigate("/marketing/home"); }
+    catch (err: any) { setDeleteError(err?.message ?? "No se pudo eliminar."); setBusy(false); }
+  };
+
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
     border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
@@ -47,9 +55,9 @@ export default function BriefDetailPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <button onClick={() => navigate("/marketing/dashboard")} style={{
+      <button onClick={() => navigate(-1)} style={{
         background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
-      }}>← Volver al dashboard</button>
+      }}>← Volver</button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: "0.5rem" }}>
         <div>
@@ -63,12 +71,22 @@ export default function BriefDetailPage() {
           </div>
           <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>Inicio: {formatDateHuman(brief.startDate)}</p>
         </div>
-        {brief.shiftDays > 0 && (
-          <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
-            ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {brief.shiftDays > 0 && (
+            <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
+              ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
+            </div>
+          )}
+          {myRole === "laura" && (
+            <button onClick={handleDelete} disabled={busy} style={{
+              fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+              background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",
+            }}>🗑 Eliminar</button>
+          )}
+        </div>
       </div>
+
+      {deleteError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{deleteError}</p>}
 
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
         <Timeline brief={brief} />

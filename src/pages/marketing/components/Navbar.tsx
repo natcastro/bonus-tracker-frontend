@@ -14,7 +14,7 @@ export default function Navbar() {
       padding: "0.6rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between",
       position: "sticky", top: 0, zIndex: 50, fontFamily: MT.font,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", cursor: "pointer" }} onClick={() => navigate("/marketing/dashboard")}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", cursor: "pointer" }} onClick={() => navigate("/marketing/tasks")}>
         <div style={{ width: 28, height: 28, borderRadius: 7, background: MT.primary, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>M</div>
         <div style={{ fontSize: 14, fontWeight: 800, color: MT.text1, letterSpacing: "-0.01em" }}>
           FTC Hub — <span style={{ color: MT.primary }}>Marketing</span>

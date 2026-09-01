@@ -1,25 +1,15 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatDateHuman, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
-import NewBriefModal from "../components/NewBriefModal";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { stageLabel, todayIso, isPastDeadline } from "../types";
-import type { MarketingBrief, MarketingRole, StageKey } from "../types";
+import type { MarketingBrief, MarketingRole } from "../types";
 
 const MONTHLY_GOAL = 8;
-
-const ACTION_TEXT: Record<StageKey, string> = {
-  brief: "crear el brief",
-  proposal: "subir la primera propuesta",
-  review1: "revisar la primera propuesta",
-  adjustments: "subir los ajustes",
-  review2: "revisar los ajustes",
-  final: "cerrar el brief",
-};
 
 type GroupKey = "overdue" | "active" | "completed";
 const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
@@ -40,9 +30,9 @@ function groupOf(b: MarketingBrief): GroupKey {
 }
 
 export default function DashboardPage() {
-  const { authedUser, briefs } = useMarketing();
+  const { briefs } = useMarketing();
   const navigate = useNavigate();
-  const [showNew, setShowNew] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all"|"in_progress"|"completed">("all");
   const [responsibleFilter, setResponsibleFilter] = useState<"all"|"laura"|"diseno">("all");
@@ -59,27 +49,6 @@ export default function DashboardPage() {
     : 100;
   const designDelays = monthBriefs.reduce((s, b) => s + b.designDelayCount, 0);
 
-  const myRole = authedUser?.role;
-  const myPending = useMemo(() => {
-    return briefs
-      .filter(b => b.status === "in_progress")
-      .filter(b => {
-        const stage = b.stages.find(s => s.key === b.currentStage);
-        return stage?.role === myRole;
-      })
-      .sort((a, b) => {
-        const sa = a.stages.find(s => s.key === a.currentStage)!;
-        const sb = b.stages.find(s => s.key === b.currentStage)!;
-        return sa.deadline.localeCompare(sb.deadline);
-      });
-  }, [briefs, myRole]);
-
-  const nextActionBrief = myPending[0];
-  const nextActionStage = nextActionBrief?.stages.find(s => s.key === nextActionBrief.currentStage);
-  const nextActionText = nextActionBrief
-    ? `Tu próxima acción: ${ACTION_TEXT[nextActionBrief.currentStage as StageKey]} de ${nextActionBrief.reference}`
-    : "No tienes acciones pendientes en este momento.";
-
   const filtered = briefs.filter(b => {
     if (search && !b.reference.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== "all" && b.status !== statusFilter) return false;
@@ -94,8 +63,24 @@ export default function DashboardPage() {
 
   const groups = GROUP_DEFS.map(g => ({ ...g, rows: filtered.filter(b => groupOf(b) === g.key) }));
 
-  const kpi = (label: string, value: string | number, color: string) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0.55rem 0.9rem", borderRight: `1px solid ${MT.border}` }}>
+  const focusGroups = (keys: GroupKey[], status: "all" | "in_progress" | "completed") => {
+    setStatusFilter(status);
+    setCollapsed(c => {
+      const next = { ...c };
+      keys.forEach(k => { next[k] = false; });
+      return next;
+    });
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const kpi = (label: string, value: string | number, color: string, onClick?: () => void) => (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex", flexDirection: "column", gap: 2, padding: "0.55rem 0.9rem", borderRight: `1px solid ${MT.border}`,
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
       <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
       <div style={{ fontSize: 16.5, fontWeight: 800, color }}>{value}</div>
     </div>
@@ -114,36 +99,9 @@ export default function DashboardPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Marketing</h1>
-          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
-        </div>
-        {myRole === "laura" && (
-          <button onClick={() => setShowNew(true)} style={{
-            fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px",
-          }}>+ Nuevo brief</button>
-        )}
-      </div>
-
-      {/* Next action banner */}
-      <div style={{
-        background: nextActionBrief ? MT.claySoft : MT.mossSoft, border: `1px solid ${nextActionBrief ? MT.clay : MT.moss}30`,
-        borderRadius: MT.radius, padding: "0.65rem 0.9rem", marginBottom: "1rem",
-        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          {myRole && <Avatar role={myRole} size={22} />}
-          <div style={{ fontSize: 13, fontWeight: 700, color: nextActionBrief ? MT.clay : MT.moss }}>{nextActionText}</div>
-        </div>
-        {nextActionStage && <DeadlineBadge deadline={nextActionStage.deadline} compact />}
-        {nextActionBrief && (
-          <button onClick={() => navigate(`/marketing/brief/${nextActionBrief.id}`)} style={{
-            fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-            background: MT.surface, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 7, padding: "0.35rem 0.75rem",
-          }}>Ir al brief →</button>
-        )}
+      <div style={{ marginBottom: "0.9rem" }}>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Vista general</h1>
+        <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
       </div>
 
       {/* KPI strip */}
@@ -152,39 +110,14 @@ export default function DashboardPage() {
         borderRadius: 10, marginBottom: "1rem", overflow: "hidden",
       }}>
         {kpi("Meta mensual", MONTHLY_GOAL, MT.text2)}
-        {kpi("Completados", `${completedThisMonth.length}/${MONTHLY_GOAL}`, MT.primary)}
-        {kpi("En proceso", inProgress, MT.info)}
-        {kpi("A tiempo", `${onTimePct}%`, MT.moss)}
-        <div style={{ padding: "0.55rem 0.9rem" }}>
+        {kpi("Completados", `${completedThisMonth.length}/${MONTHLY_GOAL}`, MT.primary, () => focusGroups(["completed"], "completed"))}
+        {kpi("En proceso", inProgress, MT.info, () => focusGroups(["overdue", "active"], "in_progress"))}
+        {kpi("A tiempo", `${onTimePct}%`, MT.moss, () => focusGroups(["completed"], "completed"))}
+        <div onClick={() => focusGroups(["overdue"], "in_progress")} style={{ padding: "0.55rem 0.9rem", cursor: "pointer" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Retrasos Diseño</div>
           <div style={{ fontSize: 16.5, fontWeight: 800, color: designDelays > 0 ? MT.danger : MT.text1 }}>{designDelays}</div>
         </div>
       </div>
-
-      {/* My pending list */}
-      {myPending.length > 0 && (
-        <div style={{ marginBottom: "1rem" }}>
-          <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.4rem" }}>
-            {myRole === "laura" ? "Esperando tu revisión / nuevos briefs" : "Tus entregas pendientes"}
-          </p>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            {myPending.map(b => {
-              const stage = b.stages.find(s => s.key === b.currentStage)!;
-              const overdue = isPastDeadline(stage.deadline);
-              return (
-                <div key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{
-                  cursor: "pointer", background: MT.surface, border: `1px solid ${overdue ? MT.danger : MT.border}`,
-                  borderRadius: 9, padding: "0.55rem 0.75rem", minWidth: 160,
-                }}>
-                  <div style={{ fontWeight: 800, fontSize: 13, color: MT.text1 }}>{b.reference}</div>
-                  <div style={{ fontSize: 11, color: MT.text2, marginTop: 1, marginBottom: 4 }}>{stageLabel(b.currentStage)}</div>
-                  <DeadlineBadge deadline={stage.deadline} compact />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Toolbar: search + filters */}
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.7rem", alignItems: "center" }}>
@@ -214,7 +147,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Grouped table */}
-      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden" }}>
+      <div ref={tableRef} style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
@@ -248,8 +181,11 @@ export default function DashboardPage() {
                       const overdue = isOverdue(b);
                       const role: MarketingRole | undefined = stage?.role;
                       const statusColor = b.status === "completed" ? MT.primary : role ? ROLE_CFG[role].color : MT.text2;
+                      const rowAccent = b.status === "completed" ? "transparent" : role ? ROLE_CFG[role].color : "transparent";
                       return (
-                        <tr key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{ borderBottom: `1px solid ${MT.border}`, cursor: "pointer" }}
+                        <tr key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{
+                          borderBottom: `1px solid ${MT.border}`, borderLeft: `3px solid ${rowAccent}`, cursor: "pointer",
+                        }}
                           onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
                           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                           <td style={{ padding: "0.55rem 0.9rem", fontWeight: 700, fontSize: 12.5, color: MT.text1 }}>{b.reference}</td>
@@ -285,8 +221,6 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-
-      {showNew && <NewBriefModal onClose={() => setShowNew(false)} />}
     </div>
   );
 }

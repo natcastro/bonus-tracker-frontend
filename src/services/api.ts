@@ -1472,6 +1472,11 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (error) throw error;
 }
 
+export async function deleteMarketingBrief(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_briefs").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function getMarketingNotifications(): Promise<MarketingNotification[]> {
   const { data, error } = await supabase.from("marketing_notifications").select("*").order("created_at", { ascending: false }).limit(100);
   if (error) throw error;
