@@ -5,15 +5,18 @@ import {
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
   deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
 } from "../../services/api";
+import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
 import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
-const DEFAULT_NOTIFY_EMAILS: Record<MarketingRole, string> = {
+const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   laura: "amazonassistant@formatucuerpo.com",
-  diseno: "marketplaces@formatucuerpo.com",
+  diseno_1: "marketplaces@formatucuerpo.com",
+  diseno_2: "",
+  diseno_3: "",
 };
 
 function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null; note?: string }): string {
@@ -44,6 +47,7 @@ interface MarketingCtx {
   requestExtraRevision: (briefId: number, note?: string) => Promise<void>;
   confirmPublish: (briefId: number, note?: string) => Promise<void>;
   updateStageLink: (briefId: number, stageKey: StageKey, link: string) => Promise<void>;
+  claimBrief: (briefId: number, email: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
 
   unreadCount: number;
@@ -51,8 +55,9 @@ interface MarketingCtx {
   deleteNotification: (id: number) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
 
-  notifyEmails: Record<MarketingRole, string>;
-  updateNotifyEmail: (role: MarketingRole, email: string) => Promise<void>;
+  notifyEmails: MarketingNotifyEmails;
+  disenoEmailList: string[];
+  updateNotifyEmail: (slot: MarketingNotifySlot, email: string) => Promise<void>;
 }
 
 const Ctx = createContext<MarketingCtx | null>(null);
@@ -73,8 +78,13 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }, [getRole]);
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
-  const [notifyEmails, setNotifyEmails] = useState<Record<MarketingRole, string>>(DEFAULT_NOTIFY_EMAILS);
+  const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
   const [loading, setLoading] = useState(true);
+
+  const disenoEmailList = useMemo(
+    () => [notifyEmails.diseno_1, notifyEmails.diseno_2, notifyEmails.diseno_3].map(e => e.trim()).filter(Boolean),
+    [notifyEmails],
+  );
 
   const reload = useCallback(async () => {
     const [b, n] = await Promise.all([getMarketingBriefs(), getMarketingNotifications()]);
@@ -87,15 +97,22 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     getMarketingNotifyEmails()
       .then(emails => setNotifyEmails(prev => ({
         laura: emails.laura || prev.laura,
-        diseno: emails.diseno || prev.diseno,
+        diseno_1: emails.diseno_1 || prev.diseno_1,
+        diseno_2: emails.diseno_2 || prev.diseno_2,
+        diseno_3: emails.diseno_3 || prev.diseno_3,
       })))
       .catch(() => {});
   }, [reload]);
 
-  const updateNotifyEmail = async (role: MarketingRole, email: string) => {
-    await setMarketingNotifyEmail(role, email);
-    setNotifyEmails(prev => ({ ...prev, [role]: email }));
+  const updateNotifyEmail = async (slot: MarketingNotifySlot, email: string) => {
+    await setMarketingNotifyEmail(slot, email);
+    setNotifyEmails(prev => ({ ...prev, [slot]: email }));
   };
+
+  // Diseño-directed emails go only to whoever claimed the brief, once someone has —
+  // otherwise everyone gets it, so anyone free can pick it up.
+  const disenoRecipients = (brief: MarketingBrief): string[] =>
+    brief.assignedDisenoEmail ? [brief.assignedDisenoEmail] : disenoEmailList;
 
   const notify = async (briefId: number | null, message: string) => {
     await createMarketingNotification(briefId, message);
@@ -117,6 +134,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       completedAt: null,
     });
     await notify(null, `Laura creó un nuevo brief: ${reference}.`);
+    for (const email of disenoEmailList) {
+      await sendMarketingEmail(
+        email,
+        `Nuevo brief — ${reference}`,
+        emailHtml({
+          intro: "Laura creó un nuevo brief. Entra a la plataforma y elige tu correo para tomarlo.",
+          reference,
+          nextTask: stageLabel("proposal"),
+          deadline: addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays),
+        }),
+      );
+    }
     await reload();
   };
 
@@ -178,17 +207,19 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       });
       await updateMarketingBrief(briefId, { stages: newStages, currentStage: "publish" });
       await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — falta que Diseño confirme la publicación.`);
-      await sendMarketingEmail(
-        notifyEmails.diseno,
-        `Aprobado — confirma la publicación de ${brief.reference}`,
-        emailHtml({
-          intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.",
-          reference: brief.reference,
-          nextTask: stageLabel("publish"),
-          deadline: publishDeadline,
-          note: opts?.note,
-        }),
-      );
+      for (const email of disenoRecipients(brief)) {
+        await sendMarketingEmail(
+          email,
+          `Aprobado — confirma la publicación de ${brief.reference}`,
+          emailHtml({
+            intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.",
+            reference: brief.reference,
+            nextTask: stageLabel("publish"),
+            deadline: publishDeadline,
+            note: opts?.note,
+          }),
+        );
+      }
       await reload();
       return;
     }
@@ -215,17 +246,19 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     });
     await notify(briefId, `Laura solicitó ajustes en ${brief.reference}.`);
     if (nextStage) {
-      await sendMarketingEmail(
-        notifyEmails.diseno,
-        `Ajustes solicitados — ${brief.reference}`,
-        emailHtml({
-          intro: "Laura solicitó ajustes en la última entrega.",
-          reference: brief.reference,
-          nextTask: stageLabel(nextStage.key),
-          deadline: nextDeadline,
-          note: opts?.note,
-        }),
-      );
+      for (const email of disenoRecipients(brief)) {
+        await sendMarketingEmail(
+          email,
+          `Ajustes solicitados — ${brief.reference}`,
+          emailHtml({
+            intro: "Laura solicitó ajustes en la última entrega.",
+            reference: brief.reference,
+            nextTask: stageLabel(nextStage.key),
+            deadline: nextDeadline,
+            note: opts?.note,
+          }),
+        );
+      }
     }
     await reload();
   };
@@ -250,17 +283,19 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       extraRevisionRounds: brief.extraRevisionRounds + 1,
     });
     await notify(briefId, `Laura solicitó una revisión adicional en ${brief.reference}.`);
-    await sendMarketingEmail(
-      notifyEmails.diseno,
-      `Revisión adicional solicitada — ${brief.reference}`,
-      emailHtml({
-        intro: "Laura solicitó una revisión adicional sobre el cierre final.",
-        reference: brief.reference,
-        nextTask: stageLabel("adjustments2"),
-        deadline: adjustments2Deadline,
-        note,
-      }),
-    );
+    for (const email of disenoRecipients(brief)) {
+      await sendMarketingEmail(
+        email,
+        `Revisión adicional solicitada — ${brief.reference}`,
+        emailHtml({
+          intro: "Laura solicitó una revisión adicional sobre el cierre final.",
+          reference: brief.reference,
+          nextTask: stageLabel("adjustments2"),
+          deadline: adjustments2Deadline,
+          note,
+        }),
+      );
+    }
     await reload();
   };
 
@@ -286,6 +321,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (!brief) return;
     const newStages = brief.stages.map(s => s.key === stageKey ? { ...s, link } : s);
     await updateMarketingBrief(briefId, { stages: newStages });
+    await reload();
+  };
+
+  const claimBrief = async (briefId: number, email: string) => {
+    await updateMarketingBrief(briefId, { assignedDisenoEmail: email });
     await reload();
   };
 
@@ -325,9 +365,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, deleteBrief,
+      createBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, claimBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
-      notifyEmails, updateNotifyEmail,
+      notifyEmails, disenoEmailList, updateNotifyEmail,
     }}>
       {children}
     </Ctx.Provider>

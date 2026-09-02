@@ -22,7 +22,7 @@ const UPLOAD_LABELS: Record<string, string> = {
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, deleteBrief } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, claimBrief, disenoEmailList, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -46,6 +46,7 @@ export default function BriefDetailPage() {
   const canAct = brief.status === "in_progress" && currentStage?.role === myRole;
   const isFinal = brief.currentStage === "final";
   const isPublish = brief.currentStage === "publish";
+  const needsClaim = canAct && myRole === "diseno" && !brief.assignedDisenoEmail && disenoEmailList.length > 0;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -206,6 +207,24 @@ export default function BriefDetailPage() {
             <span>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></span>
           </div>
           {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+        </div>
+      ) : needsClaim ? (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
+            ¿Quién de Diseño toma este brief?
+          </p>
+          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
+            Elige tu correo — los siguientes avisos de este brief (ajustes, aprobación, etc.) te llegarán solo a ti.
+          </p>
+          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {disenoEmailList.map(email => (
+              <button key={email} disabled={busy} onClick={() => run(() => claimBrief(brief.id, email))} style={{
+                fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "9px 14px",
+              }}>{email}</button>
+            ))}
+          </div>
         </div>
       ) : isPublish ? (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>

@@ -29,6 +29,9 @@ export interface MarketingBrief {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Which Diseño team member's email this brief's notifications go to, once someone claims
+  // it — null means unclaimed, so Diseño-directed emails still broadcast to everyone.
+  assignedDisenoEmail: string | null;
 }
 
 export interface MarketingNotification {

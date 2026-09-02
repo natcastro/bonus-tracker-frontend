@@ -5,7 +5,9 @@ import { useMarketing } from "../context";
 export default function MarketingSettingsPanel({ onClose }: { onClose: () => void }) {
   const { notifyEmails, updateNotifyEmail } = useMarketing();
   const [laura, setLaura] = useState(notifyEmails.laura);
-  const [diseno, setDiseno] = useState(notifyEmails.diseno);
+  const [diseno1, setDiseno1] = useState(notifyEmails.diseno_1);
+  const [diseno2, setDiseno2] = useState(notifyEmails.diseno_2);
+  const [diseno3, setDiseno3] = useState(notifyEmails.diseno_3);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -14,7 +16,9 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
     setSaving(true); setError(""); setSaved(false);
     try {
       await updateNotifyEmail("laura", laura.trim());
-      await updateNotifyEmail("diseno", diseno.trim());
+      await updateNotifyEmail("diseno_1", diseno1.trim());
+      await updateNotifyEmail("diseno_2", diseno2.trim());
+      await updateNotifyEmail("diseno_3", diseno3.trim());
       setSaved(true);
     } catch (err: any) {
       setError(err?.message ?? "No se pudo guardar.");
@@ -40,7 +44,9 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
         </div>
         <h3 style={{ margin: "0 0 6px", color: MT.text1, fontSize: 18 }}>Correos de notificación</h3>
         <p style={{ margin: "0 0 20px", color: MT.text2, fontSize: 12.5 }}>
-          A dónde llegan los avisos automáticos de Marketing para cada rol.
+          A dónde llegan los avisos automáticos de Marketing. Los 3 correos de Diseño reciben el
+          aviso de brief nuevo; una vez alguien lo toma dentro de la plataforma, los siguientes
+          avisos de ese brief le llegan solo a esa persona.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -49,8 +55,16 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
             <input style={fieldStyle} value={laura} onChange={e => setLaura(e.target.value)} placeholder="laura@formatucuerpo.com" />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño</label>
-            <input style={fieldStyle} value={diseno} onChange={e => setDiseno(e.target.value)} placeholder="diseno@formatucuerpo.com" />
+            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño 1</label>
+            <input style={fieldStyle} value={diseno1} onChange={e => setDiseno1(e.target.value)} placeholder="diseno1@formatucuerpo.com" />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño 2</label>
+            <input style={fieldStyle} value={diseno2} onChange={e => setDiseno2(e.target.value)} placeholder="diseno2@formatucuerpo.com" />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño 3</label>
+            <input style={fieldStyle} value={diseno3} onChange={e => setDiseno3(e.target.value)} placeholder="diseno3@formatucuerpo.com" />
           </div>
         </div>
 

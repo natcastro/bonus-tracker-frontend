@@ -1431,6 +1431,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
     completedAt: r.completed_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    assignedDisenoEmail: r.assigned_diseno_email ?? null,
   };
 }
 
@@ -1468,6 +1469,7 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (patch.designDelayCount !== undefined) dbPatch.design_delay_count = patch.designDelayCount;
   if (patch.extraRevisionRounds !== undefined) dbPatch.extra_revision_rounds = patch.extraRevisionRounds;
   if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
+  if (patch.assignedDisenoEmail !== undefined) dbPatch.assigned_diseno_email = patch.assignedDisenoEmail;
   const { error } = await supabase.from("marketing_briefs").update(dbPatch).eq("id", id);
   if (error) throw error;
 }
@@ -1517,20 +1519,28 @@ export async function deleteAllMarketingNotifications(): Promise<void> {
   if (error) throw error;
 }
 
+export type MarketingNotifySlot = "laura" | "diseno_1" | "diseno_2" | "diseno_3";
+
 export interface MarketingNotifyEmails {
   laura: string;
-  diseno: string;
+  diseno_1: string;
+  diseno_2: string;
+  diseno_3: string;
 }
 
 export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
-  const map: MarketingNotifyEmails = { laura: "", diseno: "" };
-  (data ?? []).forEach((r: any) => { if (r.role === "laura" || r.role === "diseno") map[r.role as "laura" | "diseno"] = r.email; });
+  const map: MarketingNotifyEmails = { laura: "", diseno_1: "", diseno_2: "", diseno_3: "" };
+  (data ?? []).forEach((r: any) => {
+    if (r.role === "laura" || r.role === "diseno_1" || r.role === "diseno_2" || r.role === "diseno_3") {
+      map[r.role as MarketingNotifySlot] = r.email;
+    }
+  });
   return map;
 }
 
-export async function setMarketingNotifyEmail(role: "laura" | "diseno", email: string): Promise<void> {
+export async function setMarketingNotifyEmail(role: MarketingNotifySlot, email: string): Promise<void> {
   const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
   if (error) throw error;
 }
