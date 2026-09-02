@@ -47,7 +47,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={labelStyle}>Referencia del producto</label>
-            <input style={inputStyle} value={reference} onChange={e => setReference(e.target.value)} placeholder="C05-54" autoFocus required />
+            <input style={inputStyle} value={reference} onChange={e => setReference(e.target.value)} placeholder="C-054" autoFocus required />
           </div>
           <div>
             <label style={labelStyle}>Línea de producto</label>
