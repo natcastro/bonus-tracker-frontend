@@ -69,8 +69,8 @@ export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; ga
   { key: "adjustments", label: "Ajustes",      role: "diseno", gapDays: 2 },
   { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 1 },
   { key: "adjustments2", label: "Ajustes 2",   role: "diseno", gapDays: 2 },
-  { key: "final",       label: "Final",        role: "laura",  gapDays: 2 },
-  { key: "publish",     label: "Publicación",  role: "diseno", gapDays: 2 },
+  { key: "final",       label: "Final",        role: "laura",  gapDays: 1 },
+  { key: "publish",     label: "Publicación",  role: "diseno", gapDays: 1 },
 ];
 
 export const STAGE_ORDER: StageKey[] = STAGE_DEFS.map(s => s.key);
