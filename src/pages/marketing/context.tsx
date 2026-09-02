@@ -41,7 +41,7 @@ interface MarketingCtx {
   loading: boolean;
   reload: () => Promise<void>;
 
-  createBrief: (reference: string, startDate: string, briefLink: string) => Promise<void>;
+  createBrief: (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => Promise<void>;
   submitDesignStage: (briefId: number, link: string, note?: string) => Promise<void>;
   lauraReview: (briefId: number, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => Promise<void>;
   requestExtraRevision: (briefId: number, note?: string) => Promise<void>;
@@ -118,7 +118,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await createMarketingNotification(briefId, message);
   };
 
-  const createBrief = async (reference: string, startDate: string, briefLink: string) => {
+  const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => {
     const stages = STAGE_DEFS.map((def, i) => {
       if (i === 0) {
         return { ...def, deadline: startDate, link: briefLink || null, completedAt: startDate, status: "done" as const };
@@ -129,20 +129,26 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
     });
     await createMarketingBrief({
-      reference, startDate, currentStage: "proposal", status: "in_progress",
+      reference, productLine, startDate, currentStage: "proposal", status: "in_progress",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
-      completedAt: null,
+      completedAt: null, assignedDisenoEmail: assignedDisenoEmail || null,
     });
     await notify(null, `Laura creó un nuevo brief: ${reference}.`);
-    for (const email of disenoEmailList) {
+    const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
+    // Laura may already know who's taking it — in that case only that person gets the email,
+    // skipping the broadcast-and-claim flow entirely. Otherwise it goes to everyone in Diseño.
+    const recipients = assignedDisenoEmail ? [assignedDisenoEmail] : disenoEmailList;
+    for (const email of recipients) {
       await sendMarketingEmail(
         email,
         `Nuevo brief — ${reference}`,
         emailHtml({
-          intro: "Laura creó un nuevo brief. Entra a la plataforma y elige tu correo para tomarlo.",
+          intro: assignedDisenoEmail
+            ? "Laura creó un nuevo brief y te lo asignó directamente."
+            : "Laura creó un nuevo brief. Entra a la plataforma y elige tu correo para tomarlo.",
           reference,
           nextTask: stageLabel("proposal"),
-          deadline: addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays),
+          deadline: nextDeadline,
         }),
       );
     }

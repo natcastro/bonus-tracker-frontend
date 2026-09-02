@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { todayIso } from "../types";
+import { PRODUCT_LINES, todayIso } from "../types";
 
 export default function NewBriefModal({ onClose }: { onClose: () => void }) {
-  const { createBrief } = useMarketing();
+  const { createBrief, disenoEmailList } = useMarketing();
   const [reference, setReference] = useState("");
+  const [productLine, setProductLine] = useState("");
   const [startDate, setStartDate] = useState(todayIso());
   const [briefLink, setBriefLink] = useState("");
+  const [assignedDisenoEmail, setAssignedDisenoEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reference.trim()) { setError("La referencia del producto es obligatoria."); return; }
+    if (!productLine) { setError("La línea de producto es obligatoria."); return; }
     setSaving(true);
     try {
-      await createBrief(reference.trim(), startDate, briefLink.trim());
+      await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined);
       onClose();
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear el brief.");
@@ -47,12 +50,26 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             <input style={inputStyle} value={reference} onChange={e => setReference(e.target.value)} placeholder="C05-54" autoFocus required />
           </div>
           <div>
+            <label style={labelStyle}>Línea de producto</label>
+            <select style={inputStyle} value={productLine} onChange={e => setProductLine(e.target.value)} required>
+              <option value="" disabled>Selecciona una línea...</option>
+              {PRODUCT_LINES.map(line => <option key={line} value={line}>{line}</option>)}
+            </select>
+          </div>
+          <div>
             <label style={labelStyle}>Fecha de inicio (Día 1)</label>
             <input type="date" style={inputStyle} value={startDate} onChange={e => setStartDate(e.target.value)} required />
           </div>
           <div>
             <label style={labelStyle}>Link de SharePoint del brief</label>
             <input style={inputStyle} value={briefLink} onChange={e => setBriefLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+          </div>
+          <div>
+            <label style={labelStyle}>Asignar a Diseño (opcional)</label>
+            <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
+              <option value="">Sin asignar — avisar a todos</option>
+              {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
+            </select>
           </div>
 
           {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}

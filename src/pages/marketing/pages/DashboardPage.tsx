@@ -158,14 +158,14 @@ export default function DashboardPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${MT.border}` }}>
-                {["Referencia", "Fecha", "Status", "Responsable", "Deadline", "Alerta"].map(h => (
+                {["Referencia", "Línea", "Fecha", "Status", "Responsable", "Deadline", "Alerta"].map(h => (
                   <th key={h} style={{ textAlign: "left", fontSize: 10.5, fontWeight: 700, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.04em", padding: "0.5rem 0.9rem" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: "2rem", textAlign: "center", color: MT.text3, fontSize: 13 }}>No hay briefs para este filtro.</td></tr>
+                <tr><td colSpan={7} style={{ padding: "2rem", textAlign: "center", color: MT.text3, fontSize: 13 }}>No hay briefs para este filtro.</td></tr>
               ) : groups.map(g => {
                 if (g.rows.length === 0) return null;
                 const isCollapsed = collapsed[g.key];
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                   <Fragment key={g.key}>
                     <tr onClick={() => setCollapsed(c => ({ ...c, [g.key]: !c[g.key] }))}
                       style={{ background: MT.surfaceAlt, cursor: "pointer" }}>
-                      <td colSpan={6} style={{ padding: "0.4rem 0.9rem" }}>
+                      <td colSpan={7} style={{ padding: "0.4rem 0.9rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                           <span style={{ fontSize: 10, color: MT.text3, width: 10, display: "inline-block" }}>{isCollapsed ? "▸" : "▾"}</span>
                           <span style={{ width: 8, height: 8, borderRadius: 999, background: g.color, flexShrink: 0 }} />
@@ -195,6 +195,7 @@ export default function DashboardPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
                           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                           <td style={{ padding: "0.55rem 0.9rem", fontWeight: 700, fontSize: 12.5, color: MT.text1 }}>{b.reference}</td>
+                          <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{b.productLine || "—"}</td>
                           <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{formatDateHuman(b.startDate)}</td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
                             <StatusPill solid color={statusColor} label={b.status === "completed" ? "✓ Completado" : stageLabel(b.currentStage)} />

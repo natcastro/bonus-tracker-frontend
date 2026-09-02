@@ -108,7 +108,9 @@ export default function BriefDetailPage() {
               label={brief.status === "completed" ? "✓ Completado" : stageLabel(brief.currentStage)}
             />
           </div>
-          <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>Inicio: {formatDateHuman(brief.startDate)}</p>
+          <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>
+            {brief.productLine && <>{brief.productLine} · </>}Inicio: {formatDateHuman(brief.startDate)}
+          </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {brief.shiftDays > 0 && (

@@ -1420,6 +1420,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
   return {
     id: r.id,
     reference: r.reference,
+    productLine: r.product_line ?? "",
     startDate: r.start_date,
     currentStage: r.current_stage,
     status: r.status,
@@ -1450,10 +1451,11 @@ export async function getMarketingBriefs(): Promise<MarketingBrief[]> {
 
 export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "createdAt" | "updatedAt">): Promise<MarketingBrief> {
   const { data, error } = await supabase.from("marketing_briefs").insert({
-    reference: b.reference, start_date: b.startDate, current_stage: b.currentStage,
+    reference: b.reference, product_line: b.productLine, start_date: b.startDate, current_stage: b.currentStage,
     status: b.status, stages: b.stages, shift_days: b.shiftDays,
     laura_delay_days: b.lauraDelayDays, design_delay_count: b.designDelayCount,
     extra_revision_rounds: b.extraRevisionRounds, completed_at: b.completedAt,
+    assigned_diseno_email: b.assignedDisenoEmail,
   }).select().single();
   if (error) throw error;
   return mapMarketingBrief(data);

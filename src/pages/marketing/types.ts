@@ -1,4 +1,15 @@
 export type MarketingRole = "laura" | "diseno";
+
+export const PRODUCT_LINES = [
+  "Línea Oro",
+  "Luxury Queen",
+  "Sport",
+  "Masculina",
+  "Comfort",
+  "Accesorios",
+  "Fajas Invisibles",
+  "Línea Sensual",
+] as const;
 export type StageKey = "brief" | "proposal" | "review1" | "adjustments" | "review2" | "adjustments2" | "final" | "publish";
 
 export interface MarketingStage {
@@ -18,6 +29,7 @@ export interface MarketingStage {
 export interface MarketingBrief {
   id: number;
   reference: string;
+  productLine: string;
   startDate: string;
   currentStage: StageKey | "completed";
   status: "in_progress" | "completed";
