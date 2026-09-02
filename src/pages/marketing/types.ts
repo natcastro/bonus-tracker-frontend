@@ -66,10 +66,10 @@ export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; ga
   { key: "brief",       label: "Brief",        role: "laura",  gapDays: 0 },
   { key: "proposal",    label: "Propuesta inicial", role: "diseno", gapDays: 2 },
   { key: "review1",     label: "Revisión 1",   role: "laura",  gapDays: 2 },
-  { key: "adjustments", label: "Ajustes",      role: "diseno", gapDays: 2 },
+  { key: "adjustments", label: "Ajuste 1",     role: "diseno", gapDays: 2 },
   { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 1 },
   { key: "adjustments2", label: "Ajustes 2",   role: "diseno", gapDays: 2 },
-  { key: "final",       label: "Final",        role: "laura",  gapDays: 1 },
+  { key: "final",       label: "Revisión Final", role: "laura", gapDays: 1 },
   { key: "publish",     label: "Publicación",  role: "diseno", gapDays: 1 },
 ];
 
