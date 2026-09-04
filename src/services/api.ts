@@ -1588,10 +1588,18 @@ export interface MarketingAccessPerson { email: string; nickname: string; role: 
 // Everyone who already has a Marketing role in Hub Access — lets the Marketing settings panel
 // offer a picker instead of asking an admin to retype emails that are already configured there.
 export async function getMarketingAccessDirectory(): Promise<MarketingAccessPerson[]> {
-  const { data, error } = await supabase.from("hub_access").select("email,nickname,teams");
+  const { data, error } = await supabase.from("hub_access").select("email,nickname,teams,is_admin");
   if (error) throw error;
   const out: MarketingAccessPerson[] = [];
   (data ?? []).forEach((r: any) => {
+    // The Hub's main admin (full "ALL" access) can fill any Marketing slot, not just the ones
+    // explicitly tagged "MARKETING:..." — they outrank per-team role tags entirely.
+    if (r.is_admin || (r.teams ?? []).includes("ALL")) {
+      (["admin", "staff", "carol"] as const).forEach(role => {
+        out.push({ email: r.email, nickname: r.nickname ?? "", role });
+      });
+      return;
+    }
     const entry = (r.teams ?? []).find((t: string) => t.startsWith("MARKETING:"));
     if (!entry) return;
     const role = entry.split(":")[1];
