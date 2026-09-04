@@ -446,16 +446,29 @@ export default function StrategyDashboard() {
     [rowsInProductWindow],
   );
 
+  // A couple of references share the same TikTok Product ID (two SKUs sold under one listing) —
+  // TikTok only reports one "samples shipped" number for that ID, so those references are merged
+  // into a single row here (quotas added together) instead of each showing the same count twice.
   const productBreakdown = useMemo(() => {
-    return catalog.filter(c => c.active).map(item => {
-      const matches = rowsInProductWindow.filter(r => r.productId === item.productId);
+    const groups = new Map<string, { key: string; ids: number[]; names: string[]; productId: string; quota: number }>();
+    for (const item of catalog.filter(c => c.active)) {
+      const key = item.productId || `__no-id-${item.id}`;
+      const g = groups.get(key) ?? { key, ids: [], names: [], productId: item.productId, quota: 0 };
+      g.ids.push(item.id);
+      g.names.push(item.productName);
+      g.quota += item.monthlyQuota;
+      groups.set(key, g);
+    }
+    return Array.from(groups.values()).map(g => {
+      const matches = rowsInProductWindow.filter(r => r.productId === g.productId);
       const sent = matches.reduce((s, r) => s + (r.samplesShipped ?? 0), 0);
       const gmv = matches.reduce((s, r) => s + (r.contentGmv ?? 0), 0);
       const latestRoi = matches.length > 0 ? matches[matches.length - 1].roi45d : null;
       return {
-        item, sent, gmv, roi45d: latestRoi,
-        remaining: Math.max(0, item.monthlyQuota - sent),
-        done: sent >= item.monthlyQuota,
+        key: g.key, productId: g.productId, productName: g.names.join(" / "), monthlyQuota: g.quota,
+        sent, gmv, roi45d: latestRoi,
+        remaining: Math.max(0, g.quota - sent),
+        done: sent >= g.quota,
       };
     });
   }, [catalog, rowsInProductWindow]);
@@ -1309,11 +1322,11 @@ export default function StrategyDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {productBreakdown.map(({item,sent,gmv,roi45d,remaining,done}) => (
-                        <tr key={item.id} style={{borderBottom:"1px solid #f1f5f9"}}>
-                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#1e293b",maxWidth:280}}>{item.productName}</td>
-                          <td style={{padding:"0.6rem 0.85rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{item.productId || "—"}</td>
-                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center"}}>{item.monthlyQuota}</td>
+                      {productBreakdown.map(({key,productId,productName,monthlyQuota,sent,gmv,roi45d,remaining,done}) => (
+                        <tr key={key} style={{borderBottom:"1px solid #f1f5f9"}}>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#1e293b",maxWidth:280}}>{productName}</td>
+                          <td style={{padding:"0.6rem 0.85rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{productId || "—"}</td>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center"}}>{monthlyQuota}</td>
                           <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center",color:done?"#15803d":sent>0?"#ca8a04":"#64748b"}}>{sent}</td>
                           <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:done?"#94a3b8":"#1e293b"}}>{remaining}</td>
                           <td style={{padding:"0.6rem 0.85rem"}}>
@@ -1347,7 +1360,7 @@ export default function StrategyDashboard() {
                     <tfoot>
                       <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
                         <td colSpan={2} style={{padding:"0.6rem 0.85rem",fontWeight:700,color:"#64748b"}}>TOTAL</td>
-                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center"}}>{productBreakdown.reduce((s,r)=>s+r.item.monthlyQuota,0)}</td>
+                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center"}}>{productBreakdown.reduce((s,r)=>s+r.monthlyQuota,0)}</td>
                         <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center",color:C.samples}}>{productWindowShippedTotal}</td>
                         <td colSpan={4} />
                       </tr>
