@@ -156,11 +156,21 @@ function EntryForm({
   );
 }
 
-function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => void }) {
+function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart: (team: string, role: TeamRole, email?: string) => void }) {
   const [team, setTeam] = useState("OPS");
   const [role, setRole] = useState<TeamRole>("admin");
+  const [personEmail, setPersonEmail] = useState("");
   const isRoleTeam = ROLE_TEAMS.some((rt) => rt.key === team);
   const roleTeam = ROLE_TEAMS.find((rt) => rt.key === team);
+
+  // Everyone whose Hub Access actually matches this exact team+role — when more than one person
+  // shares it (like Marketing's 3 Diseño people), previewing needs to know specifically who.
+  const matchingPeople = isRoleTeam
+    ? entries.filter((e) => e.teams.includes(`${team}:${role}`))
+    : [];
+
+  const changeTeam = (t: string) => { setTeam(t); setRole("admin"); setPersonEmail(""); };
+  const changeRole = (r: TeamRole) => { setRole(r); setPersonEmail(""); };
 
   return (
     <div style={{ background: "#FFF7ED", border: "1px solid #FDE0B0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
@@ -168,7 +178,7 @@ function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => 
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
         <select
           value={team}
-          onChange={(e) => { setTeam(e.target.value); setRole("admin"); }}
+          onChange={(e) => changeTeam(e.target.value)}
           className="form-control"
           style={{ width: "auto", flex: "1 1 200px" }}
         >
@@ -180,7 +190,7 @@ function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => 
               <button
                 key={r}
                 type="button"
-                onClick={() => setRole(r)}
+                onClick={() => changeRole(r)}
                 style={{
                   fontSize: 11.5, fontWeight: 600, padding: "0.3rem 0.6rem", borderRadius: 999, cursor: "pointer",
                   border: `1px solid ${role === r ? "#7C2D12" : "#E5E7EB"}`,
@@ -193,7 +203,22 @@ function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => 
             ))}
           </div>
         )}
-        <button className="btn btn-sm" style={{ background: "#7C2D12", color: "#fff" }} onClick={() => onStart(team, role)}>
+        {matchingPeople.length > 1 && (
+          <select
+            value={personEmail}
+            onChange={(e) => setPersonEmail(e.target.value)}
+            className="form-control"
+            style={{ width: "auto", flex: "1 1 180px" }}
+          >
+            <option value="">¿Cuál persona?</option>
+            {matchingPeople.map((p) => <option key={p.email} value={p.email}>{p.nickname || p.email}</option>)}
+          </select>
+        )}
+        <button
+          className="btn btn-sm" style={{ background: "#7C2D12", color: "#fff" }}
+          disabled={matchingPeople.length > 1 && !personEmail}
+          onClick={() => onStart(team, role, matchingPeople.length === 1 ? matchingPeople[0].email : personEmail || undefined)}
+        >
           Ver así
         </button>
       </div>
@@ -210,8 +235,8 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const startPreview = (team: string, role: TeamRole) => {
-    startViewAs(team, role);
+  const startPreview = (team: string, role: TeamRole, email?: string) => {
+    startViewAs(team, role, email);
     onClose();
     navigate("/");
   };
@@ -255,7 +280,7 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6B7280" }}>×</button>
         </div>
 
-        <ViewAsPicker onStart={startPreview} />
+        <ViewAsPicker entries={entries} onStart={startPreview} />
 
         {!adding && !editingEmail && (
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)} style={{ marginBottom: "1rem" }}>+ Agregar correo</button>

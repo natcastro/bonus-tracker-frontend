@@ -5,7 +5,9 @@ import { getHubAccessForEmail } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
 
 export type TeamRole = "admin" | "staff" | "carol";
-export interface ViewAs { team: string; role: TeamRole }
+// email is set when a role is shared by more than one person (e.g. Marketing's 3 Diseño people) —
+// it simulates being that specific person, not just the role, so per-person features work in preview.
+export interface ViewAs { team: string; role: TeamRole; email?: string }
 
 const VIEW_AS_KEY = "hub_view_as";
 
@@ -27,7 +29,7 @@ interface HubAccessCtxShape {
   getRole: (team: string) => TeamRole | null;
   viewAs: ViewAs | null;
   canPreview: boolean;
-  startViewAs: (team: string, role: TeamRole) => void;
+  startViewAs: (team: string, role: TeamRole, email?: string) => void;
   stopViewAs: () => void;
 }
 
@@ -42,24 +44,27 @@ export function useHubAccess() {
 export function HubAccessProvider({ children }: { children: ReactNode }) {
   const { accounts } = useMsal();
   const account = accounts[0];
-  const email = account?.username ?? "";
-  const name = account?.name ?? email;
+  const realEmail = account?.username ?? "";
   const [access, setAccess] = useState<HubAccessEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewAs, setViewAsState] = useState<ViewAs | null>(() => readViewAs());
 
   useEffect(() => {
-    if (!email) { setLoading(false); return; }
+    if (!realEmail) { setLoading(false); return; }
     setLoading(true);
-    getHubAccessForEmail(email).then(setAccess).catch(() => setAccess(null)).finally(() => setLoading(false));
-  }, [email]);
+    getHubAccessForEmail(realEmail).then(setAccess).catch(() => setAccess(null)).finally(() => setLoading(false));
+  }, [realEmail]);
 
   // Only a real admin can be previewing — otherwise ignore any leftover/tampered value.
   const activeViewAs = access?.isAdmin ? viewAs : null;
+  // While previewing as a specific person, everything (including per-person features) sees
+  // that person's email — otherwise it's just the real logged-in admin's own email.
+  const email = activeViewAs?.email || realEmail;
+  const name = activeViewAs?.email || account?.name || realEmail;
 
-  const startViewAs = (team: string, role: TeamRole) => {
+  const startViewAs = (team: string, role: TeamRole, asEmail?: string) => {
     if (!access?.isAdmin) return;
-    const next: ViewAs = { team, role };
+    const next: ViewAs = { team, role, email: asEmail };
     sessionStorage.setItem(VIEW_AS_KEY, JSON.stringify(next));
     sessionStorage.removeItem("team");
     sessionStorage.removeItem("role");
