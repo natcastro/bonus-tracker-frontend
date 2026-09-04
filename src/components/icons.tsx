@@ -98,6 +98,16 @@ export function TrashIcon({ size, color }: IconProps) {
   );
 }
 
+export function LinkIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M9.5 14.5 14.5 9.5" />
+      <path d="M11 6.5 12.7 4.8a3.6 3.6 0 0 1 5.1 5.1L16 11.5" />
+      <path d="M13 17.5 11.3 19.2a3.6 3.6 0 0 1-5.1-5.1L8 12.5" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ size, color }: IconProps) {
   return (
     <svg {...base(size, color)}>

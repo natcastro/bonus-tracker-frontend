@@ -1452,6 +1452,8 @@ function mapMarketingBrief(r: any): MarketingBrief {
     updatedAt: r.updated_at,
     assignedDisenoEmail: r.assigned_diseno_email ?? null,
     carolNotifiedAt: r.carol_notified_at ?? null,
+    publicationLinks: r.publication_links ?? {},
+    linksApprovedByKarol: r.links_approved ?? false,
   };
 }
 
@@ -1476,6 +1478,7 @@ export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "creat
     laura_delay_days: b.lauraDelayDays, design_delay_count: b.designDelayCount,
     extra_revision_rounds: b.extraRevisionRounds, completed_at: b.completedAt,
     assigned_diseno_email: b.assignedDisenoEmail, carol_notified_at: b.carolNotifiedAt,
+    publication_links: b.publicationLinks, links_approved: b.linksApprovedByKarol,
   }).select().single();
   if (error) throw error;
   return mapMarketingBrief(data);
@@ -1495,6 +1498,8 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
   if (patch.assignedDisenoEmail !== undefined) dbPatch.assigned_diseno_email = patch.assignedDisenoEmail;
   if (patch.carolNotifiedAt !== undefined) dbPatch.carol_notified_at = patch.carolNotifiedAt;
+  if (patch.publicationLinks !== undefined) dbPatch.publication_links = patch.publicationLinks;
+  if (patch.linksApprovedByKarol !== undefined) dbPatch.links_approved = patch.linksApprovedByKarol;
   const { error } = await supabase.from("marketing_briefs").update(dbPatch).eq("id", id);
   if (error) throw error;
 }

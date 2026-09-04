@@ -4,8 +4,8 @@ import { MT } from "../theme";
 import { useMarketing } from "../context";
 import NewBriefModal from "../components/NewBriefModal";
 import DeadlineBadge from "../components/DeadlineBadge";
-import { PencilIcon, EyeIcon, ClockIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline } from "../types";
+import { PencilIcon, EyeIcon, ClockIcon, LinkIcon } from "../../../components/icons";
+import { stageLabel, isPastDeadline, PUBLICATION_PLATFORMS } from "../types";
 
 export default function MyTasksPage() {
   const { authedUser, briefs } = useMarketing();
@@ -18,6 +18,13 @@ export default function MyTasksPage() {
     return briefs
       .filter(b => b.status === "draft")
       .sort((a, b) => (a.estimatedStartDate ?? "").localeCompare(b.estimatedStartDate ?? ""));
+  }, [briefs, myRole]);
+
+  const myLinkReviews = useMemo(() => {
+    if (myRole !== "carol") return [];
+    return briefs
+      .filter(b => b.status === "completed" && !b.linksApprovedByKarol)
+      .sort((a, b) => (a.completedAt ?? "").localeCompare(b.completedAt ?? ""));
   }, [briefs, myRole]);
 
   const myPending = useMemo(() => {
@@ -100,6 +107,55 @@ export default function MyTasksPage() {
                 {b.estimatedStartDate && <DeadlineBadge deadline={b.estimatedStartDate} />}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {myLinkReviews.length > 0 && (
+        <div style={{ marginBottom: "1.75rem" }}>
+          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+            Enlaces de publicación por revisar
+          </p>
+          <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+            {myLinkReviews.map(b => {
+              const filledCount = PUBLICATION_PLATFORMS.filter(p => (b.publicationLinks[p.key] ?? "").trim()).length;
+              const allFilled = filledCount === PUBLICATION_PLATFORMS.length;
+              const color = allFilled ? MT.primary : MT.info;
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => navigate(`/marketing/brief/${b.id}`)}
+                  style={{
+                    background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
+                    borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                    display: "flex", flexDirection: "column", gap: "0.9rem",
+                    minWidth: 260, maxWidth: 340, flex: "1 1 260px",
+                    boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <span style={{
+                      width: 42, height: 42, borderRadius: 8, background: color + "12",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      <LinkIcon size={20} color={color} />
+                    </span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                      {allFilled ? "Listo para aprobar" : "En progreso"}
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                  </div>
+                  <span style={{
+                    fontSize: 12.5, fontWeight: 700, color, background: color + "12",
+                    borderRadius: 999, padding: "3px 10px", width: "fit-content",
+                  }}>{filledCount}/{PUBLICATION_PLATFORMS.length} enlaces</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

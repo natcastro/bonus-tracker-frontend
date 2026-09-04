@@ -7,8 +7,8 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
-import type { StageKey } from "../types";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS } from "../types";
+import type { PublicationPlatform, StageKey } from "../types";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
 
@@ -24,7 +24,7 @@ const UPLOAD_LABELS: Record<string, string> = {
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -38,6 +38,9 @@ export default function BriefDetailPage() {
   const [editingStage, setEditingStage] = useState<StageKey | null>(null);
   const [editValue, setEditValue] = useState("");
   const [showReassign, setShowReassign] = useState(false);
+  const [linkDrafts, setLinkDrafts] = useState<Partial<Record<PublicationPlatform, string>>>({});
+  const [savingLink, setSavingLink] = useState<PublicationPlatform | null>(null);
+  const [approvingLinks, setApprovingLinks] = useState(false);
 
   if (!brief) {
     return (
@@ -299,10 +302,78 @@ export default function BriefDetailPage() {
 
       {/* Action panel */}
       {brief.status === "completed" ? (
-        <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
-          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
-          <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
-        </div>
+        <>
+          <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", marginBottom: "1rem" }}>
+            <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
+            <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
+          </div>
+
+          {(() => {
+            const filledCount = PUBLICATION_PLATFORMS.filter(p => (brief.publicationLinks[p.key] ?? "").trim()).length;
+            const allFilled = filledCount === PUBLICATION_PLATFORMS.length;
+            return (
+              <div style={{ background: MT.surface, border: `2px solid ${brief.linksApprovedByKarol ? MT.primary : MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: 0 }}>Enlaces de publicación</p>
+                  <StatusPill
+                    solid={brief.linksApprovedByKarol}
+                    color={brief.linksApprovedByKarol ? MT.primary : allFilled ? MT.info : MT.text3}
+                    label={brief.linksApprovedByKarol ? "✓ Aprobado" : `${filledCount}/${PUBLICATION_PLATFORMS.length}`}
+                  />
+                </div>
+                <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
+                  Enlace de cada canal donde ya quedó publicado el producto.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                  {PUBLICATION_PLATFORMS.map(({ key, label }) => {
+                    const saved = brief.publicationLinks[key] ?? "";
+                    const draft = linkDrafts[key] ?? saved;
+                    const dirty = draft.trim() !== saved.trim();
+                    return (
+                      <div key={key}>
+                        <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 4 }}>
+                          {saved.trim() ? "✓ " : ""}{label}
+                        </label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input
+                            style={fieldStyle} value={draft} placeholder="https://..."
+                            onChange={e => setLinkDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                          />
+                          {dirty && (
+                            <button disabled={savingLink === key} onClick={async () => {
+                              setSavingLink(key);
+                              try { await updatePublicationLink(brief.id, key, draft.trim()); }
+                              finally { setSavingLink(null); }
+                            }} style={{
+                              fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "0 14px", whiteSpace: "nowrap",
+                            }}>{savingLink === key ? "..." : "Guardar"}</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {brief.linksApprovedByKarol ? (
+                  <p style={{ fontSize: 12.5, color: MT.primary, fontWeight: 700, margin: 0 }}>✓ Karol ya aprobó los enlaces de publicación.</p>
+                ) : myRole === "carol" ? (
+                  allFilled ? (
+                    <button disabled={approvingLinks} onClick={async () => {
+                      setApprovingLinks(true);
+                      try { await approvePublicationLinks(brief.id); }
+                      finally { setApprovingLinks(false); }
+                    }} style={{
+                      fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+                      background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                    }}>{approvingLinks ? "..." : "✓ Aprobar"}</button>
+                  ) : (
+                    <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>Todavía faltan enlaces — Diseño se encarga del resto.</p>
+                  )
+                ) : null}
+              </div>
+            );
+          })()}
+        </>
       ) : !canAct ? (
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>

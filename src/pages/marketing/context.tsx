@@ -9,7 +9,7 @@ import {
 import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
+import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PublicationPlatform, StageKey } from "./types";
 import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
@@ -51,6 +51,8 @@ interface MarketingCtx {
   requestExtraRevision: (briefId: number, note?: string) => Promise<void>;
   confirmPublish: (briefId: number, note?: string) => Promise<void>;
   updateStageLink: (briefId: number, stageKey: StageKey, link: string) => Promise<void>;
+  updatePublicationLink: (briefId: number, platform: PublicationPlatform, url: string) => Promise<void>;
+  approvePublicationLinks: (briefId: number) => Promise<void>;
   assignBrief: (briefId: number, email: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
 
@@ -193,7 +195,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await createMarketingBrief({
       reference, productLine, startDate, estimatedStartDate: null, currentStage: "proposal", status: "in_progress",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
-      completedAt: null, ...assignment,
+      completedAt: null, publicationLinks: {}, linksApprovedByKarol: false, ...assignment,
     });
     await notify(null, `Laura creó un nuevo brief: ${reference}.`);
     await reload();
@@ -207,6 +209,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       reference, productLine, startDate: estimatedStartDate, estimatedStartDate, currentStage: "brief", status: "draft",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
       completedAt: null, assignedDisenoEmail: null, carolNotifiedAt: null,
+      publicationLinks: {}, linksApprovedByKarol: false,
     });
     await reload();
   };
@@ -392,6 +395,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  const updatePublicationLink = async (briefId: number, platform: PublicationPlatform, url: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief) return;
+    await updateMarketingBrief(briefId, { publicationLinks: { ...brief.publicationLinks, [platform]: url } });
+    await reload();
+  };
+
+  const approvePublicationLinks = async (briefId: number) => {
+    await updateMarketingBrief(briefId, { linksApprovedByKarol: true });
+    await reload();
+  };
+
   const updateStageLink = async (briefId: number, stageKey: StageKey, link: string) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief) return;
@@ -452,7 +467,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, deleteBrief,
+      createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
     }}>

@@ -26,6 +26,17 @@ export interface MarketingStage {
   reminded24h?: boolean;
 }
 
+export const PUBLICATION_PLATFORMS = [
+  { key: "tiktokShop",     label: "TikTok Shop" },
+  { key: "tiktokShopMx",   label: "TikTok Shop México" },
+  { key: "amazon",         label: "Amazon" },
+  { key: "shopify",        label: "Shopify" },
+  { key: "mercadoLibreMx", label: "Mercado Libre México" },
+  { key: "mercadoLibreCo", label: "Mercado Libre Colombia" },
+] as const;
+export type PublicationPlatform = typeof PUBLICATION_PLATFORMS[number]["key"];
+export type PublicationLinks = Partial<Record<PublicationPlatform, string>>;
+
 export interface MarketingBrief {
   id: number;
   reference: string;
@@ -50,6 +61,10 @@ export interface MarketingBrief {
   // Timestamp set when a brief goes public unassigned (Carol gets notified) — used by the 24h
   // auto-assign job to detect briefs Carol hasn't picked up in time.
   carolNotifiedAt: string | null;
+  // Once the brief is completed, these track posting the product live on each sales channel —
+  // Karol reviews the count and signs off once all of them are filled in.
+  publicationLinks: PublicationLinks;
+  linksApprovedByKarol: boolean;
 }
 
 export interface MarketingNotification {
