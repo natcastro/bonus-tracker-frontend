@@ -1583,6 +1583,25 @@ export async function upsertHubAccess(email: string, teams: string[], isAdmin: b
   if (error) throw error;
 }
 
+export interface MarketingAccessPerson { email: string; nickname: string; role: "admin" | "staff" | "carol" }
+
+// Everyone who already has a Marketing role in Hub Access — lets the Marketing settings panel
+// offer a picker instead of asking an admin to retype emails that are already configured there.
+export async function getMarketingAccessDirectory(): Promise<MarketingAccessPerson[]> {
+  const { data, error } = await supabase.from("hub_access").select("email,nickname,teams");
+  if (error) throw error;
+  const out: MarketingAccessPerson[] = [];
+  (data ?? []).forEach((r: any) => {
+    const entry = (r.teams ?? []).find((t: string) => t.startsWith("MARKETING:"));
+    if (!entry) return;
+    const role = entry.split(":")[1];
+    if (role === "admin" || role === "staff" || role === "carol") {
+      out.push({ email: r.email, nickname: r.nickname ?? "", role });
+    }
+  });
+  return out;
+}
+
 // Looks up display nicknames for a set of emails — used by modules (like Marketing) that want to
 // show "who" instead of a generic role, without keeping a second copy of everyone's name.
 export async function getHubNicknames(emails: string[]): Promise<Record<string, string>> {

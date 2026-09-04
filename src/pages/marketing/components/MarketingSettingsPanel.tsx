@@ -1,22 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../../services/api";
+import { getMarketingAccessDirectory } from "../../../services/api";
+import type { MarketingAccessPerson, MarketingNotifyEmails, MarketingNotifySlot } from "../../../services/api";
 
-const SLOTS: { slot: MarketingNotifySlot; label: string; placeholder: string }[] = [
-  { slot: "laura",    label: "Correo de Laura", placeholder: "laura@formatucuerpo.com" },
-  { slot: "carol",    label: "Correo de Karol", placeholder: "karol@formatucuerpo.com" },
-  { slot: "diseno_1", label: "Correo de Diseño 1", placeholder: "diseno1@formatucuerpo.com" },
-  { slot: "diseno_2", label: "Correo de Diseño 2", placeholder: "diseno2@formatucuerpo.com" },
-  { slot: "diseno_3", label: "Correo de Diseño 3", placeholder: "diseno3@formatucuerpo.com" },
+const SLOTS: { slot: MarketingNotifySlot; label: string; role: MarketingAccessPerson["role"] }[] = [
+  { slot: "laura",    label: "Laura",    role: "admin" },
+  { slot: "carol",    label: "Karol",    role: "carol" },
+  { slot: "diseno_1", label: "Diseño 1", role: "staff" },
+  { slot: "diseno_2", label: "Diseño 2", role: "staff" },
+  { slot: "diseno_3", label: "Diseño 3", role: "staff" },
 ];
 
 export default function MarketingSettingsPanel({ onClose }: { onClose: () => void }) {
   const { notifyEmails, updateNotifyEmail } = useMarketing();
   const [emails, setEmails] = useState<MarketingNotifyEmails>(notifyEmails);
+  const [people, setPeople] = useState<MarketingAccessPerson[]>([]);
+  const [loadingPeople, setLoadingPeople] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    getMarketingAccessDirectory().then(setPeople).catch(() => {}).finally(() => setLoadingPeople(false));
+  }, []);
 
   const save = async () => {
     setSaving(true); setError(""); setSaved(false);
@@ -49,21 +56,34 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
         </div>
         <h3 style={{ margin: "0 0 6px", color: MT.text1, fontSize: 18 }}>Correos de notificación</h3>
         <p style={{ margin: "0 0 20px", color: MT.text2, fontSize: 12.5 }}>
-          A dónde llegan los avisos automáticos de Marketing. Los nombres que se muestran vienen del
-          apodo que le pongas a cada correo en Accesos del Hub, no hace falta repetirlos aquí.
+          A dónde llegan los avisos automáticos de Marketing — elige entre las personas que ya
+          tienen acceso a Marketing en Accesos del Hub.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {SLOTS.map(({ slot, label, placeholder }) => (
-            <div key={slot}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>{label}</label>
-              <input
-                style={fieldStyle} value={emails[slot]} placeholder={placeholder}
-                onChange={e => setEmails(prev => ({ ...prev, [slot]: e.target.value }))}
-              />
-            </div>
-          ))}
-        </div>
+        {loadingPeople ? (
+          <p style={{ fontSize: 12.5, color: MT.text3 }}>Cargando personas...</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {SLOTS.map(({ slot, label, role }) => {
+              const options = people.filter(p => p.role === role);
+              const current = emails[slot];
+              const currentKnown = options.some(p => p.email === current);
+              return (
+                <div key={slot}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>{label}</label>
+                  <select
+                    style={fieldStyle} value={current}
+                    onChange={e => setEmails(prev => ({ ...prev, [slot]: e.target.value }))}
+                  >
+                    <option value="">Sin asignar</option>
+                    {!currentKnown && current && <option value={current}>{current} (no asignado en Accesos)</option>}
+                    {options.map(p => <option key={p.email} value={p.email}>{p.nickname || p.email}</option>)}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px", marginTop: 14 }}>{error}</div>}
         {saved && !error && <div style={{ fontSize: 12.5, color: MT.primary, background: MT.primarySoft, borderRadius: 8, padding: "8px 12px", marginTop: 14 }}>✓ Guardado</div>}
