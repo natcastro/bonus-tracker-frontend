@@ -357,7 +357,7 @@ export default function StrategyDashboard() {
   // Samples shipped this cycle vs the fixed monthly goal, and the shared
   // "% of videos made" setting that feeds the rest of the Indicador #2 bonus.
   const samplesShippedTotal = useMemo(() => {
-    const periodsInCycle = analysisPeriods.filter(p => p.periodStart >= officialPeriod.from && p.periodEnd <= officialPeriod.to);
+    const periodsInCycle = analysisPeriods.filter(p => p.periodStart <= officialPeriod.to && p.periodEnd >= officialPeriod.from);
     const periodIds = new Set(periodsInCycle.map(p => p.id));
     return analysisRows.filter(r => periodIds.has(r.periodId)).reduce((s, r) => s + (r.samplesShipped ?? 0), 0);
   }, [analysisPeriods, analysisRows, officialPeriod]);
@@ -385,9 +385,22 @@ export default function StrategyDashboard() {
 
   const periodsThisCycle = useMemo(() =>
     analysisPeriods
-      .filter(p => p.periodStart >= officialPeriod.from && p.periodEnd <= officialPeriod.to)
+      .filter(p => p.periodStart <= officialPeriod.to && p.periodEnd >= officialPeriod.from)
       .sort((a, b) => a.periodStart.localeCompare(b.periodStart)),
   [analysisPeriods, officialPeriod]);
+
+  const [samplesShowAllHistory, setSamplesShowAllHistory] = useState(false);
+  const allPeriodsSorted = useMemo(() =>
+    [...analysisPeriods].sort((a, b) => b.periodStart.localeCompare(a.periodStart)),
+  [analysisPeriods]);
+  const periodsToShow = samplesShowAllHistory ? allPeriodsSorted : periodsThisCycle;
+
+  // Nudge if it's been a while since the last document — weekly uploads are the expectation.
+  const daysSinceLastUpload = useMemo(() => {
+    if (analysisPeriods.length === 0) return null;
+    const lastEnd = analysisPeriods.reduce((max, p) => p.periodEnd > max ? p.periodEnd : max, analysisPeriods[0].periodEnd);
+    return Math.floor((Date.now() - new Date(lastEnd + "T00:00:00").getTime()) / 86_400_000);
+  }, [analysisPeriods]);
 
   const deletePeriod = async (id: number) => {
     if (!confirm("¿Eliminar este documento y sus datos?")) return;
@@ -1143,6 +1156,13 @@ export default function StrategyDashboard() {
               </div>
             )}
 
+            {/* Overdue-upload nudge */}
+            {daysSinceLastUpload !== null && daysSinceLastUpload > 8 && (
+              <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"0.75rem 1rem",marginBottom:"1.1rem",color:"#b91c1c",fontSize:"0.82rem",fontWeight:600}}>
+                ⚠ No has subido un documento nuevo hace {daysSinceLastUpload} días — el último cubre hasta {analysisPeriods.reduce((max,p)=>p.periodEnd>max?p.periodEnd:max, analysisPeriods[0]?.periodEnd ?? "")}.
+              </div>
+            )}
+
             {/* Summary: samples shipped vs goal */}
             <div className="card" style={{marginBottom:"1.1rem"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
@@ -1152,15 +1172,23 @@ export default function StrategyDashboard() {
               <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
                 <div style={{width:`${Math.min(100,samplesPct)}%`,height:"100%",background:C.samples,transition:"width 0.4s",borderRadius:4}} />
               </div>
-              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(samplesPct)}% de la meta</div>
+              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(samplesPct)}% de la meta · ciclo {officialPeriod.from} → {officialPeriod.to}</div>
             </div>
 
-            {/* Uploaded periods within this cycle */}
-            {periodsThisCycle.length === 0 ? (
-              <EmptyCard msg="No hay documentos subidos para este ciclo." />
+            {/* Uploaded periods */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
+              <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>
+                {samplesShowAllHistory ? "Todo el historial" : "Documentos de este ciclo"}
+              </p>
+              <button className="btn btn-sm btn-secondary" onClick={()=>setSamplesShowAllHistory(v=>!v)}>
+                {samplesShowAllHistory ? "Ver solo este ciclo" : "Ver todo el historial"}
+              </button>
+            </div>
+            {periodsToShow.length === 0 ? (
+              <EmptyCard msg={samplesShowAllHistory ? "No hay documentos subidos todavía." : "No hay documentos subidos para este ciclo."} />
             ) : (
               <div style={{marginBottom:"1.1rem"}}>
-                {periodsThisCycle.map(period => {
+                {periodsToShow.map(period => {
                   const shipped = analysisRows.filter(r => r.periodId === period.id).reduce((s,r) => s + (r.samplesShipped ?? 0), 0);
                   return (
                     <div key={period.id} className="card" style={{marginBottom:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem"}}>
