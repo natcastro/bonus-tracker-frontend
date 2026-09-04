@@ -354,8 +354,9 @@ export default function StrategyDashboard() {
     finally { setAnalysisSaving(false); }
   };
 
-  // Samples shipped this cycle vs the fixed monthly goal, and the shared
-  // "% of videos made" setting that feeds the rest of the Indicador #2 bonus.
+  // Samples shipped in the *official bonus cycle* — this is the number the bonus is actually
+  // paid on, always anchored to the real 24th-23rd cycle regardless of what the browsing
+  // filter below is set to (that filter is for looking around, not for changing the payout).
   const samplesShippedTotal = useMemo(() => {
     const periodsInCycle = analysisPeriods.filter(p => p.periodStart <= officialPeriod.to && p.periodEnd >= officialPeriod.from);
     const periodIds = new Set(periodsInCycle.map(p => p.id));
@@ -383,18 +384,6 @@ export default function StrategyDashboard() {
 
   const ind2Amount = samplesBonusAmount(samplesPct) + videosBonusAmount(samplesSettings.videoContentPct);
 
-  const periodsThisCycle = useMemo(() =>
-    analysisPeriods
-      .filter(p => p.periodStart <= officialPeriod.to && p.periodEnd >= officialPeriod.from)
-      .sort((a, b) => a.periodStart.localeCompare(b.periodStart)),
-  [analysisPeriods, officialPeriod]);
-
-  const [samplesShowAllHistory, setSamplesShowAllHistory] = useState(false);
-  const allPeriodsSorted = useMemo(() =>
-    [...analysisPeriods].sort((a, b) => b.periodStart.localeCompare(a.periodStart)),
-  [analysisPeriods]);
-  const periodsToShow = samplesShowAllHistory ? allPeriodsSorted : periodsThisCycle;
-
   // Nudge if it's been a while since the last document — weekly uploads are the expectation.
   const daysSinceLastUpload = useMemo(() => {
     if (analysisPeriods.length === 0) return null;
@@ -408,8 +397,8 @@ export default function StrategyDashboard() {
     await loadAnalysis();
   };
 
-  // ── Per-product breakdown — the 19 references (755 units total) against what's
-  // actually been shipped, matched by TikTok's numeric Product ID. ─────────────
+  // ── Browsing filter — drives the summary card, the document list, AND the per-product
+  // breakdown below, so switching to "por mes"/"por rango" updates everything together. ──
   const [catalog, setCatalog] = useState<SampleCatalogItem[]>([]);
   useEffect(() => { getSampleCatalog().then(setCatalog).catch(()=>{}); }, []);
 
@@ -445,6 +434,14 @@ export default function StrategyDashboard() {
     () => rowsInProductWindow.reduce((s, r) => s + (r.samplesShipped ?? 0), 0),
     [rowsInProductWindow],
   );
+
+  const productWindowPct = (productWindowShippedTotal / SAMPLES_GOAL) * 100;
+
+  const periodsInFilterWindow = useMemo(() =>
+    analysisPeriods
+      .filter(p => p.periodStart <= productFilterWindow.to && p.periodEnd >= productFilterWindow.from)
+      .sort((a, b) => a.periodStart.localeCompare(b.periodStart)),
+  [analysisPeriods, productFilterWindow]);
 
   // A couple of references share the same TikTok Product ID (two SKUs sold under one listing) —
   // TikTok only reports one "samples shipped" number for that ID, so those references are merged
@@ -1244,32 +1241,57 @@ export default function StrategyDashboard() {
               </div>
             )}
 
-            {/* Summary: samples shipped vs goal */}
-            <div className="card" style={{marginBottom:"1.1rem"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
-                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>Samples enviados este ciclo</span>
-                <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>{samplesShippedTotal} / {SAMPLES_GOAL}</span>
+            {/* Browsing filter — controls the summary card, the document list, and the
+                per-product breakdown below all together. The bonus itself never moves with
+                this; it's always the official cycle (see the breakdown card at the bottom). */}
+            <div className="card" style={{marginBottom:"1.1rem",padding:"0.9rem 1rem"}}>
+              <div style={{display:"flex",gap:"0.4rem",marginBottom:productFilterMode!=="cycle"?"0.75rem":0}}>
+                <button style={{...qBtn,borderColor:productFilterMode==="cycle"?"#0891b2":"#e2e8f0",color:productFilterMode==="cycle"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("cycle")}>Ciclo actual</button>
+                <button style={{...qBtn,borderColor:productFilterMode==="month"?"#0891b2":"#e2e8f0",color:productFilterMode==="month"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("month")}>Por mes</button>
+                <button style={{...qBtn,borderColor:productFilterMode==="range"?"#0891b2":"#e2e8f0",color:productFilterMode==="range"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("range")}>Por rango de fechas</button>
               </div>
-              <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
-                <div style={{width:`${Math.min(100,samplesPct)}%`,height:"100%",background:C.samples,transition:"width 0.4s",borderRadius:4}} />
-              </div>
-              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(samplesPct)}% de la meta · ciclo {officialPeriod.from} → {officialPeriod.to}</div>
+              {productFilterMode==="month" && (
+                <div>
+                  <label style={lbl}>Mes</label>
+                  <input type="month" className="form-control" style={{maxWidth:170}} value={productFilterMonth} onChange={e=>setProductFilterMonth(e.target.value)} />
+                </div>
+              )}
+              {productFilterMode==="range" && (
+                <div style={{display:"flex",gap:"0.75rem"}}>
+                  <div><label style={lbl}>Desde</label>
+                    <input type="date" className="form-control" value={productFilterFrom} onChange={e=>setProductFilterFrom(e.target.value)} /></div>
+                  <div><label style={lbl}>Hasta</label>
+                    <input type="date" className="form-control" value={productFilterTo} onChange={e=>setProductFilterTo(e.target.value)} /></div>
+                </div>
+              )}
             </div>
 
-            {/* Uploaded periods */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
-              <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>
-                {samplesShowAllHistory ? "Todo el historial" : "Documentos de este ciclo"}
-              </p>
-              <button className="btn btn-sm btn-secondary" onClick={()=>setSamplesShowAllHistory(v=>!v)}>
-                {samplesShowAllHistory ? "Ver solo este ciclo" : "Ver todo el historial"}
-              </button>
+            {/* Summary: samples shipped vs goal, for whatever window is selected above */}
+            <div className="card" style={{marginBottom:"1.1rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
+                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>
+                  Samples enviados {productFilterMode==="cycle"?"este ciclo":productFilterMode==="month"?`en ${productFilterMonth}`:"en el rango"}
+                </span>
+                <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>{productWindowShippedTotal} / {SAMPLES_GOAL}</span>
+              </div>
+              <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
+                <div style={{width:`${Math.min(100,productWindowPct)}%`,height:"100%",background:C.samples,transition:"width 0.4s",borderRadius:4}} />
+              </div>
+              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(productWindowPct)}% de la meta · {productFilterWindow.from} → {productFilterWindow.to}</div>
             </div>
-            {periodsToShow.length === 0 ? (
-              <EmptyCard msg={samplesShowAllHistory ? "No hay documentos subidos todavía." : "No hay documentos subidos para este ciclo."} />
+
+            {/* Uploaded periods within the selected window */}
+            <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.6rem"}}>
+              Documentos en este rango
+            </p>
+            {periodsInFilterWindow.length === 0 ? (
+              <EmptyCard msg="No hay documentos subidos para este rango." />
             ) : (
               <div style={{marginBottom:"1.1rem"}}>
-                {periodsToShow.map(period => {
+                {periodsInFilterWindow.map(period => {
                   const shipped = analysisRows.filter(r => r.periodId === period.id).reduce((s,r) => s + (r.samplesShipped ?? 0), 0);
                   return (
                     <div key={period.id} className="card" style={{marginBottom:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem"}}>
@@ -1284,31 +1306,9 @@ export default function StrategyDashboard() {
               </div>
             )}
 
-            {/* Per-product breakdown: the 19 references (755 units) vs what's shipped */}
+            {/* Per-product breakdown: the 19 references (755 units) vs what's shipped, same window */}
             <div className="card" style={{marginBottom:"1.1rem",padding:"0.9rem 1rem"}}>
               <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.75rem"}}>Desglose por producto</p>
-              <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
-                <button style={{...qBtn,borderColor:productFilterMode==="cycle"?"#0891b2":"#e2e8f0",color:productFilterMode==="cycle"?C.samples:"#64748b"}}
-                  onClick={()=>setProductFilterMode("cycle")}>Ciclo actual</button>
-                <button style={{...qBtn,borderColor:productFilterMode==="month"?"#0891b2":"#e2e8f0",color:productFilterMode==="month"?C.samples:"#64748b"}}
-                  onClick={()=>setProductFilterMode("month")}>Por mes</button>
-                <button style={{...qBtn,borderColor:productFilterMode==="range"?"#0891b2":"#e2e8f0",color:productFilterMode==="range"?C.samples:"#64748b"}}
-                  onClick={()=>setProductFilterMode("range")}>Por rango de fechas</button>
-              </div>
-              {productFilterMode==="month" && (
-                <div style={{marginBottom:"0.75rem"}}>
-                  <label style={lbl}>Mes</label>
-                  <input type="month" className="form-control" style={{maxWidth:170}} value={productFilterMonth} onChange={e=>setProductFilterMonth(e.target.value)} />
-                </div>
-              )}
-              {productFilterMode==="range" && (
-                <div style={{display:"flex",gap:"0.75rem",marginBottom:"0.75rem"}}>
-                  <div><label style={lbl}>Desde</label>
-                    <input type="date" className="form-control" value={productFilterFrom} onChange={e=>setProductFilterFrom(e.target.value)} /></div>
-                  <div><label style={lbl}>Hasta</label>
-                    <input type="date" className="form-control" value={productFilterTo} onChange={e=>setProductFilterTo(e.target.value)} /></div>
-                </div>
-              )}
               {catalog.length === 0 ? (
                 <EmptyCard msg="Catálogo vacío — agrega productos en Supabase (tabla strategy_sample_catalog)" />
               ) : (
@@ -1384,9 +1384,10 @@ export default function StrategyDashboard() {
               </p>
             </div>
 
-            {/* Bonus breakdown */}
+            {/* Bonus breakdown — always the official cycle, regardless of the browsing filter above */}
             <div className="card" style={{marginBottom:"1.1rem",background:"#f0f9ff",border:"1px solid #bae6fd"}}>
-              <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.85rem"}}>Desglose del bono</p>
+              <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.2rem"}}>Desglose del bono</p>
+              <p style={{fontSize:"0.72rem",color:"#94a3b8",marginBottom:"0.75rem"}}>Ciclo oficial: {officialPeriod.from} → {officialPeriod.to} · {samplesShippedTotal} samples enviados ({Math.round(samplesPct)}%)</p>
               <div style={{display:"flex",justifyContent:"space-between",padding:"0.4rem 0",fontSize:"0.85rem"}}>
                 <span style={{color:"#64748b"}}>Samples enviados</span>
                 <span style={{fontWeight:700,color:"#1e293b"}}>${cop(samplesBonusAmount(samplesPct))} de ${cop(SAMPLES_BONUS_MAX)}</span>
