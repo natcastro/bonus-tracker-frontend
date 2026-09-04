@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident, UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow, SampleCatalogItem } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
@@ -12,7 +12,7 @@ import {
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
   addVideoLogEntriesBulk,
   getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod,
-  getStrategySamplesSettings, setStrategySamplesVideoPct,
+  getStrategySamplesSettings, setStrategySamplesVideoPct, getSampleCatalog,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
@@ -407,6 +407,48 @@ export default function StrategyDashboard() {
     await deleteSampleAnalysisPeriod(id);
     await loadAnalysis();
   };
+
+  // ── Per-product breakdown — the 19 references (755 units total) against what's
+  // actually been shipped, matched by TikTok's numeric Product ID. ─────────────
+  const [catalog, setCatalog] = useState<SampleCatalogItem[]>([]);
+  useEffect(() => { getSampleCatalog().then(setCatalog).catch(()=>{}); }, []);
+
+  const [productFilterMode, setProductFilterMode] = useState<"cycle"|"month"|"range">("cycle");
+  const [productFilterMonth, setProductFilterMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  });
+  const [productFilterFrom, setProductFilterFrom] = useState("");
+  const [productFilterTo, setProductFilterTo] = useState("");
+
+  const productFilterWindow = useMemo(() => {
+    if (productFilterMode === "cycle") return { from: officialPeriod.from, to: officialPeriod.to };
+    if (productFilterMode === "month") {
+      const [y, m] = productFilterMonth.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      return { from: `${productFilterMonth}-01`, to: `${productFilterMonth}-${String(lastDay).padStart(2,"0")}` };
+    }
+    return { from: productFilterFrom || "0000-01-01", to: productFilterTo || "9999-12-31" };
+  }, [productFilterMode, productFilterMonth, productFilterFrom, productFilterTo, officialPeriod]);
+
+  const productBreakdown = useMemo(() => {
+    const periodIds = new Set(
+      analysisPeriods
+        .filter(p => p.periodStart <= productFilterWindow.to && p.periodEnd >= productFilterWindow.from)
+        .map(p => p.id)
+    );
+    const rowsInWindow = analysisRows.filter(r => periodIds.has(r.periodId));
+    return catalog.filter(c => c.active).map(item => {
+      const matches = rowsInWindow.filter(r => r.productId === item.productId);
+      const sent = matches.reduce((s, r) => s + (r.samplesShipped ?? 0), 0);
+      const gmv = matches.reduce((s, r) => s + (r.contentGmv ?? 0), 0);
+      const latestRoi = matches.length > 0 ? matches[matches.length - 1].roi45d : null;
+      return {
+        item, sent, gmv, roi45d: latestRoi,
+        remaining: Math.max(0, item.monthlyQuota - sent),
+        done: sent >= item.monthlyQuota,
+      };
+    });
+  }, [catalog, analysisPeriods, analysisRows, productFilterWindow]);
 
   // ── Incident log state ────────────────────────────────────────────────────────
   type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
@@ -1202,6 +1244,76 @@ export default function StrategyDashboard() {
                 })}
               </div>
             )}
+
+            {/* Per-product breakdown: the 19 references (755 units) vs what's shipped */}
+            <div className="card" style={{marginBottom:"1.1rem",padding:"0.9rem 1rem"}}>
+              <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.75rem"}}>Desglose por producto</p>
+              <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
+                <button style={{...qBtn,borderColor:productFilterMode==="cycle"?"#0891b2":"#e2e8f0",color:productFilterMode==="cycle"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("cycle")}>Ciclo actual</button>
+                <button style={{...qBtn,borderColor:productFilterMode==="month"?"#0891b2":"#e2e8f0",color:productFilterMode==="month"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("month")}>Por mes</button>
+                <button style={{...qBtn,borderColor:productFilterMode==="range"?"#0891b2":"#e2e8f0",color:productFilterMode==="range"?C.samples:"#64748b"}}
+                  onClick={()=>setProductFilterMode("range")}>Por rango de fechas</button>
+              </div>
+              {productFilterMode==="month" && (
+                <div style={{marginBottom:"0.75rem"}}>
+                  <label style={lbl}>Mes</label>
+                  <input type="month" className="form-control" style={{maxWidth:170}} value={productFilterMonth} onChange={e=>setProductFilterMonth(e.target.value)} />
+                </div>
+              )}
+              {productFilterMode==="range" && (
+                <div style={{display:"flex",gap:"0.75rem",marginBottom:"0.75rem"}}>
+                  <div><label style={lbl}>Desde</label>
+                    <input type="date" className="form-control" value={productFilterFrom} onChange={e=>setProductFilterFrom(e.target.value)} /></div>
+                  <div><label style={lbl}>Hasta</label>
+                    <input type="date" className="form-control" value={productFilterTo} onChange={e=>setProductFilterTo(e.target.value)} /></div>
+                </div>
+              )}
+              {catalog.length === 0 ? (
+                <EmptyCard msg="Catálogo vacío — agrega productos en Supabase (tabla strategy_sample_catalog)" />
+              ) : (
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
+                    <thead>
+                      <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
+                        {["Producto","Product ID","Meta","Enviados","Faltan","Estado","GMV","ROI 45d"].map(h=>(
+                          <th key={h} style={{padding:"0.6rem 0.85rem",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:"0.7rem",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productBreakdown.map(({item,sent,gmv,roi45d,remaining,done}) => (
+                        <tr key={item.id} style={{borderBottom:"1px solid #f1f5f9"}}>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#1e293b",maxWidth:280}}>{item.productName}</td>
+                          <td style={{padding:"0.6rem 0.85rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{item.productId || "—"}</td>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center"}}>{item.monthlyQuota}</td>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center",color:done?"#15803d":sent>0?"#ca8a04":"#64748b"}}>{sent}</td>
+                          <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:done?"#94a3b8":"#1e293b"}}>{remaining}</td>
+                          <td style={{padding:"0.6rem 0.85rem"}}>
+                            <span style={{display:"inline-block",padding:"0.15rem 0.65rem",borderRadius:20,fontSize:"0.68rem",fontWeight:700,
+                              background:done?"#dcfce7":sent>0?"#fef9c3":"#f1f5f9",
+                              color:done?"#15803d":sent>0?"#854d0e":"#64748b"}}>
+                              {done?"✓ Completo":sent>0?"En progreso":"Sin enviar"}
+                            </span>
+                          </td>
+                          <td style={{padding:"0.6rem 0.85rem",whiteSpace:"nowrap"}}>{gmv>0?`$${gmv.toLocaleString("en-US",{maximumFractionDigits:0})}`:"—"}</td>
+                          <td style={{padding:"0.6rem 0.85rem"}}>{roi45d ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
+                        <td colSpan={2} style={{padding:"0.6rem 0.85rem",fontWeight:700,color:"#64748b"}}>TOTAL</td>
+                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center"}}>{productBreakdown.reduce((s,r)=>s+r.item.monthlyQuota,0)}</td>
+                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center",color:C.samples}}>{productBreakdown.reduce((s,r)=>s+r.sent,0)}</td>
+                        <td colSpan={4} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
 
             {/* Manual "% de videos hechos" */}
             <div className="card" style={{marginBottom:"1.1rem"}}>
