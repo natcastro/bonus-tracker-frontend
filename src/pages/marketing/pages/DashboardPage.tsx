@@ -50,8 +50,11 @@ export default function DashboardPage() {
   const completedThisMonth = briefs.filter(b => b.status === "completed" && !!b.completedAt && b.completedAt.slice(0, 7) === thisMonthKey);
   const inProgressBriefs = briefs.filter(b => b.status === "in_progress");
   const inProgress = inProgressBriefs.length;
-  const onTimePct = completedThisMonth.length > 0
-    ? Math.round(100 * completedThisMonth.filter(b => b.designDelayCount === 0).length / completedThisMonth.length)
+  // "On time" also has to reflect briefs that are in progress right now and already past their
+  // current deadline — not just past delays on briefs that have already been completed.
+  const onTimeCohort = [...completedThisMonth, ...inProgressBriefs];
+  const onTimePct = onTimeCohort.length > 0
+    ? Math.round(100 * onTimeCohort.filter(b => b.designDelayCount === 0 && !isOverdue(b)).length / onTimeCohort.length)
     : 100;
   const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + b.designDelayCount, 0);
   const bunny = moodBunny(onTimePct);
