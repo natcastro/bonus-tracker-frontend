@@ -99,6 +99,12 @@ export default function MyTasksPage() {
         </div>
       )}
 
+      {myDrafts.length > 0 && (
+        <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+          Tareas inmediatas
+        </p>
+      )}
+
       {myPending.length === 0 ? (
         <div style={{
           background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg,
