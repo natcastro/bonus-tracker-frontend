@@ -49,11 +49,12 @@ function EntryForm({
   initial, onSave, onCancel,
 }: {
   initial?: HubAccessEntry;
-  onSave: (email: string, teams: string[], isAdmin: boolean) => Promise<void>;
+  onSave: (email: string, teams: string[], isAdmin: boolean, nickname: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const parsed = parseTeams(initial?.teams ?? []);
   const [email, setEmail] = useState(initial?.email ?? "");
+  const [nickname, setNickname] = useState(initial?.nickname ?? "");
   const [teams, setTeams] = useState<string[]>(parsed.plain);
   const [roles, setRoles] = useState<Record<string, RoleValue>>(parsed.roles);
   const [allAccess, setAllAccess] = useState(initial?.teams.includes("ALL") ?? false);
@@ -71,7 +72,7 @@ function EntryForm({
     try {
       const roleTeams = ROLE_TEAMS.filter(rt => roles[rt.key]).map(rt => `${rt.key}:${roles[rt.key]}`);
       const finalTeams = allAccess ? ["ALL"] : [...teams, ...roleTeams];
-      await onSave(email.trim().toLowerCase(), finalTeams, isAdmin);
+      await onSave(email.trim().toLowerCase(), finalTeams, isAdmin, nickname.trim());
     } catch (err: any) {
       setError(err?.message ?? "No se pudo guardar.");
     } finally { setSaving(false); }
@@ -83,6 +84,13 @@ function EntryForm({
       <input
         type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={!!initial}
         placeholder="nombre@formatucuerpo.com" autoFocus={!initial}
+        className="form-control" style={{ marginBottom: "0.75rem" }}
+      />
+
+      <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Apodo / nombre para mostrar (opcional)</label>
+      <input
+        type="text" value={nickname} onChange={e => setNickname(e.target.value)}
+        placeholder="Ej. Juanita"
         className="form-control" style={{ marginBottom: "0.75rem" }}
       />
 
@@ -200,6 +208,7 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const startPreview = (team: string, role: TeamRole) => {
     startViewAs(team, role);
@@ -215,8 +224,8 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => { load(); }, []);
 
-  const save = async (email: string, teams: string[], isAdmin: boolean) => {
-    await upsertHubAccess(email, teams, isAdmin);
+  const save = async (email: string, teams: string[], isAdmin: boolean, nickname: string) => {
+    await upsertHubAccess(email, teams, isAdmin, nickname);
     setAdding(false); setEditingEmail(null);
     await load();
   };
@@ -231,6 +240,11 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
     if (teams.includes("ALL")) return "Todo";
     return teams.map(formatTeamEntry).join(", ") || "Sin equipos";
   };
+
+  const q = search.trim().toLowerCase();
+  const visibleEntries = q
+    ? entries.filter(e => e.email.toLowerCase().includes(q) || e.nickname.toLowerCase().includes(q) || teamLabels(e.teams).toLowerCase().includes(q))
+    : entries;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1.5rem" }}>
@@ -251,21 +265,32 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
           <EntryForm onSave={save} onCancel={() => setAdding(false)} />
         )}
 
+        {!loading && entries.length > 0 && (
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por correo, apodo o equipo/rol..."
+            className="form-control" style={{ marginBottom: "0.75rem" }}
+          />
+        )}
+
         {loading ? (
           <p style={{ color: "#6B7280", fontSize: 13 }}>Cargando…</p>
         ) : entries.length === 0 ? (
           <p style={{ color: "#6B7280", fontSize: 13 }}>Todavía no hay correos con acceso.</p>
+        ) : visibleEntries.length === 0 ? (
+          <p style={{ color: "#6B7280", fontSize: 13 }}>Ningún correo coincide con "{search}".</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {entries.map(e => (
+            {visibleEntries.map(e => (
               editingEmail === e.email ? (
                 <EntryForm key={e.email} initial={e} onSave={save} onCancel={() => setEditingEmail(null)} />
               ) : (
                 <div key={e.email} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #E5E7EB", borderRadius: 8, padding: "0.6rem 0.8rem" }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
-                      {e.email} {e.isAdmin && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#7c3aed", background: "#f1ebfe", borderRadius: 999, padding: "0.1rem 0.5rem", marginLeft: 6 }}>ADMIN</span>}
+                      {e.nickname || e.email} {e.isAdmin && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#7c3aed", background: "#f1ebfe", borderRadius: 999, padding: "0.1rem 0.5rem", marginLeft: 6 }}>ADMIN</span>}
                     </div>
+                    {e.nickname && <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 1 }}>{e.email}</div>}
                     <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{teamLabels(e.teams)}</div>
                   </div>
                   <div style={{ display: "flex", gap: "0.4rem" }}>

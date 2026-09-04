@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
-  deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyDirectory, setMarketingNotifyEntry,
+  deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
+  getHubNicknames,
 } from "../../services/api";
-import type { MarketingNotifyEmails, MarketingNotifyNames, MarketingNotifySlot } from "../../services/api";
+import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, StageKey } from "./types";
@@ -19,8 +20,6 @@ const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   diseno_2: "",
   diseno_3: "",
 };
-
-const EMPTY_NOTIFY_NAMES: MarketingNotifyNames = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
 
 function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null; note?: string }): string {
   const { intro, reference, nextTask, deadline, note } = opts;
@@ -61,11 +60,10 @@ interface MarketingCtx {
   clearAllNotifications: () => Promise<void>;
 
   notifyEmails: MarketingNotifyEmails;
-  notifyNames: MarketingNotifyNames;
   disenoEmailList: string[];
-  updateNotifyEntry: (slot: MarketingNotifySlot, email: string, name: string) => Promise<void>;
-  // Human-friendly label for a Diseño email — the person's name if one was set for it,
-  // otherwise the raw email, otherwise "Diseño" when nobody is assigned.
+  updateNotifyEmail: (slot: MarketingNotifySlot, email: string) => Promise<void>;
+  // Human-friendly label for a Diseño email — that person's Hub Access nickname if they have
+  // one, otherwise the raw email, otherwise "Diseño" when nobody is assigned.
   disenoDisplayName: (email: string | null) => string;
 }
 
@@ -82,24 +80,20 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
   const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
-  const [notifyNames, setNotifyNames] = useState<MarketingNotifyNames>(EMPTY_NOTIFY_NAMES);
+  // Keyed by lowercased email — sourced from each person's Hub Access nickname, so a name never
+  // has to be typed twice (once for login access, once for Marketing notifications).
+  const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   // Every Diseño person shares the same "staff" role — the Microsoft login email is the only
   // thing that tells them apart, matched against the diseno_1/2/3 slots Laura configured.
   const authedUser: MarketingUser | null = useMemo(() => {
     const role = getRole("MARKETING");
-    if (role === "admin") return { role: "laura", name: "Laura", email: myEmail };
-    if (role === "carol") return { role: "carol", name: "Karol", email: myEmail };
-    if (role === "staff") {
-      const slot = (["diseno_1", "diseno_2", "diseno_3"] as const).find(
-        s => notifyEmails[s].toLowerCase() === myEmail.toLowerCase(),
-      );
-      const name = (slot && notifyNames[slot]) || "Diseño";
-      return { role: "diseno", name, email: myEmail };
-    }
+    if (role === "admin") return { role: "laura", name: nicknames[myEmail.toLowerCase()] || "Laura", email: myEmail };
+    if (role === "carol") return { role: "carol", name: nicknames[myEmail.toLowerCase()] || "Karol", email: myEmail };
+    if (role === "staff") return { role: "diseno", name: nicknames[myEmail.toLowerCase()] || "Diseño", email: myEmail };
     return null;
-  }, [getRole, myEmail, notifyEmails, notifyNames]);
+  }, [getRole, myEmail, nicknames]);
 
   const disenoEmailList = useMemo(
     () => [notifyEmails.diseno_1, notifyEmails.diseno_2, notifyEmails.diseno_3].map(e => e.trim()).filter(Boolean),
@@ -108,8 +102,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   const disenoDisplayName = (email: string | null): string => {
     if (!email) return "Diseño";
-    const slot = (["diseno_1", "diseno_2", "diseno_3"] as const).find(s => notifyEmails[s] === email);
-    return (slot && notifyNames[slot]) || email;
+    return nicknames[email.toLowerCase()] || email;
   };
 
   const reload = useCallback(async () => {
@@ -117,27 +110,36 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     setBriefs(b); setNotifications(n);
   }, []);
 
+  const loadNicknames = useCallback(async (emails: MarketingNotifyEmails) => {
+    try {
+      const map = await getHubNicknames([myEmail, emails.laura, emails.carol, emails.diseno_1, emails.diseno_2, emails.diseno_3]);
+      setNicknames(map);
+    } catch { /* nicknames are a display-only nicety — never block the app on this */ }
+  }, [myEmail]);
+
   useEffect(() => {
     setLoading(true);
     reload().finally(() => setLoading(false));
-    getMarketingNotifyDirectory()
-      .then(({ emails, names }) => {
-        setNotifyEmails(prev => ({
-          laura: emails.laura || prev.laura,
-          carol: emails.carol || prev.carol,
-          diseno_1: emails.diseno_1 || prev.diseno_1,
-          diseno_2: emails.diseno_2 || prev.diseno_2,
-          diseno_3: emails.diseno_3 || prev.diseno_3,
-        }));
-        setNotifyNames(names);
+    getMarketingNotifyEmails()
+      .then(emails => {
+        const merged = {
+          laura: emails.laura || DEFAULT_NOTIFY_EMAILS.laura,
+          carol: emails.carol || DEFAULT_NOTIFY_EMAILS.carol,
+          diseno_1: emails.diseno_1 || DEFAULT_NOTIFY_EMAILS.diseno_1,
+          diseno_2: emails.diseno_2 || DEFAULT_NOTIFY_EMAILS.diseno_2,
+          diseno_3: emails.diseno_3 || DEFAULT_NOTIFY_EMAILS.diseno_3,
+        };
+        setNotifyEmails(merged);
+        loadNicknames(merged);
       })
       .catch(() => {});
-  }, [reload]);
+  }, [reload, loadNicknames]);
 
-  const updateNotifyEntry = async (slot: MarketingNotifySlot, email: string, name: string) => {
-    await setMarketingNotifyEntry(slot, email, name);
-    setNotifyEmails(prev => ({ ...prev, [slot]: email }));
-    setNotifyNames(prev => ({ ...prev, [slot]: name }));
+  const updateNotifyEmail = async (slot: MarketingNotifySlot, email: string) => {
+    await setMarketingNotifyEmail(slot, email);
+    const next = { ...notifyEmails, [slot]: email };
+    setNotifyEmails(next);
+    await loadNicknames(next);
   };
 
   // Diseño-directed emails go only to whoever claimed the brief, once someone has —
@@ -452,7 +454,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       authedUser, briefs, notifications, loading, reload,
       createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
-      notifyEmails, notifyNames, disenoEmailList, updateNotifyEntry, disenoDisplayName,
+      notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
     }}>
       {children}
     </Ctx.Provider>

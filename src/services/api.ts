@@ -1537,26 +1537,22 @@ export interface MarketingNotifyEmails {
   diseno_3: string;
 }
 
-export type MarketingNotifyNames = MarketingNotifyEmails;
-
 const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3"];
 
-export async function getMarketingNotifyDirectory(): Promise<{ emails: MarketingNotifyEmails; names: MarketingNotifyNames }> {
+// Display names come from each person's Hub Access nickname (see getHubNicknames) — this table
+// only maps a Marketing slot to an email address, so a name never has to be typed twice.
+export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
   const emails: MarketingNotifyEmails = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
-  const names: MarketingNotifyNames = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
   (data ?? []).forEach((r: any) => {
-    if (NOTIFY_SLOTS.includes(r.role)) {
-      emails[r.role as MarketingNotifySlot] = r.email ?? "";
-      names[r.role as MarketingNotifySlot] = r.name ?? "";
-    }
+    if (NOTIFY_SLOTS.includes(r.role)) emails[r.role as MarketingNotifySlot] = r.email ?? "";
   });
-  return { emails, names };
+  return emails;
 }
 
-export async function setMarketingNotifyEntry(role: MarketingNotifySlot, email: string, name: string): Promise<void> {
-  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email, name });
+export async function setMarketingNotifyEmail(role: MarketingNotifySlot, email: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
   if (error) throw error;
 }
 
@@ -1566,24 +1562,37 @@ export interface HubAccessEntry {
   email: string;
   teams: string[];
   isAdmin: boolean;
+  nickname: string;
 }
 
 export async function getHubAccessForEmail(email: string): Promise<HubAccessEntry | null> {
   const { data, error } = await supabase.from("hub_access").select("*").ilike("email", email).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { email: data.email, teams: data.teams ?? [], isAdmin: data.is_admin ?? false };
+  return { email: data.email, teams: data.teams ?? [], isAdmin: data.is_admin ?? false, nickname: data.nickname ?? "" };
 }
 
 export async function getAllHubAccess(): Promise<HubAccessEntry[]> {
   const { data, error } = await supabase.from("hub_access").select("*").order("email");
   if (error) throw error;
-  return (data ?? []).map((r: any) => ({ email: r.email, teams: r.teams ?? [], isAdmin: r.is_admin ?? false }));
+  return (data ?? []).map((r: any) => ({ email: r.email, teams: r.teams ?? [], isAdmin: r.is_admin ?? false, nickname: r.nickname ?? "" }));
 }
 
-export async function upsertHubAccess(email: string, teams: string[], isAdmin: boolean): Promise<void> {
-  const { error } = await supabase.from("hub_access").upsert({ email: email.toLowerCase().trim(), teams, is_admin: isAdmin });
+export async function upsertHubAccess(email: string, teams: string[], isAdmin: boolean, nickname: string): Promise<void> {
+  const { error } = await supabase.from("hub_access").upsert({ email: email.toLowerCase().trim(), teams, is_admin: isAdmin, nickname });
   if (error) throw error;
+}
+
+// Looks up display nicknames for a set of emails — used by modules (like Marketing) that want to
+// show "who" instead of a generic role, without keeping a second copy of everyone's name.
+export async function getHubNicknames(emails: string[]): Promise<Record<string, string>> {
+  const clean = Array.from(new Set(emails.map(e => e.trim().toLowerCase()).filter(Boolean)));
+  if (clean.length === 0) return {};
+  const { data, error } = await supabase.from("hub_access").select("email,nickname").in("email", clean);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  (data ?? []).forEach((r: any) => { if (r.nickname) map[r.email.toLowerCase()] = r.nickname; });
+  return map;
 }
 
 export async function deleteHubAccess(email: string): Promise<void> {
