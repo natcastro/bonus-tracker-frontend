@@ -30,6 +30,8 @@ export default function BriefDetailPage() {
   const [noteInput, setNoteInput] = useState("");
   const [reviewLinkInput, setReviewLinkInput] = useState("");
   const [publishAssignEmail, setPublishAssignEmail] = useState("");
+  const [draftLinkInput, setDraftLinkInput] = useState(() => brief?.stages.find(s => s.key === "brief")?.link ?? "");
+  const [savingDraftLink, setSavingDraftLink] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -149,13 +151,33 @@ export default function BriefDetailPage() {
           </p>
           {myRole === "laura" ? (
             <>
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Link de SharePoint del brief (opcional)</label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  style={fieldStyle} value={draftLinkInput} onChange={e => setDraftLinkInput(e.target.value)}
+                  placeholder="https://formatucuerpo.sharepoint.com/..."
+                />
+                <button disabled={savingDraftLink} onClick={async () => {
+                  setSavingDraftLink(true);
+                  try { await updateStageLink(brief.id, "brief", draftLinkInput.trim()); }
+                  finally { setSavingDraftLink(false); }
+                }} style={{
+                  fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: savingDraftLink ? "not-allowed" : "pointer",
+                  background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "0 16px", whiteSpace: "nowrap",
+                }}>{savingDraftLink ? "..." : "Guardar enlace"}</button>
+              </div>
+
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
               <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
                 <option value="">Sin asignar — avisar a Karol</option>
                 {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
               </select>
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-              <button disabled={busy} onClick={() => run(() => publishBrief(brief.id, publishAssignEmail || undefined))} style={{
+              <button disabled={busy} onClick={() => run(async () => {
+                const currentLink = brief.stages.find(s => s.key === "brief")?.link ?? "";
+                if (draftLinkInput.trim() !== currentLink) await updateStageLink(brief.id, "brief", draftLinkInput.trim());
+                await publishBrief(brief.id, publishAssignEmail || undefined);
+              })} style={{
                 fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                 background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
               }}>{busy ? "Publicando..." : "Publicar ahora"}</button>
