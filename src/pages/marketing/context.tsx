@@ -78,19 +78,28 @@ export function useMarketing() {
 }
 
 export function MarketingProvider({ children }: { children: ReactNode }) {
-  const { getRole } = useHubAccess();
-  const authedUser: MarketingUser | null = useMemo(() => {
-    const role = getRole("MARKETING");
-    if (role === "admin") return { role: "laura", name: "Laura" };
-    if (role === "staff") return { role: "diseno", name: "Diseño" };
-    if (role === "carol") return { role: "carol", name: "Karol" };
-    return null;
-  }, [getRole]);
+  const { getRole, email: myEmail } = useHubAccess();
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
   const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
   const [notifyNames, setNotifyNames] = useState<MarketingNotifyNames>(EMPTY_NOTIFY_NAMES);
   const [loading, setLoading] = useState(true);
+
+  // Every Diseño person shares the same "staff" role — the Microsoft login email is the only
+  // thing that tells them apart, matched against the diseno_1/2/3 slots Laura configured.
+  const authedUser: MarketingUser | null = useMemo(() => {
+    const role = getRole("MARKETING");
+    if (role === "admin") return { role: "laura", name: "Laura", email: myEmail };
+    if (role === "carol") return { role: "carol", name: "Karol", email: myEmail };
+    if (role === "staff") {
+      const slot = (["diseno_1", "diseno_2", "diseno_3"] as const).find(
+        s => notifyEmails[s].toLowerCase() === myEmail.toLowerCase(),
+      );
+      const name = (slot && notifyNames[slot]) || "Diseño";
+      return { role: "diseno", name, email: myEmail };
+    }
+    return null;
+  }, [getRole, myEmail, notifyEmails, notifyNames]);
 
   const disenoEmailList = useMemo(
     () => [notifyEmails.diseno_1, notifyEmails.diseno_2, notifyEmails.diseno_3].map(e => e.trim()).filter(Boolean),

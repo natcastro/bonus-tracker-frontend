@@ -30,14 +30,19 @@ export default function MyTasksPage() {
       .filter(b => b.status === "in_progress")
       .filter(b => {
         const stage = b.stages.find(s => s.key === b.currentStage);
-        return stage?.role === myRole;
+        if (stage?.role !== myRole) return false;
+        // Each Diseño person only sees briefs assigned specifically to them, never a colleague's.
+        if (myRole === "diseno") {
+          return !!b.assignedDisenoEmail && b.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
+        }
+        return true;
       })
       .sort((a, b) => {
         const sa = a.stages.find(s => s.key === a.currentStage)!;
         const sb = b.stages.find(s => s.key === b.currentStage)!;
         return (sa.deadline ?? "").localeCompare(sb.deadline ?? "");
       });
-  }, [briefs, myRole]);
+  }, [briefs, myRole, authedUser?.email]);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>

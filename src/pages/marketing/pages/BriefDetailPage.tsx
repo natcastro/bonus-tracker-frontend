@@ -46,7 +46,10 @@ export default function BriefDetailPage() {
 
   const currentStage = brief.stages.find(s => s.key === brief.currentStage);
   const myRole = authedUser?.role;
-  const canAct = brief.status === "in_progress" && currentStage?.role === myRole;
+  // A Diseño person can only act on briefs assigned specifically to them, never a colleague's.
+  const isMyDisenoAssignment = myRole !== "diseno" || !brief.assignedDisenoEmail
+    || brief.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
+  const canAct = brief.status === "in_progress" && currentStage?.role === myRole && isMyDisenoAssignment;
   const isFinal = brief.currentStage === "final";
   const isPublish = brief.currentStage === "publish";
   // Only Laura or Carol can assign — Diseño no longer picks itself. Independent of canAct/turn,
@@ -189,7 +192,7 @@ export default function BriefDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {brief.stages.map(s => {
             const isCurrent = brief.status === "in_progress" && s.key === brief.currentStage;
-            const canEdit = LINK_STAGES.has(s.key) && s.role === myRole;
+            const canEdit = LINK_STAGES.has(s.key) && s.role === myRole && isMyDisenoAssignment;
             const isEditing = editingStage === s.key;
             return (
               <div key={s.key} style={{
@@ -255,7 +258,11 @@ export default function BriefDetailPage() {
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
             {currentStage && <Avatar role={currentStage.role} size={18} />}
-            <span>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></span>
+            <span>
+              {currentStage?.role === "diseno" && myRole === "diseno" && !isMyDisenoAssignment
+                ? <>Asignado a {disenoDisplayName(brief.assignedDisenoEmail)} — no es tu tarea</>
+                : <>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></>}
+            </span>
           </div>
           {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
         </div>

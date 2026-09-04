@@ -65,6 +65,9 @@ export interface MarketingNotification {
 export interface MarketingUser {
   role: MarketingRole;
   name: string;
+  // The actual Microsoft login email — used to tell individual Diseño people apart, since they
+  // all share the same "diseno" role and only this identifies which one is logged in.
+  email: string;
 }
 
 // gapDays is always counted from the previous stage's actual completion date — never from the
