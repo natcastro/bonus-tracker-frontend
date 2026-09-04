@@ -37,6 +37,7 @@ export default function BriefDetailPage() {
   const [deleteError, setDeleteError] = useState("");
   const [editingStage, setEditingStage] = useState<StageKey | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [showReassign, setShowReassign] = useState(false);
 
   if (!brief) {
     return (
@@ -57,7 +58,7 @@ export default function BriefDetailPage() {
   // Only Laura or Carol can assign — Diseño no longer picks itself. Independent of canAct/turn,
   // since assignment needs to happen as soon as possible, not just when it's Diseño's turn.
   const canAssign = myRole === "laura" || myRole === "carol";
-  const showAssignPanel = brief.status === "in_progress" && !brief.assignedDisenoEmail && canAssign;
+  const showAssignPanel = brief.status === "in_progress" && canAssign;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -189,19 +190,45 @@ export default function BriefDetailPage() {
       ) : (
       <>
       {showAssignPanel && (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Asignar a Diseño</p>
-          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>{ASSIGN_HELP_TEXT}</p>
-          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {disenoEmailList.map(email => (
-              <button key={email} disabled={busy} onClick={() => run(() => assignBrief(brief.id, email))} style={{
-                fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "9px 14px",
-              }}>{disenoDisplayName(email)}</button>
-            ))}
+        brief.assignedDisenoEmail && !showReassign ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.6rem 1rem", marginBottom: "1rem" }}>
+            <span style={{ fontSize: 12.5, color: MT.text2 }}>Asignado a <strong style={{ color: MT.text1 }}>{disenoDisplayName(brief.assignedDisenoEmail)}</strong></span>
+            <button onClick={() => setShowReassign(true)} style={{
+              fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              background: "none", border: "none", color: MT.info, padding: 0,
+            }}>Reasignar</button>
           </div>
-        </div>
+        ) : (
+          <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
+            <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
+              {brief.assignedDisenoEmail ? "Reasignar a Diseño" : "Asignar a Diseño"}
+            </p>
+            <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
+              {brief.assignedDisenoEmail
+                ? "Por si alguien no puede seguir con esta tarea — elige a quién más se le asigna."
+                : ASSIGN_HELP_TEXT}
+            </p>
+            {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {disenoEmailList.map(email => {
+                const isCurrent = brief.assignedDisenoEmail === email;
+                return (
+                  <button key={email} disabled={busy || isCurrent} onClick={() => run(async () => { await assignBrief(brief.id, email); setShowReassign(false); })} style={{
+                    fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy || isCurrent ? "not-allowed" : "pointer",
+                    background: isCurrent ? MT.primarySoft : MT.surfaceAlt, color: isCurrent ? MT.primary : MT.text1,
+                    border: `1px solid ${isCurrent ? MT.primary : MT.border}`, borderRadius: 8, padding: "9px 14px",
+                  }}>{isCurrent && "✓ "}{disenoDisplayName(email)}</button>
+                );
+              })}
+              {brief.assignedDisenoEmail && (
+                <button onClick={() => setShowReassign(false)} style={{
+                  fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  background: "none", border: "none", color: MT.text2, padding: "9px 4px",
+                }}>Cancelar</button>
+              )}
+            </div>
+          </div>
+        )
       )}
 
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
