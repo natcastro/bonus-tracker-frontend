@@ -373,12 +373,15 @@ export default function StrategyDashboard() {
   const [videoPctDraft, setVideoPctDraft] = useState("0");
   useEffect(() => { setVideoPctDraft(String(samplesSettings.videoContentPct)); }, [samplesSettings.videoContentPct]);
   const [savingVideoPct, setSavingVideoPct] = useState(false);
+  const [videoPctErr, setVideoPctErr] = useState("");
   const saveVideoPct = async () => {
     const v = Math.max(0, Math.min(100, Number(videoPctDraft) || 0));
-    setSavingVideoPct(true);
+    setSavingVideoPct(true); setVideoPctErr("");
     try {
       await setStrategySamplesVideoPct(year, cycleId, v);
       setSamplesSettingsState({ videoContentPct: v });
+    } catch (err: any) {
+      setVideoPctErr(err?.message ?? "No se pudo guardar.");
     } finally { setSavingVideoPct(false); }
   };
 
@@ -1379,6 +1382,7 @@ export default function StrategyDashboard() {
                 <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
                 <button className="btn btn-primary btn-sm" disabled={savingVideoPct} onClick={saveVideoPct}>{savingVideoPct?"...":"Guardar"}</button>
               </div>
+              {videoPctErr && <p style={{color:"#dc2626",fontSize:"0.8rem",marginTop:"0.5rem",marginBottom:0}}>{videoPctErr}</p>}
               <p style={{fontSize:"0.75rem",color:"#94a3b8",marginTop:"0.5rem",marginBottom:0}}>
                 Aproximadamente 2 videos por sample enviado es un buen punto de referencia.
               </p>
