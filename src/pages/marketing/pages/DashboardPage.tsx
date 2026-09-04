@@ -9,6 +9,7 @@ import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
+import { moodBunny } from "../../../components/moodBunny";
 
 const MONTHLY_GOAL = 8;
 
@@ -53,6 +54,7 @@ export default function DashboardPage() {
     ? Math.round(100 * completedThisMonth.filter(b => b.designDelayCount === 0).length / completedThisMonth.length)
     : 100;
   const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + b.designDelayCount, 0);
+  const bunny = moodBunny(onTimePct);
 
   const filtered = briefs.filter(b => {
     if (search && !b.reference.toLowerCase().includes(search.toLowerCase())) return false;
@@ -105,9 +107,12 @@ export default function DashboardPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <div style={{ marginBottom: "0.9rem" }}>
-        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Vista general</h1>
-        <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Vista general</h1>
+          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
+        </div>
+        <img src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 52, height: 52, objectFit: "contain", flexShrink: 0 }} />
       </div>
 
       {/* KPI strip */}
