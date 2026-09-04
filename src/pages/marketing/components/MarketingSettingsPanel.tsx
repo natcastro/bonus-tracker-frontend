@@ -47,8 +47,8 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
         <h3 style={{ margin: "0 0 6px", color: MT.text1, fontSize: 18 }}>Correos de notificación</h3>
         <p style={{ margin: "0 0 20px", color: MT.text2, fontSize: 12.5 }}>
           A dónde llegan los avisos automáticos de Marketing. Si Laura no asigna un brief nuevo a
-          alguien de Diseño, se le avisa a Carol para que lo asigne — los 3 correos de Diseño solo
-          reciben el aviso una vez que alguien (Laura o Carol) se lo asigna directamente.
+          alguien de Diseño, se le avisa a Karol para que lo asigne — los 3 correos de Diseño solo
+          reciben el aviso una vez que alguien (Laura o Karol) se lo asigna directamente.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -57,8 +57,8 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
             <input style={fieldStyle} value={laura} onChange={e => setLaura(e.target.value)} placeholder="laura@formatucuerpo.com" />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Carol</label>
-            <input style={fieldStyle} value={carol} onChange={e => setCarol(e.target.value)} placeholder="carol@formatucuerpo.com" />
+            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Karol</label>
+            <input style={fieldStyle} value={carol} onChange={e => setCarol(e.target.value)} placeholder="karol@formatucuerpo.com" />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño 1</label>

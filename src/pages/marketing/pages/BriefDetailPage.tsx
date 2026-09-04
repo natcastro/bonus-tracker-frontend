@@ -142,13 +142,13 @@ export default function BriefDetailPage() {
         <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
           <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
-            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Carol.
+            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
           </p>
           {myRole === "laura" ? (
             <>
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
               <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
-                <option value="">Sin asignar — avisar a Carol</option>
+                <option value="">Sin asignar — avisar a Karol</option>
                 {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
               </select>
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}

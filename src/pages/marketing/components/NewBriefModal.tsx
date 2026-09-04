@@ -85,7 +85,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             <div>
               <label style={labelStyle}>Asignar a Diseño (opcional)</label>
               <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
-                <option value="">Sin asignar — avisar a Carol</option>
+                <option value="">Sin asignar — avisar a Karol</option>
                 {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
               </select>
             </div>

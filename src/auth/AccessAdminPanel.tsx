@@ -20,7 +20,7 @@ const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC Méxic
 // extraRole lets a team offer a third role button beyond admin/staff (only Marketing needs this, for Carol).
 const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string; extraRole?: { value: string; label: string } }[] = [
   { key: "MEX",       label: "FTC México", adminLabel: "Administrador", staffLabel: "Staff" },
-  { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRole: { value: "carol", label: "Carol (coordinación)" } },
+  { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRole: { value: "carol", label: "Karol (coordinación)" } },
 ];
 
 type RoleValue = "admin" | "staff" | "carol" | "";

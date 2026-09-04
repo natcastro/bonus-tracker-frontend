@@ -126,7 +126,7 @@ export const handler = async (event) => {
 
     try {
       await updateBrief(brief.id, { assigned_diseno_email: email, carol_notified_at: null });
-      await insertNotification(brief.id, `Se asignó automáticamente ${brief.reference} a Diseño — Carol no lo asignó a tiempo.`);
+      await insertNotification(brief.id, `Se asignó automáticamente ${brief.reference} a Diseño — Karol no lo asignó a tiempo.`);
       await sendGraphMail(
         email,
         `Te asignaron un brief — ${brief.reference}`,

@@ -77,7 +77,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const role = getRole("MARKETING");
     if (role === "admin") return { role: "laura", name: "Laura" };
     if (role === "staff") return { role: "diseno", name: "Diseño" };
-    if (role === "carol") return { role: "carol", name: "Carol" };
+    if (role === "carol") return { role: "carol", name: "Karol" };
     return null;
   }, [getRole]);
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);

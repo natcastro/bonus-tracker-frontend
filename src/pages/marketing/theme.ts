@@ -43,7 +43,7 @@ export const MT = {
 export const ROLE_CFG: Record<string, { label: string; color: string; soft: string }> = {
   laura: { label: "Laura", color: MT.primary, soft: MT.primarySoft },
   diseno: { label: "Diseño", color: MT.clay, soft: MT.claySoft },
-  carol: { label: "Carol", color: MT.info, soft: MT.infoSoft },
+  carol: { label: "Karol", color: MT.info, soft: MT.infoSoft },
 };
 
 export function formatDateHuman(iso: string | null): string {
