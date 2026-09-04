@@ -32,7 +32,7 @@ function groupOf(b: MarketingBrief): GroupKey {
 }
 
 export default function DashboardPage() {
-  const { briefs: allBriefs } = useMarketing();
+  const { briefs: allBriefs, disenoDisplayName } = useMarketing();
   // Private/pending tasks live only in "Mis tareas" — Vista general only shows published briefs.
   const briefs = useMemo(() => allBriefs.filter(b => b.status !== "draft"), [allBriefs]);
   const navigate = useNavigate();
@@ -214,7 +214,9 @@ export default function DashboardPage() {
                             {role ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 <Avatar role={role} size={20} />
-                                <span style={{ fontSize: 12, color: MT.text2 }}>{ROLE_CFG[role].label}</span>
+                                <span style={{ fontSize: 12, color: MT.text2 }}>
+                                  {role === "diseno" && b.assignedDisenoEmail ? disenoDisplayName(b.assignedDisenoEmail) : ROLE_CFG[role].label}
+                                </span>
                               </div>
                             ) : "—"}
                           </td>

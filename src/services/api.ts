@@ -1537,22 +1537,26 @@ export interface MarketingNotifyEmails {
   diseno_3: string;
 }
 
+export type MarketingNotifyNames = MarketingNotifyEmails;
+
 const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3"];
 
-export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
+export async function getMarketingNotifyDirectory(): Promise<{ emails: MarketingNotifyEmails; names: MarketingNotifyNames }> {
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
-  const map: MarketingNotifyEmails = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
+  const emails: MarketingNotifyEmails = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
+  const names: MarketingNotifyNames = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
   (data ?? []).forEach((r: any) => {
     if (NOTIFY_SLOTS.includes(r.role)) {
-      map[r.role as MarketingNotifySlot] = r.email;
+      emails[r.role as MarketingNotifySlot] = r.email ?? "";
+      names[r.role as MarketingNotifySlot] = r.name ?? "";
     }
   });
-  return map;
+  return { emails, names };
 }
 
-export async function setMarketingNotifyEmail(role: MarketingNotifySlot, email: string): Promise<void> {
-  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
+export async function setMarketingNotifyEntry(role: MarketingNotifySlot, email: string, name: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email, name });
   if (error) throw error;
 }
 

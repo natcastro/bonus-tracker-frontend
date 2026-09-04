@@ -4,7 +4,7 @@ import { useMarketing } from "../context";
 import { PRODUCT_LINES, todayIso } from "../types";
 
 export default function NewBriefModal({ onClose }: { onClose: () => void }) {
-  const { createBrief, createDraftBrief, disenoEmailList } = useMarketing();
+  const { createBrief, createDraftBrief, disenoEmailList, disenoDisplayName } = useMarketing();
   const [mode, setMode] = useState<"public" | "draft">("public");
   const [reference, setReference] = useState("");
   const [productLine, setProductLine] = useState("");
@@ -86,7 +86,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
               <label style={labelStyle}>Asignar a Diseño (opcional)</label>
               <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
                 <option value="">Sin asignar — avisar a Karol</option>
-                {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
+                {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
               </select>
             </div>
           ) : (

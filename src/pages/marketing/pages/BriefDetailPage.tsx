@@ -24,7 +24,7 @@ const UPLOAD_LABELS: Record<string, string> = {
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, publishBrief, disenoEmailList, deleteBrief } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -117,7 +117,7 @@ export default function BriefDetailPage() {
           <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>
             {brief.productLine && <>{brief.productLine} · </>}
             {brief.status === "draft" ? <>Inicio estimado: {formatDateHuman(brief.estimatedStartDate)}</> : <>Inicio: {formatDateHuman(brief.startDate)}</>}
-            {brief.status === "in_progress" && brief.assignedDisenoEmail && <> · Asignado a {brief.assignedDisenoEmail}</>}
+            {brief.status === "in_progress" && brief.assignedDisenoEmail && <> · Asignado a {disenoDisplayName(brief.assignedDisenoEmail)}</>}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -149,7 +149,7 @@ export default function BriefDetailPage() {
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
               <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
                 <option value="">Sin asignar — avisar a Karol</option>
-                {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
+                {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
               </select>
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
               <button disabled={busy} onClick={() => run(() => publishBrief(brief.id, publishAssignEmail || undefined))} style={{
@@ -173,7 +173,7 @@ export default function BriefDetailPage() {
               <button key={email} disabled={busy} onClick={() => run(() => assignBrief(brief.id, email))} style={{
                 fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                 background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "9px 14px",
-              }}>{email}</button>
+              }}>{disenoDisplayName(email)}</button>
             ))}
           </div>
         </div>
