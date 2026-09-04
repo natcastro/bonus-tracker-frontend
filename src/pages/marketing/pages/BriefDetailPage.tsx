@@ -305,25 +305,25 @@ export default function BriefDetailPage() {
               <input style={{ ...fieldStyle, marginBottom: 12 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
               {noteField}
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve", { note: noteInput.trim() || undefined }))} style={{
-                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-                }}>✓ Aprobar sin cambios</button>
-
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 {!isFinal && (
                   <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "request_changes", { link: reviewLinkInput.trim() || undefined, note: noteInput.trim() || undefined }))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 8, padding: "10px 18px",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
                   }}>Solicitar ajustes / continuar</button>
                 )}
 
                 {isFinal && (
                   <button disabled={busy} onClick={() => run(() => requestExtraRevision(brief.id, noteInput.trim() || undefined))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 8, padding: "10px 18px",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
                   }}>Solicitar revisión adicional</button>
                 )}
+
+                <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve", { note: noteInput.trim() || undefined }))} style={{
+                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
+                }}>✓ Aprobar sin cambios</button>
               </div>
               <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
                 {isFinal
