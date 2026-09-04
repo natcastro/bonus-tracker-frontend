@@ -1,0 +1,15 @@
+name: Marketing draft publish reminders
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger draft publish reminder check
+        run: |
+          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-draft-publish-reminders" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

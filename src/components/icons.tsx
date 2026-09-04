@@ -136,6 +136,15 @@ export function HubIcon({ size, color }: IconProps) {
   );
 }
 
+export function ClockIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  );
+}
+
 export function GearIcon({ size, color }: IconProps) {
   return (
     <svg {...base(size, color)}>

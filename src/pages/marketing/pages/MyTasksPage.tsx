@@ -4,7 +4,7 @@ import { MT } from "../theme";
 import { useMarketing } from "../context";
 import NewBriefModal from "../components/NewBriefModal";
 import DeadlineBadge from "../components/DeadlineBadge";
-import { PencilIcon, EyeIcon } from "../../../components/icons";
+import { PencilIcon, EyeIcon, ClockIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline } from "../types";
 
 export default function MyTasksPage() {
@@ -12,6 +12,13 @@ export default function MyTasksPage() {
   const navigate = useNavigate();
   const [showNew, setShowNew] = useState(false);
   const myRole = authedUser?.role;
+
+  const myDrafts = useMemo(() => {
+    if (myRole !== "laura") return [];
+    return briefs
+      .filter(b => b.status === "draft")
+      .sort((a, b) => (a.estimatedStartDate ?? "").localeCompare(b.estimatedStartDate ?? ""));
+  }, [briefs, myRole]);
 
   const myPending = useMemo(() => {
     if (myRole === "carol") {
@@ -50,6 +57,47 @@ export default function MyTasksPage() {
           }}>+ Nuevo</button>
         )}
       </div>
+
+      {myDrafts.length > 0 && (
+        <div style={{ marginBottom: "1.75rem" }}>
+          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+            Pendientes por publicar
+          </p>
+          <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+            {myDrafts.map(b => (
+              <button
+                key={b.id}
+                onClick={() => navigate(`/marketing/brief/${b.id}`)}
+                style={{
+                  background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.info}`,
+                  borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                  display: "flex", flexDirection: "column", gap: "0.9rem",
+                  minWidth: 260, maxWidth: 340, flex: "1 1 260px",
+                  boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{
+                    width: 42, height: 42, borderRadius: 8, background: MT.info + "12",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <ClockIcon size={20} color={MT.info} />
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MT.info }}>
+                    Pendiente
+                  </span>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                </div>
+                {b.estimatedStartDate && <DeadlineBadge deadline={b.estimatedStartDate} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {myPending.length === 0 ? (
         <div style={{
