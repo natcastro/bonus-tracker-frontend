@@ -1247,6 +1247,23 @@ export async function setSampleAnalysisRowCatalog(rowId: number, catalogId: numb
   if (error) throw error;
 }
 
+// One shared "% of videos made" number per bonus cycle — feeds the samples bonus (indicator #2)
+// alongside the samples-shipped percentage, since video counts come from TikTok Shop separately
+// and aren't in the Sample Analysis export.
+export interface StrategySamplesSettings { year: string; cycleId: string; videoContentPct: number }
+
+export async function getStrategySamplesSettings(year: string, cycleId: string): Promise<StrategySamplesSettings | null> {
+  const { data, error } = await supabase.from("strategy_samples_settings").select("*").eq("year", year).eq("cycle_id", cycleId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { year: data.year, cycleId: data.cycle_id, videoContentPct: data.video_content_pct ?? 0 };
+}
+
+export async function setStrategySamplesVideoPct(year: string, cycleId: string, videoContentPct: number): Promise<void> {
+  const { error } = await supabase.from("strategy_samples_settings").upsert({ year, cycle_id: cycleId, video_content_pct: videoContentPct });
+  if (error) throw error;
+}
+
 // ── Affiliate contest ("Concurso de Afiliados") ────────────────────────────────
 
 function mapContestEntry(r: any): AffiliateContestEntry {

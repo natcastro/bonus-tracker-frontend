@@ -1,23 +1,22 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import type { Agent, StrategyEntry, StrategySample, StrategyIncident, SampleCatalogItem, UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow } from "../types";
+import type { Agent, StrategyEntry, StrategySample, StrategyIncident, UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getStrategyEntries, upsertStrategyEntry,
-  getStrategySamples, createStrategySample, updateStrategySample, bulkCreateStrategySamples,
-  deleteStrategySample, lockSampleBonus, unlockSampleBonus, addVideoLogEntry, removeLastVideoLogEntry,
+  getStrategySamples, createStrategySample, deleteStrategySample,
   getStrategyIncidents, createStrategyIncident, updateStrategyIncident, deleteStrategyIncident,
-  getSampleCatalog,
   getUploadBatches, getUploadRows, createUploadBatch, decideUploadRow, reinstateUploadRow, deleteUploadBatch,
   deleteUploadRows, decideUploadRowsBulk,
   getAffiliateContestEntries, upsertAffiliateContestSnapshot, setAffiliateContestQualified, deleteAffiliateContestEntry, deleteAffiliateContestEntries,
   addVideoLogEntriesBulk,
-  getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod, setSampleAnalysisRowCatalog,
+  getSampleAnalysisPeriods, getSampleAnalysisRows, createSampleAnalysisPeriod, deleteSampleAnalysisPeriod,
+  getStrategySamplesSettings, setStrategySamplesVideoPct,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault,
-  getCycleDatesFromId, getNextCycleKey, addDaysToDateStr, getCycleFromDate,
+  getCycleDatesFromId,
 } from "../services/usaCycles";
 import { moodBunny } from "../components/moodBunny";
 
@@ -49,6 +48,9 @@ const IND1_MAX  = 260_000;
 const IND2_MAX  = 195_000;
 const IND3_MAX  = 130_000;
 const IND4_MAX  =  65_000;
+const SAMPLES_GOAL = 755;
+const SAMPLES_BONUS_MAX = 100_000; // of the $195,000 IND2_MAX total
+const VIDEOS_BONUS_MAX = 95_000;   // the rest of IND2_MAX
 
 function roiScale(v: number) { if(v>=10)return 1;if(v>=8)return .70;if(v>=6)return .40;if(v>=5)return .30;if(v>=4)return .20;return 0; }
 // Below 4% ROI the bonus isn't a percentage of IND1_MAX — it's small fixed
@@ -64,10 +66,19 @@ function nonBuyerScale(v: number)    { if(v<=0)return 0;if(v<=2.10)return 1;if(v
 function negReviewScale(v: number)   { if(v<=0)return 0;if(v<0.55)return 1;if(v<=0.80)return .90;if(v<=0.90)return .75;if(v<=1.30)return .50;if(v<=1.60)return .25;return 0; }
 function operativeScale(v: number)   { if(v>=100)return 1;if(v>=80)return .75;if(v>=60)return .50;if(v>=40)return .25;return 0; }
 
-// finalScore: 0–100 (Coverage 80pts + Additional 20pts)
-function calcBonus(e: StrategyEntry, finalScore: number) {
+// Below 70% samples shipped, this half of the bono earns nothing. From 70% to 100%
+// it's directly proportional (70% -> $70,000, 85% -> $85,000, 100% -> $100,000).
+function samplesBonusAmount(samplesPct: number): number {
+  if (samplesPct < 70) return 0;
+  return Math.min(samplesPct, 100) / 100 * SAMPLES_BONUS_MAX;
+}
+// Directly proportional from 0% to 100% (e.g. 40% videos -> $38,000).
+function videosBonusAmount(videoPct: number): number {
+  return Math.min(Math.max(videoPct, 0), 100) / 100 * VIDEOS_BONUS_MAX;
+}
+
+function calcBonus(e: StrategyEntry, ind2: number) {
   const ind1 = roiBonusAmount(e.roiPct);
-  const ind2 = Math.round(finalScore / 100 * IND2_MAX);
   const pA = productScoreScale(e.productScore);
   const pB = nonBuyerScale(e.nonBuyerFaultRate);
   const pC = negReviewScale(e.negativeReviewRate);
@@ -75,71 +86,6 @@ function calcBonus(e: StrategyEntry, finalScore: number) {
   const ind4  = IND4_MAX * operativeScale(e.operativeCompliancePct);
   const bonoVariable = ind1 + ind2 + ind3 + ind4;
   return { ind1, ind2, ind3, pA, pB, pC, ind4, bonoVariable, total: BONO_BASE + bonoVariable };
-}
-
-// ── Samples bonus calculation (by creator) ─────────────────────────────────────
-interface SamplesStats {
-  officialSamples: StrategySample[];
-  pendingSamples: StrategySample[];
-  countableSamples: StrategySample[];
-  totalCreators: number;
-  coverageCreators: number;   // ≥1 video
-  additionalCreators: number; // ≥2 videos
-  coverageScore: number;      // 0–80
-  additionalScore: number;    // 0–20
-  finalScore: number;         // 0–100
-  bonusEst: number;
-  gracePeriodActive: boolean;
-  graceEnd: string;
-  byCreator: Record<string, number>; // username → total videos
-}
-
-function getSampleCycleKey(s: StrategySample): string {
-  if (s.bonusCycleKey) return s.bonusCycleKey;
-  if (!s.sentDate) return "";
-  const { year, cycleId } = getCycleFromDate(s.sentDate);
-  return `${year}-${cycleId}`;
-}
-
-function computeSamplesStats(
-  allSamples: StrategySample[],
-  year: string,
-  cycleId: string,
-  officialPeriod: { from: string; to: string },
-): SamplesStats {
-  const todayStr = new Date().toISOString().split("T")[0];
-  const graceEnd = addDaysToDateStr(officialPeriod.to, 7);
-  const gracePeriodActive = todayStr <= graceEnd;
-  const currentKey = `${year}-${cycleId}`;
-
-  const officialSamples = allSamples.filter(s => getSampleCycleKey(s) === currentKey);
-  const pendingSamples  = officialSamples.filter(s => s.deliveryStatus === "pending");
-
-  const countableSamples = officialSamples.filter(s =>
-    s.deliveryStatus === "delivered" ||
-    (s.deliveryStatus === "pending" && gracePeriodActive)
-  );
-
-  const byCreator: Record<string, number> = {};
-  countableSamples.forEach(s => {
-    byCreator[s.username] = (byCreator[s.username] ?? 0) + s.videosPublished;
-  });
-
-  const totalCreators     = Object.keys(byCreator).length;
-  const coverageCreators  = Object.values(byCreator).filter(v => v >= 1).length;
-  const additionalCreators= Object.values(byCreator).filter(v => v >= 2).length;
-
-  const coverageScore   = totalCreators > 0 ? (coverageCreators  / totalCreators) * 80 : 0;
-  const additionalScore = totalCreators > 0 ? (additionalCreators / totalCreators) * 20 : 0;
-  const finalScore      = coverageScore + additionalScore;
-
-  return {
-    officialSamples, pendingSamples, countableSamples,
-    totalCreators, coverageCreators, additionalCreators,
-    coverageScore, additionalScore, finalScore,
-    bonusEst: Math.round(finalScore / 100 * IND2_MAX),
-    gracePeriodActive, graceEnd, byCreator,
-  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -198,9 +144,6 @@ export default function StrategyDashboard() {
   const loadSamples = useCallback(async () => {
     setAllSamples(await getStrategySamples());
   }, []);
-
-  const [catalog, setCatalog] = useState<SampleCatalogItem[]>([]);
-  useEffect(() => { getSampleCatalog().then(setCatalog).catch(()=>{}); }, []);
 
   // ── Uploads (agency Excel approval workflow) ───────────────────────────────
   const [uploadBatches, setUploadBatches] = useState<UploadBatch[]>([]);
@@ -329,14 +272,7 @@ export default function StrategyDashboard() {
     });
   }, [contestEntries, contestSearch]);
 
-  // Samples sub-tab and inventory month
-  const [samplesTab, setSamplesTab] = useState<"tracking"|"inventory">("tracking");
-  const [invMonth, setInvMonth] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-  });
-
   // ── Sample product analysis (TikTok export uploads) ────────────────────────
-  const [inventorySubView, setInventorySubView] = useState<"cupos"|"analisis">("cupos");
   const [analysisPeriods, setAnalysisPeriods] = useState<SampleAnalysisPeriod[]>([]);
   const [analysisRows, setAnalysisRows] = useState<SampleAnalysisRow[]>([]);
   const loadAnalysis = useCallback(async () => {
@@ -352,12 +288,6 @@ export default function StrategyDashboard() {
   } | null>(null);
   const [analysisSaving, setAnalysisSaving] = useState(false);
   const [analysisErr, setAnalysisErr] = useState("");
-  const [analysisFilterMode, setAnalysisFilterMode] = useState<"month"|"range">("month");
-  const [analysisFilterMonth, setAnalysisFilterMonth] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-  });
-  const [analysisFilterFrom, setAnalysisFilterFrom] = useState("");
-  const [analysisFilterTo, setAnalysisFilterTo] = useState("");
 
   const parseAnalysisNum = (v: any): number | null => {
     if (v === null || v === undefined) return null;
@@ -365,46 +295,6 @@ export default function StrategyDashboard() {
     if (s === "" || s === "--") return null;
     const n = Number(s);
     return isNaN(n) ? null : n;
-  };
-
-  // Match a "Sample Analysis" row to a catalog item automatically, in two passes:
-  //  1) Same TikTok Product ID already linked in a previous upload -> reuse that link.
-  //     (TikTok's numeric Product ID is stable across re-exports even when the
-  //     product name text changes slightly.)
-  //  2) Otherwise, extract every SKU-code-shaped token (e.g. "C-073", "LUXI-213")
-  //     from anywhere in the name — not just a trailing parenthetical, since real
-  //     TikTok exports put "Ref." prefixes, multiple codes joined by "/", trailing
-  //     descriptive text after the parens, or no parens at all — and match against
-  //     the catalog item(s) sharing the most SKU codes. Only auto-links when there's
-  //     a single best match; ties or zero matches are left for manual linking.
-  const SKU_CODE_PATTERN = /[A-Z]{1,12}-\d{2,4}/g;
-  const extractSkuCodes = (name: string): string[] =>
-    Array.from(new Set(name.toUpperCase().match(SKU_CODE_PATTERN) ?? []));
-
-  const matchCatalogIdByName = (productName: string, productId: string): number | null => {
-    const remembered = new Set(
-      analysisRows.filter(r => r.productId === productId && r.catalogId != null).map(r => r.catalogId as number)
-    );
-    if (remembered.size === 1) return [...remembered][0];
-
-    const codes = extractSkuCodes(productName);
-    if (codes.length === 0) return null;
-    const scored = catalog
-      .map(c => {
-        const cCodes = extractSkuCodes(c.productName);
-        return { id: c.id, overlap: cCodes.filter(code => codes.includes(code)).length, totalCodes: cCodes.length };
-      })
-      .filter(x => x.overlap > 0);
-    if (scored.length === 0) return null;
-    const maxOverlap = Math.max(...scored.map(x => x.overlap));
-    let best = scored.filter(x => x.overlap === maxOverlap);
-    if (best.length > 1) {
-      // Tie-break toward the more specific catalog entry (fewer total SKU codes) —
-      // e.g. a single-item listing over a "Bundle" that happens to include the same code.
-      const minCodes = Math.min(...best.map(x => x.totalCodes));
-      best = best.filter(x => x.totalCodes === minCodes);
-    }
-    return best.length === 1 ? best[0].id : null;
   };
 
   const handleAnalysisFileSelected = async (file: File) => {
@@ -435,7 +325,7 @@ export default function StrategyDashboard() {
           refundedOrders: parseAnalysisNum(row["Refunded orders"]),
           estRefundableGmv: parseAnalysisNum(row["Est. refundable GMV"]),
           ordersNeededForRefund: parseAnalysisNum(row["Orders needed for refund"]),
-          catalogId: matchCatalogIdByName(productName, productId),
+          catalogId: null,
         });
       }
       if (rows.length === 0) { setAnalysisErr("No se detectaron productos en el archivo."); return; }
@@ -464,48 +354,46 @@ export default function StrategyDashboard() {
     finally { setAnalysisSaving(false); }
   };
 
-  // "Enviados" for a catalog item in the selected month: if the TikTok analysis
-  // document has linked rows overlapping that month, their "Samples shipped"
-  // replaces the manually-tracked count (it's the real platform number);
-  // otherwise fall back to what's tracked in the app's own samples.
-  const sentForCatalogItem = (catalogItemId: number): number => {
-    const [y, m] = invMonth.split("-").map(Number);
-    const monthStart = `${invMonth}-01`;
-    const monthEnd = new Date(y, m, 0).toISOString().slice(0,10);
-    const overlapping = analysisRows.filter(r => {
-      if (r.catalogId !== catalogItemId) return false;
-      const period = analysisPeriods.find(p => p.id === r.periodId);
-      return period && period.periodStart <= monthEnd && period.periodEnd >= monthStart;
-    });
-    if (overlapping.length > 0) return overlapping.reduce((s,r) => s + (r.samplesShipped ?? 0), 0);
-    return allSamples.filter(s => s.catalogId === catalogItemId && s.sentDate.startsWith(invMonth) && s.deliveryStatus !== "requested").length;
-  };
+  // Samples shipped this cycle vs the fixed monthly goal, and the shared
+  // "% of videos made" setting that feeds the rest of the Indicador #2 bonus.
+  const samplesShippedTotal = useMemo(() => {
+    const periodsInCycle = analysisPeriods.filter(p => p.periodStart >= officialPeriod.from && p.periodEnd <= officialPeriod.to);
+    const periodIds = new Set(periodsInCycle.map(p => p.id));
+    return analysisRows.filter(r => periodIds.has(r.periodId)).reduce((s, r) => s + (r.samplesShipped ?? 0), 0);
+  }, [analysisPeriods, analysisRows, officialPeriod]);
 
-  const updateAnalysisRowCatalog = async (rowId: number, catalogId: number | null) => {
+  const samplesPct = (samplesShippedTotal / SAMPLES_GOAL) * 100;
+
+  const [samplesSettings, setSamplesSettingsState] = useState<{ videoContentPct: number }>({ videoContentPct: 0 });
+  useEffect(() => {
+    getStrategySamplesSettings(year, cycleId).then(s => setSamplesSettingsState({ videoContentPct: s?.videoContentPct ?? 0 })).catch(() => {});
+  }, [year, cycleId]);
+
+  const [videoPctDraft, setVideoPctDraft] = useState("0");
+  useEffect(() => { setVideoPctDraft(String(samplesSettings.videoContentPct)); }, [samplesSettings.videoContentPct]);
+  const [savingVideoPct, setSavingVideoPct] = useState(false);
+  const saveVideoPct = async () => {
+    const v = Math.max(0, Math.min(100, Number(videoPctDraft) || 0));
+    setSavingVideoPct(true);
     try {
-      await setSampleAnalysisRowCatalog(rowId, catalogId);
-      await loadAnalysis();
-    } catch (err: any) {
-      alert(err?.message ?? "No se pudo vincular el cupo.");
-    }
+      await setStrategySamplesVideoPct(year, cycleId, v);
+      setSamplesSettingsState({ videoContentPct: v });
+    } finally { setSavingVideoPct(false); }
   };
 
-  const removeAnalysisPeriod = async (p: SampleAnalysisPeriod) => {
-    if (!confirm(`¿Eliminar "${p.filename}" (${p.periodStart} – ${p.periodEnd}) y sus datos?`)) return;
-    await deleteSampleAnalysisPeriod(p.id);
+  const ind2Amount = samplesBonusAmount(samplesPct) + videosBonusAmount(samplesSettings.videoContentPct);
+
+  const periodsThisCycle = useMemo(() =>
+    analysisPeriods
+      .filter(p => p.periodStart >= officialPeriod.from && p.periodEnd <= officialPeriod.to)
+      .sort((a, b) => a.periodStart.localeCompare(b.periodStart)),
+  [analysisPeriods, officialPeriod]);
+
+  const deletePeriod = async (id: number) => {
+    if (!confirm("¿Eliminar este documento y sus datos?")) return;
+    await deleteSampleAnalysisPeriod(id);
     await loadAnalysis();
   };
-
-  const analysisMatchingPeriods = useMemo(() => {
-    if (analysisFilterMode === "month") {
-      const [y, m] = analysisFilterMonth.split("-").map(Number);
-      const monthStart = `${analysisFilterMonth}-01`;
-      const monthEnd = new Date(y, m, 0).toISOString().slice(0,10);
-      return analysisPeriods.filter(p => p.periodStart <= monthEnd && p.periodEnd >= monthStart);
-    }
-    if (!analysisFilterFrom || !analysisFilterTo) return analysisPeriods;
-    return analysisPeriods.filter(p => p.periodStart <= analysisFilterTo && p.periodEnd >= analysisFilterFrom);
-  }, [analysisPeriods, analysisFilterMode, analysisFilterMonth, analysisFilterFrom, analysisFilterTo]);
 
   // ── Incident log state ────────────────────────────────────────────────────────
   type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
@@ -561,12 +449,6 @@ export default function StrategyDashboard() {
 
   useEffect(() => { load(); },        [load]);
   useEffect(() => { loadSamples(); }, [loadSamples]);
-
-  // Samples stats (creator-based, official period)
-  const stats = useMemo(
-    () => computeSamplesStats(allSamples, year, cycleId, officialPeriod),
-    [allSamples, year, cycleId, officialPeriod],
-  );
 
   // ── Entry drafts (QA included)
   type Draft = Omit<StrategyEntry, "id" | "bonusSamplesLocked" | "bonusSamplesLockedAt" | "bonusSamplesLockedAmount">;
@@ -847,367 +729,6 @@ export default function StrategyDashboard() {
     await loadUploads();
   };
 
-  // ── Samples local state ────────────────────────────────────────────────────
-  const [filterUser,   setFilterUser]   = useState("");
-  const [filterSku,    setFilterSku]    = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all"|"requested"|"pending"|"delivered">("requested");
-  const [viewMode,     setViewMode]     = useState<"samples"|"creators">("samples");
-  const [showBanner,   setShowBanner]   = useState(true);
-  const [trackingFilterMode, setTrackingFilterMode] = useState<"period"|"month"|"all">("period");
-  const [trackingFrom, setTrackingFrom] = useState(officialPeriod.from);
-  const [trackingTo,   setTrackingTo]   = useState(officialPeriod.to);
-  const [trackingMonth, setTrackingMonth] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-  });
-  const [videoFilter, setVideoFilter] = useState<"all"|"withVideo"|"noVideo">("all");
-  const [sampleSort, setSampleSort] = useState<{col:"videos"|"username"|"sentDate"; dir:"asc"|"desc"} | null>(null);
-  const toggleSampleSort = (col:"videos"|"username"|"sentDate") => {
-    setSampleSort(prev => prev && prev.col===col ? { col, dir: prev.dir==="asc"?"desc":"asc" } : { col, dir: col==="videos"?"desc":"asc" });
-  };
-  useEffect(() => { setTrackingFrom(officialPeriod.from); setTrackingTo(officialPeriod.to); }, [officialPeriod.from, officialPeriod.to]);
-  const [addVideoPopoverId, setAddVideoPopoverId] = useState<number|null>(null);
-  const [addVideoDate, setAddVideoDate] = useState("");
-  const [videoLogBusyId, setVideoLogBusyId] = useState<number|null>(null);
-
-  const daysSince = (dateStr: string): number => {
-    const d = new Date(dateStr + "T00:00:00");
-    if (isNaN(d.getTime())) return 0;
-    return Math.floor((Date.now() - d.getTime()) / 86400000);
-  };
-
-  const openAddVideo = (id: number) => {
-    const d = new Date(); const off = d.getTimezoneOffset();
-    setAddVideoDate(new Date(d.getTime() - off*60000).toISOString().slice(0,10));
-    setAddVideoPopoverId(id);
-  };
-
-  const confirmAddVideo = async (id: number) => {
-    if (!addVideoDate) return;
-    setVideoLogBusyId(id);
-    try { await addVideoLogEntry(id, addVideoDate); setAddVideoPopoverId(null); await loadSamples(); }
-    finally { setVideoLogBusyId(null); }
-  };
-
-  const removeLastVideo = async (id: number) => {
-    if (!confirm("¿Quitar el último video registrado para este sample?")) return;
-    setVideoLogBusyId(id);
-    try { await removeLastVideoLogEntry(id); await loadSamples(); }
-    finally { setVideoLogBusyId(null); }
-  };
-
-  const deleteStaleRequest = async (id: number) => {
-    if (!confirm("¿Eliminar esta solicitud sin respuesta? Lleva más de 7 días sin actualizarse.")) return;
-    await deleteStrategySample(id);
-    await loadSamples();
-  };
-
-  // ── Creator activity import (username + videos → advance stage to Entregado) ──
-  const [activityImporting, setActivityImporting] = useState(false);
-  const [activityParsed, setActivityParsed] = useState<{
-    filename: string; periodStart: string; periodEnd: string;
-    rows: { username: string; videos: number }[];
-  } | null>(null);
-  const [activityErr, setActivityErr] = useState("");
-  const [activityResult, setActivityResult] = useState<{matched:number; created:number} | null>(null);
-  const [activityScope, setActivityScope] = useState<"month"|"period">("period");
-  const [activityMonth, setActivityMonth] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-  });
-
-  const ACTIVITY_NAME_HINTS = /creator_name|username|nombre/i;
-  const ACTIVITY_VIDEOS_HINTS = /videos_posted|videos/i;
-
-  const handleActivityFileSelected = async (file: File) => {
-    setActivityErr("");
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const json = XLSX.utils.sheet_to_json<Record<string,any>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-      if (json.length === 0) { setActivityErr("El archivo no tiene filas."); return; }
-      const columns = Object.keys(json[0]);
-      const nameCol = columns.find(c => ACTIVITY_NAME_HINTS.test(c)) ?? columns[0];
-      const videosCol = columns.find(c => ACTIVITY_VIDEOS_HINTS.test(c)) ?? columns[1];
-      const rows = json.map(row => ({
-        username: String(row[nameCol] ?? "").trim(),
-        videos: Number(row[videosCol] ?? 0),
-      })).filter(r => r.username);
-      const m = file.name.match(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/);
-      const periodStart = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
-      const periodEnd   = m ? `${m[4]}-${m[5]}-${m[6]}` : "";
-      setActivityParsed({ filename: file.name, periodStart, periodEnd, rows });
-    } catch { setActivityErr("No se pudo leer el archivo."); }
-  };
-
-  const confirmActivityImport = async () => {
-    if (!activityParsed) return;
-    let periodStart = activityParsed.periodStart, periodEnd = activityParsed.periodEnd;
-    if (activityScope === "month") {
-      const [y, m] = activityMonth.split("-").map(Number);
-      periodStart = `${activityMonth}-01`;
-      periodEnd = new Date(y, m, 0).toISOString().slice(0,10);
-    }
-    if (!periodStart || !periodEnd) { setActivityErr("Falta el rango de fechas."); return; }
-    const agentId = agents[0]?.id;
-    if (!agentId) { setActivityErr("No hay agentes. Ve a Settings primero."); return; }
-    setActivityImporting(true);
-    try {
-      let matched = 0, created = 0;
-      const { year, month } = parseDateParts(periodEnd);
-      for (const row of activityParsed.rows) {
-        const key = row.username.toLowerCase();
-        const candidates = allSamples.filter(s => s.username.trim().toLowerCase() === key);
-        if (candidates.length === 0) {
-          // Not tracked yet anywhere — add it directly, since showing up in this
-          // report means the sample was delivered regardless of video count.
-          const sample = await createStrategySample({
-            agentId, username: row.username.trim(), sku: "", sentDate: periodEnd,
-            videosPublished: 0, year, month,
-            notes: `Agregado desde importar documento — ${activityParsed.filename}`,
-            deliveryStatus: "delivered", catalogId: undefined,
-          });
-          if (row.videos > 0) await addVideoLogEntriesBulk(sample.id, periodEnd, row.videos);
-          created++;
-          continue;
-        }
-        const target = candidates.reduce((a,b) => a.sentDate >= b.sentDate ? a : b);
-        if (target.deliveryStatus !== "delivered") await updateStrategySample(target.id, { deliveryStatus: "delivered" });
-        // Never reduces an existing count — only tops it up to match the document
-        // if the document reports more than what's already logged.
-        const currentCount = videoCountOf(target);
-        const delta = Math.max(0, row.videos - currentCount);
-        if (delta > 0) await addVideoLogEntriesBulk(target.id, periodEnd, delta);
-        matched++;
-      }
-      setActivityResult({ matched, created });
-      setActivityParsed(null);
-      await loadSamples();
-    } catch (err: any) {
-      setActivityErr(err?.message ?? "Error al importar.");
-    } finally { setActivityImporting(false); }
-  };
-
-  // ── Historical CSV import (TikTok order export → samples pipeline) ────────
-  const [historyImporting, setHistoryImporting] = useState(false);
-  const [historyResult, setHistoryResult] = useState<{
-    total:number; imported:number; skippedCancelled:number; skippedUnrecognized:number; skippedNoUsername:number; reconciled:number;
-  } | null>(null);
-
-  const mapOrderStatusToStage = (status: string, substatus: string): "pending"|"delivered"|null => {
-    const s = status.trim().toLowerCase();
-    const ss = substatus.trim().toLowerCase();
-    if (s === "canceled" || s === "cancelled") return null;
-    if (s === "completed") return "delivered";
-    if (s === "shipped") return ss === "delivered" ? "delivered" : "pending";
-    if (s === "to ship") return "pending";
-    return null;
-  };
-
-  const parseUsDateToIso = (raw: string): string | null => {
-    const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (!m) return null;
-    const [, mm, dd, yyyy] = m;
-    return `${yyyy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
-  };
-
-  const handleHistoryCsvSelected = async (file: File) => {
-    const agentId = agents[0]?.id;
-    if (!agentId) { alert("No hay agentes. Ve a Settings primero."); return; }
-    setHistoryImporting(true); setHistoryResult(null);
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const json = XLSX.utils.sheet_to_json<Record<string,string>>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
-      let skippedCancelled = 0, skippedUnrecognized = 0, skippedNoUsername = 0;
-      const toInsert: Omit<StrategySample,"id">[] = [];
-      for (const row of json) {
-        const status    = String(row["Order Status"] ?? "").trim();
-        const substatus = String(row["Order Substatus"] ?? "").trim();
-        const username  = String(row["Buyer Username"] ?? "").trim();
-        const orderId   = String(row["Order ID"] ?? "").trim();
-        const sku       = String(row["Seller SKU"] ?? "").trim();
-        const createdRaw = String(row["Created Time"] ?? "").trim();
-        if (status.toLowerCase() === "canceled" || status.toLowerCase() === "cancelled") { skippedCancelled++; continue; }
-        const stage = mapOrderStatusToStage(status, substatus);
-        const iso = parseUsDateToIso(createdRaw);
-        if (!stage || !iso) { skippedUnrecognized++; continue; }
-        if (!username) { skippedNoUsername++; continue; }
-        const { year, month } = parseDateParts(iso);
-        toInsert.push({
-          agentId, username, sku, sentDate: iso, videosPublished: 0, year, month,
-          notes: `Importado de historial CSV — Order ID ${orderId} — Estado original: ${status} / ${substatus}`,
-          deliveryStatus: stage, catalogId: undefined,
-        });
-      }
-      if (toInsert.length) await bulkCreateStrategySamples(toInsert);
-
-      // Reconcile: pre-existing "Enviado" samples with no matching creator anywhere in this
-      // historical export are demoted back to "Solicitud enviada" — the shipment was never confirmed.
-      const csvUsernames = new Set(
-        json.map(r => String(r["Buyer Username"] ?? "").trim().toLowerCase()).filter(Boolean)
-      );
-      const staleOld = allSamples.filter(s =>
-        s.deliveryStatus === "pending" &&
-        !s.notes?.startsWith("Importado de historial CSV") &&
-        !csvUsernames.has(s.username.trim().toLowerCase())
-      );
-      for (const s of staleOld) {
-        await updateStrategySample(s.id, { deliveryStatus: "requested" });
-      }
-
-      setHistoryResult({ total: json.length, imported: toInsert.length, skippedCancelled, skippedUnrecognized, skippedNoUsername, reconciled: staleOld.length });
-      await loadSamples();
-    } catch (err: any) {
-      alert(err?.message ?? "Error al importar el historial.");
-    } finally { setHistoryImporting(false); }
-  };
-
-  // One button, two possible document shapes: TikTok order exports (Order ID /
-  // Order Status columns) create new samples via the historial flow; creator
-  // activity exports (username + videos) update existing samples' stage/videos.
-  const unifiedFileRef = useRef<HTMLInputElement>(null);
-  const handleUnifiedImport = async (file: File) => {
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const json = XLSX.utils.sheet_to_json<Record<string,any>>(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-      const columns = json.length ? Object.keys(json[0]) : [];
-      const isOrderExport = columns.includes("Order Status") && columns.includes("Order ID");
-      if (isOrderExport) await handleHistoryCsvSelected(file);
-      else await handleActivityFileSelected(file);
-    } catch {
-      setActivityErr("No se pudo leer el archivo.");
-    }
-  };
-
-  const [showAdd,  setShowAdd]  = useState(false);
-  const [editing,  setEditing]  = useState<StrategySample | null>(null);
-  const [sErr,     setSErr]     = useState("");
-  const [sSaving,  setSSaving]  = useState(false);
-
-  const [newS, setNewS] = useState({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered" as "requested"|"pending"|"delivered", catalogId: undefined as number|undefined });
-
-  // Password prompts
-  const [delPw,  setDelPw]  = useState<{ id:number; pw:string; err:string } | null>(null);
-  const [movePw, setMovePw] = useState<{ id:number; pw:string; err:string } | null>(null);
-  const [lockPw, setLockPw] = useState<{ agId:number; action:"lock"|"unlock"; pw:string; err:string } | null>(null);
-
-  const activeCatalogIds = new Set(catalog.map(c => c.id));
-  const isInactiveProduct = (s: StrategySample) =>
-    s.catalogId !== undefined && !activeCatalogIds.has(s.catalogId);
-
-  const trackingMonthBounds = () => {
-    const [y, m] = trackingMonth.split("-").map(Number);
-    return { start: `${trackingMonth}-01`, end: new Date(y, m, 0).toISOString().slice(0,10) };
-  };
-
-  // A sample counts toward a date range if it was sent in that range OR has
-  // video activity dated in that range — otherwise a creator-activity upload
-  // for a past month never shows up under that month's filter, since the
-  // sample's original sentDate can be from a totally different month.
-  const inDateRange = (s: StrategySample, start: string, end: string) =>
-    (s.sentDate >= start && s.sentDate <= end) || (s.videoLog ?? []).some(d => d >= start && d <= end);
-
-  const stageBase = trackingFilterMode === "all" ? allSamples
-    : trackingFilterMode === "month" ? (() => { const {start,end} = trackingMonthBounds(); return allSamples.filter(s => inDateRange(s,start,end)); })()
-    : allSamples.filter(s => inDateRange(s, trackingFrom || "0000-01-01", trackingTo || "9999-12-31"));
-
-  const videoCountOf = (s: StrategySample) => s.videoLog?.length ?? s.videosPublished;
-
-  const tableRows = stageBase
-    .filter(s => filterStatus === "all" || s.deliveryStatus === filterStatus)
-    .filter(s => !filterUser || s.username.toLowerCase().includes(filterUser.toLowerCase()))
-    .filter(s => !filterSku  || s.sku.toLowerCase().includes(filterSku.toLowerCase()))
-    .filter(s => videoFilter === "all" || (videoFilter === "withVideo" ? videoCountOf(s) > 0 : videoCountOf(s) === 0));
-  if (sampleSort) {
-    const { col, dir } = sampleSort;
-    const mul = dir === "asc" ? 1 : -1;
-    tableRows.sort((a,b) => {
-      if (col === "videos") return (videoCountOf(a) - videoCountOf(b)) * mul;
-      if (col === "username") return a.username.localeCompare(b.username) * mul;
-      return a.sentDate.localeCompare(b.sentDate) * mul;
-    });
-  }
-  const stageCounts = {
-    requested: stageBase.filter(s => s.deliveryStatus === "requested").length,
-    pending:   stageBase.filter(s => s.deliveryStatus === "pending").length,
-    delivered: stageBase.filter(s => s.deliveryStatus === "delivered").length,
-  };
-
-  // Creator summary for "creators" view
-  const creatorRows = Object.entries(stats.byCreator).map(([username, totalVideos]) => ({
-    username, totalVideos,
-    coverage:   totalVideos >= 1,
-    additional: totalVideos >= 2,
-    samples: stats.countableSamples.filter(s => s.username === username),
-  })).sort((a, b) => b.totalVideos - a.totalVideos);
-
-  const submitSample = async (e: React.FormEvent) => {
-    e.preventDefault(); setSErr("");
-    if (!newS.username.trim() || !newS.sku.trim() || !newS.sentDate) { setSErr("Completa todos los campos requeridos."); return; }
-    const agentId = agents[0]?.id;
-    if (!agentId) { setSErr("No hay agentes. Ve a Settings primero."); return; }
-    const { year: sy, month: sm } = parseDateParts(newS.sentDate);
-    setSSaving(true);
-    try {
-      await createStrategySample({ agentId, username:newS.username.trim(), sku:newS.sku.trim(),
-        sentDate:newS.sentDate, videosPublished:newS.videosPublished, year:sy, month:sm,
-        notes:newS.notes, deliveryStatus:newS.deliveryStatus, catalogId:newS.catalogId });
-      setNewS({ username:"", sku:"", sentDate:"", videosPublished:0, notes:"", deliveryStatus:"delivered", catalogId:undefined });
-      setShowAdd(false);
-      await loadSamples();
-    } catch(err: any) { setSErr(err?.message ?? "Error al guardar."); }
-    finally { setSSaving(false); }
-  };
-
-  const submitEdit = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!editing) return;
-    setSSaving(true);
-    try {
-      await updateStrategySample(editing.id, {
-        username:editing.username, sku:editing.sku, sentDate:editing.sentDate,
-        videosPublished:editing.videosPublished, notes:editing.notes, deliveryStatus:editing.deliveryStatus,
-      });
-      setEditing(null); await loadSamples();
-    } catch(err: any) { setSErr(err?.message ?? "Error al guardar."); }
-    finally { setSSaving(false); }
-  };
-
-  const markDelivered = async (id: number) => {
-    await updateStrategySample(id, { deliveryStatus: "delivered" });
-    await loadSamples();
-  };
-
-  const markResponded = async (id: number) => {
-    await updateStrategySample(id, { responded: true, deliveryStatus: "pending" });
-    await loadSamples();
-  };
-
-  const confirmDelete = async (id: number, pw: string) => {
-    if (!verifySuperAdmin("APT", pw)) { setDelPw({ id, pw, err:"Contraseña incorrecta." }); return; }
-    await deleteStrategySample(id);
-    setDelPw(null);
-    await loadSamples();
-  };
-
-  const confirmMove = async (id: number, pw: string) => {
-    if (!verifySuperAdmin("APT", pw)) { setMovePw({ id, pw, err:"Contraseña incorrecta." }); return; }
-    const nextKey = getNextCycleKey(year, cycleId);
-    await updateStrategySample(id, { bonusCycleKey: nextKey });
-    setMovePw(null);
-    await loadSamples();
-  };
-
-  const confirmLock = async (agId: number, action: "lock"|"unlock", pw: string) => {
-    if (!verifySuperAdmin("APT", pw)) { setLockPw({ agId, action, pw, err:"Contraseña incorrecta." }); return; }
-    if (action === "lock") {
-      await lockSampleBonus(agId, year, cycleId, stats.bonusEst);
-    } else {
-      await unlockSampleBonus(agId, year, cycleId);
-    }
-    setLockPw(null);
-    await load();
-  };
-
   // Settings state
   const [agentNames, setAgentNames] = useState<Record<number,string>>({});
   useEffect(() => { const n:Record<number,string>={};agents.forEach(a=>{n[a.id]=a.name;});setAgentNames(n); }, [agents]);
@@ -1249,7 +770,7 @@ export default function StrategyDashboard() {
               <EmptyCard msg="No hay agentes. Ve a Settings." />
             ) : agents.map(ag => {
               const entry = entries.find(e => e.agentId === ag.id);
-              const b     = entry ? calcBonus(entry, stats.finalScore) : null;
+              const b     = entry ? calcBonus(entry, ind2Amount) : null;
               return (
                 <div key={ag.id} style={{maxWidth:860,margin:"0 auto 2rem"}}>
                   <h3 style={{fontWeight:800,fontSize:"1.1rem",color:"#1e293b",marginBottom:"1rem",textAlign:"center"}}>{ag.name}</h3>
@@ -1265,11 +786,9 @@ export default function StrategyDashboard() {
                       <IndSummaryCard num="1" weight="40%" label="ROI Programa Afiliados" earned={b!.ind1} max={IND1_MAX} color={C.roi}
                         scalePct={roiBonusAmount(entry.roiPct)/IND1_MAX}
                         detail={`ROI del ciclo: ${entry.roiPct}%`} />
-                      <IndSummaryCard num="2" weight="30%" label="Samples con Contenido" earned={b!.ind2} max={IND2_MAX} color={C.samples}
-                        scalePct={stats.finalScore/100}
-                        detail={`Score: ${stats.finalScore.toFixed(1)}pts · Coverage: ${stats.coverageCreators}/${stats.totalCreators} creadores`}
-                        locked={entry.bonusSamplesLocked}
-                        lockedAmount={entry.bonusSamplesLockedAmount} />
+                      <IndSummaryCard num="2" weight="30%" label="Samples enviados" earned={b!.ind2} max={IND2_MAX} color={C.samples}
+                        scalePct={ind2Amount/IND2_MAX}
+                        detail={`${samplesShippedTotal}/${SAMPLES_GOAL} samples (${Math.round(samplesPct)}%) · Videos: ${samplesSettings.videoContentPct}%`} />
                       <IndSummaryCard num="3" weight="20%" label="Salud Cuenta TikTok" earned={b!.ind3} max={IND3_MAX} color={C.health}
                         scalePct={b!.pA*0.05+b!.pB*0.50+b!.pC*0.45}
                         detail={`Score ${entry.productScore} · NBFR ${entry.nonBuyerFaultRate}% · NRR ${entry.negativeReviewRate}%`} />
@@ -1589,718 +1108,103 @@ export default function StrategyDashboard() {
         {tab==="samples" && (
           <section>
             <header className="section-header">
-              <div><h2>Sample Content Performance</h2>
-                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #2 · 30% del bono variable · Máx $195.000 COP · Por creador (Coverage 80pts + Additional 20pts)</p>
+              <div><h2>Samples enviados</h2>
+                <p style={{color:"var(--text-muted)",fontSize:"0.85rem",margin:0}}>Indicador #2 · 30% del bono variable · Máx $195.000 COP · Meta: 755 samples enviados por ciclo</p>
               </div>
             </header>
 
-            {/* Sub-tabs */}
-            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.25rem",borderBottom:"2px solid #e2e8f0",paddingBottom:"0"}}>
-              {([["tracking","📦 Tracking"],["inventory","📋 Inventario de Samples"]] as const).map(([k,l])=>(
-                <button key={k} onClick={()=>setSamplesTab(k)}
-                  style={{padding:"0.5rem 1.1rem",border:"none",borderBottom:samplesTab===k?`2px solid ${C.samples}`:"2px solid transparent",
-                    marginBottom:-2,background:"transparent",fontWeight:samplesTab===k?700:500,
-                    color:samplesTab===k?C.samples:"#64748b",cursor:"pointer",fontSize:"0.85rem"}}>
-                  {l}
-                </button>
-              ))}
-            </div>
+            <input ref={analysisFileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}}
+              onChange={e=>{const f=e.target.files?.[0]; if(f) handleAnalysisFileSelected(f); e.target.value="";}} />
 
-            {/* ── INVENTORY TAB ─────────────────────────────────────────────── */}
-            {samplesTab==="inventory" && (
-              <div>
-                <div style={{display:"flex",gap:"0.4rem",marginBottom:"1.25rem"}}>
-                  {([["cupos","Cupos mensuales"],["analisis","Análisis de producto (TikTok)"]] as const).map(([k,l])=>(
-                    <button key={k} style={{...qBtn,borderColor:inventorySubView===k?"#0891b2":"#e2e8f0",color:inventorySubView===k?C.samples:"#64748b"}}
-                      onClick={()=>setInventorySubView(k)}>{l}</button>
-                  ))}
-                </div>
-
-                {inventorySubView==="cupos" && (<>
-                <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap",justifyContent:"space-between"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:"1rem",flexWrap:"wrap"}}>
-                    <div>
-                      <label style={lbl}>Mes</label>
-                      <input type="month" className="form-control" value={invMonth} onChange={e=>setInvMonth(e.target.value)} style={{maxWidth:170}} />
-                    </div>
-                    <div style={{fontSize:"0.8rem",color:"#64748b",marginTop:"1rem"}}>
-                      Mostrando samples enviados en {new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"})}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const monthLabel = new Date(invMonth+"-01").toLocaleString("es-CO",{month:"long",year:"numeric"});
-                      const rows = catalog.map(item => {
-                        const sent  = sentForCatalogItem(item.id);
-                        const avail = Math.max(0, item.monthlyQuota - sent);
-                        const done  = sent >= item.monthlyQuota;
-                        const started = sent > 0 && !done;
-                        return {
-                          "Producto":       item.productName,
-                          "Product ID":     item.productId || "",
-                          "Cuota mensual":  item.monthlyQuota,
-                          "Enviados":       sent,
-                          "Disponibles":    avail,
-                          "Estado":         done ? "Completo" : started ? "En progreso" : "Pendiente",
-                        };
-                      });
-                      const totalSent = catalog.reduce((s,c)=>s+sentForCatalogItem(c.id),0);
-                      rows.push({
-                        "Producto": "TOTAL", "Product ID": "",
-                        "Cuota mensual": catalog.reduce((s,c)=>s+c.monthlyQuota,0),
-                        "Enviados": totalSent, "Disponibles": 0, "Estado": "",
-                      });
-                      const ws = XLSX.utils.json_to_sheet(rows);
-                      ws["!cols"] = [{wch:36},{wch:20},{wch:15},{wch:12},{wch:13},{wch:14}];
-                      const wb = XLSX.utils.book_new();
-                      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-                      XLSX.writeFile(wb, `inventario_samples_${invMonth}.xlsx`);
-                    }}
-                    style={{
-                      display:"flex",alignItems:"center",gap:"6px",
-                      background:"#0891b2",color:"#fff",border:"none",borderRadius:8,
-                      padding:"7px 14px",fontSize:"0.82rem",fontWeight:600,cursor:"pointer",
-                      whiteSpace:"nowrap",marginTop:"1rem",
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Descargar Excel
-                  </button>
-                </div>
-                {catalog.length === 0
-                  ? <div className="card" style={{textAlign:"center",color:"#94a3b8",padding:"2rem"}}>
-                      Catálogo vacío — agrega productos en Supabase (tabla strategy_sample_catalog)
-                    </div>
-                  : <div className="card" style={{overflowX:"auto",padding:0}}>
-                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
-                        <thead>
-                          <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
-                            {["Producto","Product ID","Cuota mensual","Enviados","Disponibles","Estado"].map(h=>(
-                              <th key={h} style={{padding:"0.75rem 1rem",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:"0.72rem",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {catalog.map((item,i)=>{
-                            const sent = sentForCatalogItem(item.id);
-                            const avail = Math.max(0, item.monthlyQuota - sent);
-                            const done  = sent >= item.monthlyQuota;
-                            const started = sent > 0 && !done;
-                            return (
-                              <tr key={item.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"white":"#fafafa"}}>
-                                <td style={{padding:"0.75rem 1rem",fontWeight:600,color:"#1e293b",maxWidth:320}}>{item.productName}</td>
-                                <td style={{padding:"0.75rem 1rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.75rem",whiteSpace:"nowrap"}}>{item.productId || "—"}</td>
-                                <td style={{padding:"0.75rem 1rem",fontWeight:700,color:"#1e293b",textAlign:"center"}}>{item.monthlyQuota}</td>
-                                <td style={{padding:"0.75rem 1rem",fontWeight:700,textAlign:"center",color:done?"#15803d":started?"#ca8a04":"#64748b"}}>{sent}</td>
-                                <td style={{padding:"0.75rem 1rem",textAlign:"center",color:done?"#94a3b8":"#1e293b"}}>{avail}</td>
-                                <td style={{padding:"0.75rem 1rem"}}>
-                                  <span style={{display:"inline-block",padding:"0.2rem 0.75rem",borderRadius:20,fontSize:"0.72rem",fontWeight:700,
-                                    background:done?"#dcfce7":started?"#fef9c3":"#f1f5f9",
-                                    color:done?"#15803d":started?"#854d0e":"#64748b",
-                                    border:`1px solid ${done?"#bbf7d0":started?"#fef08a":"#e2e8f0"}`}}>
-                                    {done?"✓ Completo":started?"En progreso":"Pendiente"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
-                            <td colSpan={2} style={{padding:"0.65rem 1rem",fontWeight:700,color:"#64748b",fontSize:"0.78rem"}}>TOTAL</td>
-                            <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:"#1e293b"}}>
-                              {catalog.reduce((s,c)=>s+c.monthlyQuota,0)}
-                            </td>
-                            <td style={{padding:"0.65rem 1rem",fontWeight:800,textAlign:"center",color:C.samples}}>
-                              {catalog.reduce((s,c)=>s+sentForCatalogItem(c.id),0)}
-                            </td>
-                            <td colSpan={2} />
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                }
-                </>)}
-
-                {inventorySubView==="analisis" && (
-                  <div>
-                    <input ref={analysisFileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}}
-                      onChange={e=>{const f=e.target.files?.[0]; if(f) handleAnalysisFileSelected(f); e.target.value="";}} />
-
-                    {!analysisParsed && (
-                      <div style={{marginBottom:"1rem"}}>
-                        <button className="btn btn-primary" onClick={()=>analysisFileRef.current?.click()}>+ Subir documento</button>
-                        {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{analysisErr}</p>}
-                      </div>
-                    )}
-
-                    {analysisParsed && (
-                      <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
-                        <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{analysisParsed.filename}</h4>
-                        <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{analysisParsed.rows.length} productos detectados.</p>
-                        <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
-                          <div><label style={lbl}>Desde</label>
-                            <input type="date" className="form-control" value={analysisParsed.periodStart}
-                              onChange={e=>setAnalysisParsed({...analysisParsed,periodStart:e.target.value})} /></div>
-                          <div><label style={lbl}>Hasta</label>
-                            <input type="date" className="form-control" value={analysisParsed.periodEnd}
-                              onChange={e=>setAnalysisParsed({...analysisParsed,periodEnd:e.target.value})} /></div>
-                        </div>
-                        {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{analysisErr}</p>}
-                        <div style={{display:"flex",gap:"0.5rem"}}>
-                          <button className="btn btn-primary btn-sm" disabled={analysisSaving} onClick={confirmAnalysisUpload}>{analysisSaving?"...":"Confirmar y guardar"}</button>
-                          <button className="btn btn-secondary btn-sm" onClick={()=>{setAnalysisParsed(null);setAnalysisErr("");}}>Cancelar</button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
-                      <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
-                        <button style={{...qBtn,borderColor:analysisFilterMode==="month"?"#0891b2":"#e2e8f0",color:analysisFilterMode==="month"?C.samples:"#64748b"}}
-                          onClick={()=>setAnalysisFilterMode("month")}>Por mes</button>
-                        <button style={{...qBtn,borderColor:analysisFilterMode==="range"?"#0891b2":"#e2e8f0",color:analysisFilterMode==="range"?C.samples:"#64748b"}}
-                          onClick={()=>setAnalysisFilterMode("range")}>Por rango de fechas</button>
-                      </div>
-                      {analysisFilterMode==="month" ? (
-                        <div><label style={lbl}>Mes</label>
-                          <input type="month" className="form-control" style={{maxWidth:170}} value={analysisFilterMonth} onChange={e=>setAnalysisFilterMonth(e.target.value)} />
-                        </div>
-                      ) : (
-                        <div style={{display:"flex",gap:"0.75rem"}}>
-                          <div><label style={lbl}>Desde</label>
-                            <input type="date" className="form-control" value={analysisFilterFrom} onChange={e=>setAnalysisFilterFrom(e.target.value)} /></div>
-                          <div><label style={lbl}>Hasta</label>
-                            <input type="date" className="form-control" value={analysisFilterTo} onChange={e=>setAnalysisFilterTo(e.target.value)} /></div>
-                        </div>
-                      )}
-                    </div>
-
-                    {analysisMatchingPeriods.length === 0 ? (
-                      <EmptyCard msg="No hay documentos subidos para este filtro." />
-                    ) : analysisMatchingPeriods.map(period => {
-                      const rows = analysisRows.filter(r => r.periodId === period.id);
-                      return (
-                        <div key={period.id} className="card" style={{marginBottom:"1rem",overflowX:"auto"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.75rem"}}>
-                            <div>
-                              <h4 style={{margin:0}}>{period.periodStart} → {period.periodEnd}</h4>
-                              <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0.2rem 0 0"}}>{period.filename}</p>
-                            </div>
-                            <button className="btn btn-sm btn-danger" onClick={()=>removeAnalysisPeriod(period)}>Eliminar</button>
-                          </div>
-                          <table className="data-table">
-                            <thead><tr>
-                              <th>Producto</th><th>Categoría</th><th>Content GMV</th><th>Refunds</th>
-                              <th>Solicitados</th><th>Enviados</th><th>Status</th><th>Videos</th><th>LIVEs</th>
-                              <th>ROI 45d</th><th>ROI 90d</th><th>Cupo vinculado</th>
-                            </tr></thead>
-                            <tbody>
-                              {rows.map(r => (
-                                <tr key={r.id}>
-                                  <td style={{maxWidth:280,fontSize:"0.8rem"}}>{r.productName}</td>
-                                  <td style={{fontSize:"0.8rem",color:"var(--text-muted)"}}>{r.productCategory}</td>
-                                  <td>{r.contentGmv!=null?`$${r.contentGmv.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}</td>
-                                  <td>{r.refunds!=null?`$${r.refunds.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}</td>
-                                  <td>{r.samplesRequested ?? "—"}</td>
-                                  <td>{r.samplesShipped ?? "—"}</td>
-                                  <td>{r.status || "—"}</td>
-                                  <td>{r.videosWithSamples ?? "—"}</td>
-                                  <td>{r.liveStreamsWithSamples ?? "—"}</td>
-                                  <td>{r.roi45d ?? "—"}</td>
-                                  <td>{r.roi90d ?? "—"}</td>
-                                  <td>
-                                    <select className="form-control" style={{fontSize:"0.75rem",minWidth:160,
-                                        borderColor:r.catalogId?"#bbf7d0":"#fde68a",background:r.catalogId?undefined:"#fffbeb"}}
-                                      value={r.catalogId ?? ""} onChange={e=>updateAnalysisRowCatalog(r.id, e.target.value?Number(e.target.value):null)}>
-                                      <option value="">Sin vincular</option>
-                                      {catalog.map(c=><option key={c.id} value={c.id}>{c.productName}</option>)}
-                                    </select>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+            {!analysisParsed && (
+              <div style={{marginBottom:"1.1rem"}}>
+                <button className="btn btn-primary" onClick={()=>analysisFileRef.current?.click()}>+ Subir documento</button>
+                {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{analysisErr}</p>}
               </div>
             )}
 
-            {samplesTab==="tracking" && (<>
-
-            {/* Official period banner */}
-            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,marginBottom:"1.1rem",overflow:"hidden"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.6rem 1.1rem",cursor:"pointer"}} onClick={()=>setShowBanner(v=>!v)}>
-                <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
-                  <span style={{fontWeight:700,fontSize:"0.72rem",color:"#1d4ed8",textTransform:"uppercase",letterSpacing:"0.06em"}}>Período oficial del bono</span>
-                  <span style={{fontWeight:800,fontSize:"0.95rem",color:"#1e293b"}}>{officialPeriod.from} → {officialPeriod.to}</span>
-                  {stats.gracePeriodActive && <span style={{background:"#fefce8",border:"1px solid #fef08a",borderRadius:6,padding:"0.1rem 0.5rem",fontSize:"0.72rem",color:"#854d0e",fontWeight:600}}>⏳ Gracia hasta {stats.graceEnd}</span>}
+            {analysisParsed && (
+              <div className="card" style={{marginBottom:"1.1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
+                <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{analysisParsed.filename}</h4>
+                <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{analysisParsed.rows.length} productos detectados.</p>
+                <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
+                  <div><label style={lbl}>Desde</label>
+                    <input type="date" className="form-control" value={analysisParsed.periodStart}
+                      onChange={e=>setAnalysisParsed({...analysisParsed,periodStart:e.target.value})} /></div>
+                  <div><label style={lbl}>Hasta</label>
+                    <input type="date" className="form-control" value={analysisParsed.periodEnd}
+                      onChange={e=>setAnalysisParsed({...analysisParsed,periodEnd:e.target.value})} /></div>
                 </div>
-                <span style={{fontSize:"0.72rem",color:"#3b82f6",fontWeight:600}}>{showBanner ? "Ocultar ▲" : "Ver detalles ▼"}</span>
+                {analysisErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{analysisErr}</p>}
+                <div style={{display:"flex",gap:"0.5rem"}}>
+                  <button className="btn btn-primary btn-sm" disabled={analysisSaving} onClick={confirmAnalysisUpload}>{analysisSaving?"...":"Confirmar y guardar"}</button>
+                  <button className="btn btn-secondary btn-sm" onClick={()=>{setAnalysisParsed(null);setAnalysisErr("");}}>Cancelar</button>
+                </div>
               </div>
-              {showBanner && (
-                <div style={{padding:"0 1.1rem 0.85rem",display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap",borderTop:"1px solid #bfdbfe"}}>
-                  <div style={{flex:1,minWidth:260,fontSize:"0.75rem",color:"#3b82f6",lineHeight:1.5,paddingTop:"0.65rem"}}>
-                    Bonus calculations are based on all eligible samples assigned to the selected bonus period, regardless of the table filters currently applied.
-                  </div>
-                  {!stats.gracePeriodActive && (
-                    <div style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,padding:"0.45rem 0.8rem",fontSize:"0.75rem",color:"#64748b",fontWeight:600,marginTop:"0.65rem"}}>
-                      Período de gracia terminó el {stats.graceEnd}
-                    </div>
-                  )}
-                </div>
-              )}
+            )}
+
+            {/* Summary: samples shipped vs goal */}
+            <div className="card" style={{marginBottom:"1.1rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
+                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>Samples enviados este ciclo</span>
+                <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>{samplesShippedTotal} / {SAMPLES_GOAL}</span>
+              </div>
+              <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
+                <div style={{width:`${Math.min(100,samplesPct)}%`,height:"100%",background:C.samples,transition:"width 0.4s",borderRadius:4}} />
+              </div>
+              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(samplesPct)}% de la meta</div>
             </div>
 
-            {/* Bonus score cards */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"0.65rem",marginBottom:"1.1rem"}}>
-              {[
-                { label:"Creadores elegibles", value:stats.totalCreators,         color:C.samples },
-                { label:"Con ≥1 video (Coverage)", value:stats.coverageCreators,  color:"#15803d" },
-                { label:"Con ≥2 videos (Additional)", value:stats.additionalCreators, color:"#7c3aed" },
-                { label:"Score final", value:`${stats.finalScore.toFixed(1)} pts`, color:"#1d4ed8" },
-                { label:"Bono estimado", value:`$${cop(stats.bonusEst)}`, color:C.operative },
-              ].map(s => (
-                <div key={s.label} style={{border:`1px solid ${s.color}30`,borderTop:`3px solid ${s.color}`,borderRadius:10,padding:"0.75rem 1rem",background:"white"}}>
-                  <div style={{fontSize:"0.65rem",fontWeight:700,color:s.color,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.25rem"}}>{s.label}</div>
-                  <div style={{fontSize:"1.15rem",fontWeight:800,color:"#1e293b"}}>{s.value}</div>
-                </div>
-              ))}
+            {/* Uploaded periods within this cycle */}
+            {periodsThisCycle.length === 0 ? (
+              <EmptyCard msg="No hay documentos subidos para este ciclo." />
+            ) : (
+              <div style={{marginBottom:"1.1rem"}}>
+                {periodsThisCycle.map(period => {
+                  const shipped = analysisRows.filter(r => r.periodId === period.id).reduce((s,r) => s + (r.samplesShipped ?? 0), 0);
+                  return (
+                    <div key={period.id} className="card" style={{marginBottom:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem"}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>{period.periodStart} → {period.periodEnd}</div>
+                        <div style={{fontSize:"0.75rem",color:"#94a3b8"}}>{period.filename} · {shipped} samples enviados</div>
+                      </div>
+                      <button className="btn btn-sm btn-danger" onClick={()=>deletePeriod(period.id)}>Eliminar</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Manual "% de videos hechos" */}
+            <div className="card" style={{marginBottom:"1.1rem"}}>
+              <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.6rem"}}>% de videos hechos</p>
+              <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                <input type="number" min={0} max={100} className="form-control" style={{maxWidth:120}}
+                  value={videoPctDraft} onChange={e=>setVideoPctDraft(e.target.value)} />
+                <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
+                <button className="btn btn-primary btn-sm" disabled={savingVideoPct} onClick={saveVideoPct}>{savingVideoPct?"...":"Guardar"}</button>
+              </div>
+              <p style={{fontSize:"0.75rem",color:"#94a3b8",marginTop:"0.5rem",marginBottom:0}}>
+                Aproximadamente 2 videos por sample enviado es un buen punto de referencia.
+              </p>
             </div>
 
             {/* Bonus breakdown */}
             <div className="card" style={{marginBottom:"1.1rem",background:"#f0f9ff",border:"1px solid #bae6fd"}}>
               <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.85rem"}}>Desglose del bono</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"0.85rem"}}>
-                <BonusBar label="A. Sample Coverage" weight="80 pts" description={`${stats.coverageCreators} de ${stats.totalCreators} creadores publicaron ≥1 video`}
-                  rate={stats.totalCreators>0?stats.coverageCreators/stats.totalCreators:0}
-                  score={stats.coverageScore} maxScore={80} color="#15803d" />
-                <BonusBar label="B. Additional Content" weight="20 pts" description={`${stats.additionalCreators} de ${stats.totalCreators} creadores publicaron ≥2 videos`}
-                  rate={stats.totalCreators>0?stats.additionalCreators/stats.totalCreators:0}
-                  score={stats.additionalScore} maxScore={20} color="#7c3aed" />
+              <div style={{display:"flex",justifyContent:"space-between",padding:"0.4rem 0",fontSize:"0.85rem"}}>
+                <span style={{color:"#64748b"}}>Samples enviados</span>
+                <span style={{fontWeight:700,color:"#1e293b"}}>${cop(samplesBonusAmount(samplesPct))} de ${cop(SAMPLES_BONUS_MAX)}</span>
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.65rem 0.85rem",background:"white",borderRadius:8,border:"1px solid #e0f2fe"}}>
-                <div>
-                  <span style={{fontSize:"0.75rem",color:"#64748b"}}>Score final = {stats.coverageScore.toFixed(1)} + {stats.additionalScore.toFixed(1)} = </span>
-                  <span style={{fontWeight:800,fontSize:"1rem",color:"#1d4ed8"}}>{stats.finalScore.toFixed(1)} pts</span>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:"0.7rem",color:"#64748b"}}>Bono estimado ({stats.finalScore.toFixed(1)}% × $195.000)</div>
-                  <div style={{fontWeight:800,fontSize:"1.2rem",color:C.operative}}>${cop(stats.bonusEst)} COP</div>
-                </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"0.4rem 0",fontSize:"0.85rem"}}>
+                <span style={{color:"#64748b"}}>Videos hechos</span>
+                <span style={{fontWeight:700,color:"#1e293b"}}>${cop(videosBonusAmount(samplesSettings.videoContentPct))} de ${cop(VIDEOS_BONUS_MAX)}</span>
               </div>
-              <p style={{fontSize:"0.7rem",color:"#94a3b8",marginTop:"0.6rem",marginBottom:0}}>
-                Nota: el máximo aporte por creador es 2 niveles (1 por Coverage + 1 por Additional). Videos adicionales se registran pero no generan puntos extra.
-              </p>
-            </div>
-
-            {/* Button toggles into form in-place */}
-            {!showAdd && !editing && (
-              <div style={{marginBottom:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
-                <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setSErr("");}}>+ Agregar Sample</button>
-                <input ref={unifiedFileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:"none"}}
-                  onChange={e=>{const f=e.target.files?.[0]; if(f) handleUnifiedImport(f); e.target.value="";}} />
-                <button className="btn btn-secondary" disabled={historyImporting||activityImporting} onClick={()=>unifiedFileRef.current?.click()}>
-                  {historyImporting||activityImporting?"Importando...":"⇪ Importar documento"}
-                </button>
-              </div>
-            )}
-            {activityParsed && (
-              <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
-                <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{activityParsed.filename}</h4>
-                <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>
-                  {activityParsed.rows.length} creadores detectados. Los que hagan match con un username existente (en cualquier estado) pasan a "Entregado". Si el video count del documento es mayor al que ya tiene, se suma la diferencia; si es igual o menor, no se toca. Los que no existan todavía se agregan como nuevos.
-                </p>
-                <label style={lbl}>¿Este documento es de un mes completo o de un período específico?</label>
-                <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
-                  <button type="button" style={{...qBtn,borderColor:activityScope==="month"?"#0891b2":"#e2e8f0",color:activityScope==="month"?C.samples:"#64748b"}}
-                    onClick={()=>setActivityScope("month")}>Mes completo</button>
-                  <button type="button" style={{...qBtn,borderColor:activityScope==="period"?"#0891b2":"#e2e8f0",color:activityScope==="period"?C.samples:"#64748b"}}
-                    onClick={()=>setActivityScope("period")}>Período específico</button>
-                </div>
-                {activityScope==="month" ? (
-                  <div style={{marginBottom:"1rem"}}>
-                    <label style={lbl}>Mes</label>
-                    <input type="month" className="form-control" style={{maxWidth:170}} value={activityMonth} onChange={e=>setActivityMonth(e.target.value)} />
-                  </div>
-                ) : (
-                  <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
-                    <div><label style={lbl}>Desde</label>
-                      <input type="date" className="form-control" value={activityParsed.periodStart}
-                        onChange={e=>setActivityParsed({...activityParsed,periodStart:e.target.value})} /></div>
-                    <div><label style={lbl}>Hasta</label>
-                      <input type="date" className="form-control" value={activityParsed.periodEnd}
-                        onChange={e=>setActivityParsed({...activityParsed,periodEnd:e.target.value})} /></div>
-                  </div>
-                )}
-                {activityErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{activityErr}</p>}
-                <div style={{display:"flex",gap:"0.5rem"}}>
-                  <button className="btn btn-primary btn-sm" disabled={activityImporting} onClick={confirmActivityImport}>{activityImporting?"...":"Confirmar y aplicar"}</button>
-                  <button className="btn btn-secondary btn-sm" onClick={()=>{setActivityParsed(null);setActivityErr("");}}>Cancelar</button>
-                </div>
-              </div>
-            )}
-            {activityResult && (
-              <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <p style={{fontSize:"0.82rem",color:"#166534",margin:0}}>
-                    {activityResult.matched} creador{activityResult.matched!==1?"es":""} actualizado{activityResult.matched!==1?"s":""} a Entregado · {activityResult.created} nuevo{activityResult.created!==1?"s":""} agregado{activityResult.created!==1?"s":""}
-                  </p>
-                  <button className="btn btn-sm btn-secondary" onClick={()=>setActivityResult(null)}>Cerrar</button>
-                </div>
-              </div>
-            )}
-            {historyResult && (
-              <div className="card" style={{marginBottom:"1rem",background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.4rem"}}>
-                  <h4 style={{margin:0,color:"#166534"}}>Historial importado</h4>
-                  <button className="btn btn-sm btn-secondary" onClick={()=>setHistoryResult(null)}>Cerrar</button>
-                </div>
-                <p style={{fontSize:"0.82rem",color:"#166534",margin:"0 0 0.25rem"}}>
-                  {historyResult.imported} de {historyResult.total} filas importadas como samples (Enviado/Entregado según estado).
-                </p>
-                <p style={{fontSize:"0.78rem",color:"#64748b",margin:"0 0 0.25rem"}}>
-                  Omitidas: {historyResult.skippedCancelled} canceladas · {historyResult.skippedUnrecognized} estado/fecha no reconocidos · {historyResult.skippedNoUsername} sin username.
-                </p>
-                {historyResult.reconciled > 0 && (
-                  <p style={{fontSize:"0.78rem",color:"#92400e",margin:0}}>
-                    ⚠ {historyResult.reconciled} sample{historyResult.reconciled!==1?"s":""} que estaban en "Enviado" no aparecen en este historial — se regresaron a "Solicitud enviada".
-                  </p>
-                )}
-              </div>
-            )}
-            {(showAdd || editing) && (
-              <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
-                <h4 style={{margin:"0 0 1rem",color:C.samples}}>{editing?"Editar Sample":"Agregar Nuevo Sample"}</h4>
-                {sErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{sErr}</p>}
-                <form onSubmit={editing?submitEdit:submitSample}>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:"0.75rem",marginBottom:"0.75rem"}}>
-                    {/* Username */}
-                    <div><label style={lbl}>Username / User ID</label>
-                      <input type="text" className="form-control" placeholder="@username" required
-                        value={editing?editing.username:newS.username}
-                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,username:v}):setNewS({...newS,username:v});}} />
-                    </div>
-                    {/* SKU autocomplete */}
-                    <div style={{gridColumn:"span 2"}}>
-                      <label style={lbl}>Producto</label>
-                      <SkuSelect
-                        catalog={catalog}
-                        value={editing?editing.sku:newS.sku}
-                        onSelect={(sku,catId)=>{
-                          editing?setEditing({...editing,sku,catalogId:catId}):setNewS({...newS,sku,catalogId:catId});
-                        }} />
-                    </div>
-                    {/* Date */}
-                    <div><label style={lbl}>Fecha de envío</label>
-                      <input type="date" className="form-control" required
-                        value={editing?editing.sentDate:newS.sentDate}
-                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,sentDate:v}):setNewS({...newS,sentDate:v});}} />
-                    </div>
-                    {/* Videos */}
-                    <div><label style={lbl}>Videos publicados</label>
-                      <input type="number" className="form-control" placeholder="0" min={0}
-                        value={editing?nv(editing.videosPublished):nv(newS.videosPublished)}
-                        onChange={e=>{const v=Number(e.target.value); editing?setEditing({...editing,videosPublished:v}):setNewS({...newS,videosPublished:v});}} />
-                    </div>
-                    {/* Notes with size hint */}
-                    <div>
-                      <label style={{...lbl,display:"flex",gap:"0.3rem",alignItems:"center"}}>
-                        Notas
-                        <span title="Importante: incluye la talla del creador en las notas (ej: S, M, L, XL, 2XL)" style={{cursor:"help",color:"#f59e0b",fontSize:"0.8rem"}}>⚠️</span>
-                      </label>
-                      <input type="text" className="form-control" placeholder="Incluye la talla aquí (ej: M)"
-                        value={editing?editing.notes:newS.notes}
-                        onChange={e=>{const v=e.target.value; editing?setEditing({...editing,notes:v}):setNewS({...newS,notes:v});}} />
-                    </div>
-                    {/* Delivery status */}
-                    <div><label style={lbl}>Estado</label>
-                      <select className="form-control"
-                        value={editing?editing.deliveryStatus:newS.deliveryStatus}
-                        onChange={e=>{const v=e.target.value as "requested"|"pending"|"delivered";editing?setEditing({...editing,deliveryStatus:v}):setNewS({...newS,deliveryStatus:v});}}>
-                        <option value="requested">Solicitud enviada</option>
-                        <option value="pending">Enviado</option>
-                        <option value="delivered">Entregado</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:"0.5rem"}}>
-                    <button type="submit" className="btn btn-primary btn-sm" disabled={sSaving}>{sSaving?"...":editing?"Guardar cambios":"Agregar"}</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{setShowAdd(false);setEditing(null);setSErr("");}}>Cancelar</button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Stage pipeline tabs */}
-            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1rem",flexWrap:"wrap"}}>
-              {([
-                {key:"requested", label:"📩 Solicitud enviada", count:stageCounts.requested, color:"#6366f1"},
-                {key:"delivered", label:"✓ Entregado",          count:stageCounts.delivered, color:"#16a34a"},
-                {key:"all",       label:"Todos",                count:stageBase.length, color:"#64748b"},
-              ] as const).map(t => (
-                <button key={t.key}
-                  onClick={()=>setFilterStatus(t.key)}
-                  style={{
-                    display:"flex",alignItems:"center",gap:"0.4rem",
-                    border:`2px solid ${filterStatus===t.key?t.color:"#e2e8f0"}`,
-                    background:filterStatus===t.key?`${t.color}14`:"#fff",
-                    color:filterStatus===t.key?t.color:"#475569",
-                    borderRadius:10,padding:"0.5rem 0.9rem",fontSize:"0.85rem",fontWeight:700,cursor:"pointer",
-                  }}>
-                  {t.label}
-                  <span style={{
-                    background:filterStatus===t.key?t.color:"#e2e8f0",
-                    color:filterStatus===t.key?"#fff":"#475569",
-                    borderRadius:999,padding:"0.05rem 0.45rem",fontSize:"0.72rem",fontWeight:800,
-                  }}>{t.count}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Filters */}
-            <div className="card" style={{marginBottom:"1rem",padding:"0.9rem 1rem"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.6rem"}}>
-                <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:0}}>Buscar (no afecta el cálculo del bono)</p>
-                <div style={{display:"flex",gap:"0.4rem"}}>
-                  <button style={{...qBtn,borderColor:viewMode==="samples"?"#0891b2":"#e2e8f0",color:viewMode==="samples"?C.samples:"#64748b"}} onClick={()=>setViewMode("samples")}>Por sample</button>
-                  <button style={{...qBtn,borderColor:viewMode==="creators"?"#0891b2":"#e2e8f0",color:viewMode==="creators"?C.samples:"#64748b"}} onClick={()=>setViewMode("creators")}>Por creador</button>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:"0.4rem",marginBottom:"0.75rem"}}>
-                <button style={{...qBtn,borderColor:trackingFilterMode==="period"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="period"?C.samples:"#64748b"}}
-                  onClick={()=>setTrackingFilterMode("period")}>Por período</button>
-                <button style={{...qBtn,borderColor:trackingFilterMode==="month"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="month"?C.samples:"#64748b"}}
-                  onClick={()=>setTrackingFilterMode("month")}>Por mes</button>
-                <button style={{...qBtn,borderColor:trackingFilterMode==="all"?"#0891b2":"#e2e8f0",color:trackingFilterMode==="all"?C.samples:"#64748b"}}
-                  onClick={()=>setTrackingFilterMode("all")}>Ver historial completo</button>
-              </div>
-              {trackingFilterMode==="period" && (
-                <div style={{display:"flex",gap:"0.75rem",marginBottom:"0.75rem"}}>
-                  <div><label style={lbl}>Desde</label>
-                    <input type="date" className="form-control" value={trackingFrom} onChange={e=>setTrackingFrom(e.target.value)} /></div>
-                  <div><label style={lbl}>Hasta</label>
-                    <input type="date" className="form-control" value={trackingTo} onChange={e=>setTrackingTo(e.target.value)} /></div>
-                </div>
-              )}
-              {trackingFilterMode==="month" && (
-                <div style={{marginBottom:"0.75rem"}}>
-                  <label style={lbl}>Mes</label>
-                  <input type="month" className="form-control" style={{maxWidth:170}} value={trackingMonth} onChange={e=>setTrackingMonth(e.target.value)} />
-                </div>
-              )}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",alignItems:"flex-end"}}>
-                <div><label style={lbl}>Buscar username</label>
-                  <input type="text" className="form-control" placeholder="@username..." value={filterUser} onChange={e=>setFilterUser(e.target.value)} />
-                </div>
-                <div><label style={lbl}>Buscar SKU</label>
-                  <input type="text" className="form-control" placeholder="SKU..." value={filterSku} onChange={e=>setFilterSku(e.target.value)} />
-                </div>
-                <div><label style={lbl}>Videos</label>
-                  <select className="form-control" value={videoFilter} onChange={e=>setVideoFilter(e.target.value as any)}>
-                    <option value="all">Todos</option>
-                    <option value="withVideo">Con video</option>
-                    <option value="noVideo">Sin video</option>
-                  </select>
-                </div>
+              <div style={{borderTop:"1px solid #bae6fd",marginTop:"0.5rem",paddingTop:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>Total Indicador #2</span>
+                <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>${cop(ind2Amount)} de ${cop(IND2_MAX)} COP</span>
               </div>
             </div>
-
-            {/* Password prompts */}
-            {delPw && (
-              <PwPrompt title="Confirmar eliminación" desc="Ingresa la contraseña de admin para eliminar."
-                pw={delPw.pw} err={delPw.err} btnLabel="Eliminar" btnColor="#dc2626"
-                onChange={pw=>setDelPw({...delPw,pw,err:""})}
-                onConfirm={()=>confirmDelete(delPw.id,delPw.pw)}
-                onCancel={()=>setDelPw(null)} />
-            )}
-            {movePw && (
-              <PwPrompt title="Mover al siguiente período" desc={`El sample se asignará al período: ${getNextCycleKey(year,cycleId)}`}
-                pw={movePw.pw} err={movePw.err} btnLabel="Mover" btnColor="#0891b2"
-                onChange={pw=>setMovePw({...movePw,pw,err:""})}
-                onConfirm={()=>confirmMove(movePw.id,movePw.pw)}
-                onCancel={()=>setMovePw(null)} />
-            )}
-
-            {/* Table — samples view */}
-            {viewMode==="samples" && (
-              <div className="card" style={{overflowX:"auto"}}>
-                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{tableRows.length} resultado{tableRows.length!==1?"s":""} · el bono siempre se calcula sobre el período oficial ({stats.officialSamples.length} samples), sin importar este filtro</p>
-                {tableRows.length===0 ? (
-                  <EmptyCard msg="No hay samples para este período." />
-                ) : (
-                  <table className="data-table">
-                    <thead><tr>
-                      <th>Estado</th>
-                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("username")}>Username {sampleSort?.col==="username"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
-                      <th>SKU</th>
-                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("sentDate")}>Fecha envío {sampleSort?.col==="sentDate"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
-                      <th style={{cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSampleSort("videos")}>Videos {sampleSort?.col==="videos"?(sampleSort.dir==="asc"?"▲":"▼"):""}</th>
-                      <th>Aporte al bono</th><th>Notas</th><th>Acciones</th>
-                    </tr></thead>
-                    <tbody>
-                      {tableRows.map(s => {
-                        const totalForCreator = stats.byCreator[s.username] ?? 0;
-                        const inactive = isInactiveProduct(s);
-                        const rowBg = inactive ? "#fef2f2"
-                          : s.deliveryStatus==="requested" ? "#eef2ff"
-                          : s.deliveryStatus==="pending" ? "#fffbeb"
-                          : undefined;
-                        return (
-                          <tr key={s.id} style={{background:rowBg}}>
-                            <td>
-                              {s.deliveryStatus==="requested" ? (
-                                <div style={{display:"flex",flexDirection:"column",gap:"0.2rem",alignItems:"flex-start"}}>
-                                  <span style={{background:"#e0e7ff",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#4338ca",fontWeight:700}}>📩 Solicitud enviada</span>
-                                  {daysSince(s.sentDate) > 7 && (
-                                    <span style={{background:"#fef2f2",borderRadius:6,padding:"0.1rem 0.45rem",fontSize:"0.68rem",color:"#b91c1c",fontWeight:700}}>⚠ {daysSince(s.sentDate)} días sin respuesta</span>
-                                  )}
-                                </div>
-                              ) : s.deliveryStatus==="pending" ? (
-                                <span style={{background:"#fef3c7",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#92400e",fontWeight:700}}>📦 Enviado</span>
-                              ) : (
-                                <span style={{background:"#f0fdf4",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#166534",fontWeight:700}}>✓ Entregado</span>
-                              )}
-                            </td>
-                            <td style={{fontWeight:600}}>{s.username}</td>
-                            <td>
-                              <span style={{background:"#f1f5f9",borderRadius:4,padding:"0.1rem 0.45rem",fontSize:"0.8rem",fontFamily:"monospace"}}>{s.sku}</span>
-                              {inactive && <span style={{marginLeft:"0.4rem",background:"#fee2e2",color:"#b91c1c",borderRadius:4,padding:"0.1rem 0.4rem",fontSize:"0.68rem",fontWeight:700}}>DESCONTINUADO</span>}
-                            </td>
-                            <td>{s.sentDate}</td>
-                            <td>
-                              {s.deliveryStatus==="delivered" ? (
-                                <div style={{display:"flex",alignItems:"center",gap:"0.35rem",position:"relative"}}>
-                                  <button className="btn btn-sm btn-secondary" style={{padding:"0.05rem 0.5rem"}}
-                                    disabled={videoLogBusyId===s.id || (s.videoLog?.length ?? 0)===0}
-                                    onClick={()=>removeLastVideo(s.id)}>−</button>
-                                  <span style={{fontWeight:700,minWidth:16,textAlign:"center",color:(s.videoLog?.length ?? s.videosPublished)===0?"#dc2626":"#15803d"}}>
-                                    {s.videoLog?.length ?? s.videosPublished}
-                                  </span>
-                                  <button className="btn btn-sm btn-secondary" style={{padding:"0.05rem 0.5rem"}}
-                                    disabled={videoLogBusyId===s.id}
-                                    onClick={()=>openAddVideo(s.id)}>+</button>
-                                  {addVideoPopoverId===s.id && (
-                                    <div className="card" style={{position:"absolute",top:"110%",left:0,zIndex:20,width:190,padding:"0.6rem"}}>
-                                      <label style={lbl}>Fecha del video</label>
-                                      <input type="date" className="form-control" value={addVideoDate} onChange={e=>setAddVideoDate(e.target.value)} />
-                                      <div style={{display:"flex",gap:"0.3rem",marginTop:"0.4rem"}}>
-                                        <button className="btn btn-sm btn-primary" disabled={videoLogBusyId===s.id} onClick={()=>confirmAddVideo(s.id)}>{videoLogBusyId===s.id?"...":"Agregar"}</button>
-                                        <button className="btn btn-sm btn-secondary" onClick={()=>setAddVideoPopoverId(null)}>Cancelar</button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span style={{fontWeight:700,color:s.videosPublished===0?"#dc2626":"#15803d"}}>{s.videosPublished===0?"0":"✓ "+s.videosPublished}</span>
-                              )}
-                            </td>
-                            <td style={{fontSize:"0.75rem"}}>
-                              {totalForCreator>=2 && <span style={{color:"#7c3aed",fontWeight:600}}>Coverage + Additional</span>}
-                              {totalForCreator===1 && <span style={{color:"#15803d",fontWeight:600}}>Coverage</span>}
-                              {totalForCreator===0 && <span style={{color:"#94a3b8"}}>Sin cumplimiento</span>}
-                            </td>
-                            <td style={{color:"var(--text-muted)",fontSize:"0.8rem"}}>{s.notes||"—"}</td>
-                            <td style={{whiteSpace:"nowrap",display:"flex",gap:"0.3rem",flexWrap:"wrap"}}>
-                              {s.deliveryStatus==="requested" && (
-                                <button className="btn btn-sm btn-secondary" style={{color:"#4338ca",borderColor:"#c7d2fe"}} onClick={()=>markResponded(s.id)}>✓ Contestó → Enviado</button>
-                              )}
-                              {s.deliveryStatus==="requested" && daysSince(s.sentDate) > 7 && (
-                                <button className="btn btn-sm btn-danger" onClick={()=>deleteStaleRequest(s.id)}>🗑 Eliminar</button>
-                              )}
-                              {s.deliveryStatus==="pending" && (
-                                <button className="btn btn-sm btn-secondary" onClick={()=>markDelivered(s.id)}>Entregar</button>
-                              )}
-                              <button className="btn btn-sm btn-secondary" onClick={()=>{setEditing(s);setShowAdd(false);setSErr("");setDelPw(null);setMovePw(null);}}>Editar</button>
-                              <button className="btn btn-sm btn-secondary" style={{color:"#0891b2",borderColor:"#bae6fd"}} onClick={()=>setMovePw({id:s.id,pw:"",err:""})}>→ Sig. período</button>
-                              <button className="btn btn-sm btn-danger" onClick={()=>setDelPw({id:s.id,pw:"",err:""})}>Eliminar</button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* Table — creators view */}
-            {viewMode==="creators" && (
-              <div className="card" style={{overflowX:"auto"}}>
-                <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.75rem"}}>{creatorRows.length} creadores en este período (de muestras contables)</p>
-                {creatorRows.length===0 ? (
-                  <EmptyCard msg="No hay creadores para este período." />
-                ) : (
-                  <table className="data-table">
-                    <thead><tr><th>Creador</th><th>Total videos</th><th>Coverage (≥1 video)</th><th>Additional (≥2 videos)</th><th>Samples enviados</th></tr></thead>
-                    <tbody>
-                      {creatorRows.map(r => (
-                        <tr key={r.username}>
-                          <td style={{fontWeight:700}}>{r.username}</td>
-                          <td style={{fontWeight:700,color:r.totalVideos>0?"#15803d":"#dc2626"}}>{r.totalVideos}</td>
-                          <td>{r.coverage ? <span style={{color:"#15803d",fontWeight:700}}>✓ Sí</span> : <span style={{color:"#94a3b8"}}>✗ No</span>}</td>
-                          <td>{r.additional ? <span style={{color:"#7c3aed",fontWeight:700}}>✓ Sí</span> : <span style={{color:"#94a3b8"}}>✗ No</span>}</td>
-                          <td style={{fontSize:"0.78rem",color:"#64748b"}}>{r.samples.map(s=>s.sku).join(", ")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* Bonus authorization */}
-            {agents.map(ag => {
-              const entry = entries.find(e => e.agentId === ag.id);
-              return (
-                <div key={ag.id} className="card" style={{marginTop:"1.25rem",border:`1px solid ${entry?.bonusSamplesLocked?"#16a34a":"#e2e8f0"}`,background:entry?.bonusSamplesLocked?"#f0fdf4":"white"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"1rem",flexWrap:"wrap"}}>
-                    <div>
-                      <p style={{fontWeight:700,fontSize:"0.82rem",color:entry?.bonusSamplesLocked?"#15803d":"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",margin:"0 0 0.3rem"}}>
-                        {entry?.bonusSamplesLocked ? "🔒 Bono autorizado y bloqueado" : "Autorizar bono final"}
-                      </p>
-                      {entry?.bonusSamplesLocked ? (
-                        <>
-                          <p style={{fontSize:"1.3rem",fontWeight:800,color:"#15803d",margin:"0 0 0.2rem"}}>${cop(entry.bonusSamplesLockedAmount ?? stats.bonusEst)} COP</p>
-                          <p style={{fontSize:"0.75rem",color:"#64748b",margin:0}}>Bloqueado el {entry.bonusSamplesLockedAt ? new Date(entry.bonusSamplesLockedAt).toLocaleString("es-CO") : "—"}</p>
-                        </>
-                      ) : (
-                        <>
-                          <p style={{fontSize:"1.3rem",fontWeight:800,color:C.operative,margin:"0 0 0.2rem"}}>${cop(stats.bonusEst)} COP <span style={{fontSize:"0.75rem",color:"#94a3b8",fontWeight:400}}>(calculado en vivo)</span></p>
-                          <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:0}}>Al bloquear se congela el monto actual.</p>
-                        </>
-                      )}
-                    </div>
-                    <div>
-                      {entry?.bonusSamplesLocked ? (
-                        <button className="btn btn-secondary btn-sm" onClick={()=>setLockPw({agId:ag.id,action:"unlock",pw:"",err:""})}>Desbloquear</button>
-                      ) : (
-                        <button className="btn btn-primary btn-sm" style={{background:"#15803d",borderColor:"#15803d"}} onClick={()=>{if(!entry){alert("Guarda primero los indicadores del período.");return;}setLockPw({agId:ag.id,action:"lock",pw:"",err:""});}}>
-                          Autorizar y bloquear bono
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {lockPw && lockPw.agId === ag.id && (
-                    <div style={{marginTop:"1rem"}}>
-                      <PwPrompt title={lockPw.action==="lock"?"Confirmar autorización":"Confirmar desbloqueo"}
-                        desc="Ingresa la contraseña de admin para continuar."
-                        pw={lockPw.pw} err={lockPw.err}
-                        btnLabel={lockPw.action==="lock"?"Autorizar":"Desbloquear"}
-                        btnColor={lockPw.action==="lock"?"#15803d":"#0891b2"}
-                        onChange={pw=>setLockPw({...lockPw,pw,err:""})}
-                        onConfirm={()=>confirmLock(lockPw.agId,lockPw.action,lockPw.pw)}
-                        onCancel={()=>setLockPw(null)} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            </>)}
           </section>
         )}
 
@@ -2667,42 +1571,6 @@ function EmptyCard({ msg }: { msg: string }) {
   return <div className="card" style={{textAlign:"center",padding:"2.5rem",color:"var(--text-muted)"}}>{msg}</div>;
 }
 
-function PwPrompt({ title, desc, pw, err, btnLabel, btnColor, onChange, onConfirm, onCancel }:
-  { title:string; desc:string; pw:string; err:string; btnLabel:string; btnColor:string; onChange:(pw:string)=>void; onConfirm:()=>void; onCancel:()=>void }) {
-  return (
-    <div className="card" style={{border:"2px solid #dc2626",background:"#fef2f2",marginBottom:"1rem"}}>
-      <h4 style={{margin:"0 0 0.35rem",color:"#dc2626"}}>{title}</h4>
-      <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.6rem"}}>{desc}</p>
-      {err && <p style={{color:"#dc2626",fontSize:"0.82rem",margin:"0 0 0.5rem"}}>{err}</p>}
-      <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
-        <input type="password" className="form-control" style={{maxWidth:220}} placeholder="Contraseña admin"
-          value={pw} onChange={e=>onChange(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onConfirm()} autoFocus />
-        <button className="btn btn-sm" style={{background:btnColor,color:"white",border:"none"}} onClick={onConfirm}>{btnLabel}</button>
-        <button className="btn btn-sm btn-secondary" onClick={onCancel}>Cancelar</button>
-      </div>
-    </div>
-  );
-}
-
-function BonusBar({ label, weight, description, rate, score, maxScore, color }:
-  { label:string; weight:string; description:string; rate:number; score:number; maxScore:number; color:string }) {
-  return (
-    <div style={{background:"white",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.3rem"}}>
-        <span style={{fontWeight:700,fontSize:"0.82rem",color:"#1e293b"}}>{label}</span>
-        <span style={{fontSize:"0.72rem",color,fontWeight:700}}>máx {weight}</span>
-      </div>
-      <div style={{fontSize:"0.75rem",color:"#64748b",marginBottom:"0.6rem"}}>{description}</div>
-      <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
-        <div style={{width:`${rate*100}%`,height:"100%",background:color,transition:"width 0.4s",borderRadius:4}} />
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.75rem"}}>
-        <span style={{color:"#64748b"}}>{Math.round(rate*100)}% de creadores</span>
-        <span style={{fontWeight:700,color}}>{score.toFixed(1)} / {maxScore} pts</span>
-      </div>
-    </div>
-  );
-}
 
 function SummaryBox({ label, value, color, sub, large }:{ label:string; value:number; color:string; sub:string; large?:boolean }) {
   return (
@@ -2736,76 +1604,6 @@ function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, deta
         <div style={{fontSize:"1.05rem",fontWeight:800,color}}>${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(displayEarned)}</div>
         <div style={{fontSize:"0.7rem",color:"#94a3b8"}}>{Math.round(scalePct*100)}%</div>
       </div>
-    </div>
-  );
-}
-
-function SkuSelect({ catalog, value, onSelect }: {
-  catalog: SampleCatalogItem[];
-  value: string;
-  onSelect: (sku: string, catalogId: number | undefined) => void;
-}) {
-  const [query, setQuery]   = useState("");
-  const [open, setOpen]     = useState(false);
-  const selected = catalog.find(c => c.productName === value);
-
-  const filtered = query.trim().length === 0
-    ? catalog
-    : catalog.filter(c => c.productName.toLowerCase().includes(query.toLowerCase()));
-
-  const handleOpen = () => { setQuery(""); setOpen(true); };
-  const handleClose = () => setTimeout(() => { setOpen(false); setQuery(""); }, 150);
-
-  return (
-    <div style={{position:"relative"}}>
-      {/* Trigger — looks like a select */}
-      {!open ? (
-        <button type="button" onClick={handleOpen}
-          style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"0.45rem 0.75rem",border:"1px solid #e2e8f0",borderRadius:8,background:"white",
-            cursor:"pointer",textAlign:"left",gap:"0.5rem",minHeight:38}}>
-          <span style={{fontSize:"0.85rem",color:selected?"#1e293b":"#94a3b8",flex:1,overflow:"hidden",
-            textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {selected ? selected.productName : "— Seleccionar producto —"}
-          </span>
-          <span style={{color:"#64748b",fontSize:"0.75rem",flexShrink:0}}>▼</span>
-        </button>
-      ) : (
-        /* Search input when open */
-        <input autoFocus type="text" className="form-control"
-          placeholder="Buscar (ej: BBL, Corset, S-002)..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onBlur={handleClose}
-          style={{borderRadius:"8px 8px 0 0"}}
-        />
-      )}
-
-      {/* Dropdown list */}
-      {open && (
-        <div style={{position:"absolute",zIndex:200,left:0,right:0,top:"100%",
-          background:"white",border:"1px solid #bae6fd",borderTop:"none",
-          borderRadius:"0 0 8px 8px",boxShadow:"0 8px 24px rgba(0,0,0,0.12)",
-          maxHeight:280,overflowY:"auto"}}>
-          {filtered.length === 0
-            ? <div style={{padding:"0.75rem 1rem",color:"#94a3b8",fontSize:"0.82rem"}}>Sin resultados</div>
-            : filtered.map(c => (
-                <div key={c.id}
-                  onMouseDown={() => { onSelect(c.productName, c.id); setOpen(false); setQuery(""); }}
-                  style={{padding:"0.6rem 1rem",cursor:"pointer",borderBottom:"1px solid #f1f5f9",
-                    display:"flex",flexDirection:"column",gap:"0.1rem",
-                    background:value===c.productName?"#eff6ff":"white"}}
-                  onMouseEnter={e=>(e.currentTarget.style.background="#f0f9ff")}
-                  onMouseLeave={e=>(e.currentTarget.style.background=value===c.productName?"#eff6ff":"white")}>
-                  <span style={{fontSize:"0.82rem",fontWeight:600,color:"#1e293b"}}>{c.productName}</span>
-                  {c.productId && <span style={{fontSize:"0.68rem",color:"#94a3b8",fontFamily:"monospace"}}>ID: {c.productId} · cuota mensual: {c.monthlyQuota}</span>}
-                </div>
-              ))
-          }
-        </div>
-      )}
-      {/* Hidden required input for form validation */}
-      <input type="text" required style={{position:"absolute",opacity:0,height:0,pointerEvents:"none"}} value={value} readOnly />
     </div>
   );
 }
