@@ -473,7 +473,7 @@ export default function StrategyDashboard() {
       cur.roi45d = r.roi45d ?? cur.roi45d;
       byId.set(r.productId, cur);
     }
-    return Array.from(byId.values()).sort((a, b) => b.sent - a.sent);
+    return Array.from(byId.values()).filter(u => u.sent > 0).sort((a, b) => b.sent - a.sent);
   }, [catalog, rowsInProductWindow]);
 
   // ── Incident log state ────────────────────────────────────────────────────────
