@@ -1422,6 +1422,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
     reference: r.reference,
     productLine: r.product_line ?? "",
     startDate: r.start_date,
+    estimatedStartDate: r.estimated_start_date ?? null,
     currentStage: r.current_stage,
     status: r.status,
     stages: Array.isArray(r.stages) ? r.stages : [],
@@ -1433,13 +1434,14 @@ function mapMarketingBrief(r: any): MarketingBrief {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     assignedDisenoEmail: r.assigned_diseno_email ?? null,
+    carolNotifiedAt: r.carol_notified_at ?? null,
   };
 }
 
 function mapMarketingNotification(r: any): MarketingNotification {
   return {
     id: r.id, briefId: r.brief_id, message: r.message, createdAt: r.created_at,
-    readLaura: r.read_laura ?? false, readDiseno: r.read_diseno ?? false,
+    readLaura: r.read_laura ?? false, readDiseno: r.read_diseno ?? false, readCarol: r.read_carol ?? false,
   };
 }
 
@@ -1451,11 +1453,12 @@ export async function getMarketingBriefs(): Promise<MarketingBrief[]> {
 
 export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "createdAt" | "updatedAt">): Promise<MarketingBrief> {
   const { data, error } = await supabase.from("marketing_briefs").insert({
-    reference: b.reference, product_line: b.productLine, start_date: b.startDate, current_stage: b.currentStage,
+    reference: b.reference, product_line: b.productLine, start_date: b.startDate,
+    estimated_start_date: b.estimatedStartDate, current_stage: b.currentStage,
     status: b.status, stages: b.stages, shift_days: b.shiftDays,
     laura_delay_days: b.lauraDelayDays, design_delay_count: b.designDelayCount,
     extra_revision_rounds: b.extraRevisionRounds, completed_at: b.completedAt,
-    assigned_diseno_email: b.assignedDisenoEmail,
+    assigned_diseno_email: b.assignedDisenoEmail, carol_notified_at: b.carolNotifiedAt,
   }).select().single();
   if (error) throw error;
   return mapMarketingBrief(data);
@@ -1466,12 +1469,15 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
   if (patch.status !== undefined) dbPatch.status = patch.status;
   if (patch.stages !== undefined) dbPatch.stages = patch.stages;
+  if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
+  if (patch.estimatedStartDate !== undefined) dbPatch.estimated_start_date = patch.estimatedStartDate;
   if (patch.shiftDays !== undefined) dbPatch.shift_days = patch.shiftDays;
   if (patch.lauraDelayDays !== undefined) dbPatch.laura_delay_days = patch.lauraDelayDays;
   if (patch.designDelayCount !== undefined) dbPatch.design_delay_count = patch.designDelayCount;
   if (patch.extraRevisionRounds !== undefined) dbPatch.extra_revision_rounds = patch.extraRevisionRounds;
   if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
   if (patch.assignedDisenoEmail !== undefined) dbPatch.assigned_diseno_email = patch.assignedDisenoEmail;
+  if (patch.carolNotifiedAt !== undefined) dbPatch.carol_notified_at = patch.carolNotifiedAt;
   const { error } = await supabase.from("marketing_briefs").update(dbPatch).eq("id", id);
   if (error) throw error;
 }
@@ -1504,9 +1510,9 @@ export async function createMarketingNotification(briefId: number | null, messag
   if (error) throw error;
 }
 
-export async function markMarketingNotificationsRead(role: "laura"|"diseno", ids: number[]): Promise<void> {
+export async function markMarketingNotificationsRead(role: "laura"|"diseno"|"carol", ids: number[]): Promise<void> {
   if (ids.length === 0) return;
-  const field = role === "laura" ? "read_laura" : "read_diseno";
+  const field = role === "laura" ? "read_laura" : role === "carol" ? "read_carol" : "read_diseno";
   const { error } = await supabase.from("marketing_notifications").update({ [field]: true }).in("id", ids);
   if (error) throw error;
 }
@@ -1521,21 +1527,24 @@ export async function deleteAllMarketingNotifications(): Promise<void> {
   if (error) throw error;
 }
 
-export type MarketingNotifySlot = "laura" | "diseno_1" | "diseno_2" | "diseno_3";
+export type MarketingNotifySlot = "laura" | "carol" | "diseno_1" | "diseno_2" | "diseno_3";
 
 export interface MarketingNotifyEmails {
   laura: string;
+  carol: string;
   diseno_1: string;
   diseno_2: string;
   diseno_3: string;
 }
 
+const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3"];
+
 export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
-  const map: MarketingNotifyEmails = { laura: "", diseno_1: "", diseno_2: "", diseno_3: "" };
+  const map: MarketingNotifyEmails = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
   (data ?? []).forEach((r: any) => {
-    if (r.role === "laura" || r.role === "diseno_1" || r.role === "diseno_2" || r.role === "diseno_3") {
+    if (NOTIFY_SLOTS.includes(r.role)) {
       map[r.role as MarketingNotifySlot] = r.email;
     }
   });

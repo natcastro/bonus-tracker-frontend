@@ -23,7 +23,9 @@ export default function NotificationBell() {
 
   const isUnread = (n: MarketingNotification) => {
     if (!authedUser) return false;
-    return authedUser.role === "laura" ? !n.readLaura : !n.readDiseno;
+    if (authedUser.role === "laura") return !n.readLaura;
+    if (authedUser.role === "carol") return !n.readCarol;
+    return !n.readDiseno;
   };
 
   const handleClick = (n: MarketingNotification) => {

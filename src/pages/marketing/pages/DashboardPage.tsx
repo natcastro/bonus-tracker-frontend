@@ -12,20 +12,22 @@ import type { MarketingBrief, MarketingRole } from "../types";
 
 const MONTHLY_GOAL = 8;
 
-type GroupKey = "overdue" | "active" | "completed";
+type GroupKey = "draft" | "overdue" | "active" | "completed";
 const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
+  { key: "draft",     label: "Pendientes (privadas)", color: MT.text3 },
   { key: "overdue",   label: "⚠ Atrasados", color: MT.danger },
   { key: "active",    label: "En proceso",  color: MT.info },
   { key: "completed", label: "Completados", color: MT.primary },
 ];
 
 function isOverdue(brief: MarketingBrief): boolean {
-  if (brief.status === "completed") return false;
+  if (brief.status !== "in_progress") return false;
   const stage = brief.stages.find(s => s.key === brief.currentStage);
-  return !!stage && isPastDeadline(stage.deadline);
+  return !!stage?.deadline && isPastDeadline(stage.deadline);
 }
 
 function groupOf(b: MarketingBrief): GroupKey {
+  if (b.status === "draft") return "draft";
   if (b.status === "completed") return "completed";
   return isOverdue(b) ? "overdue" : "active";
 }
@@ -39,7 +41,7 @@ export default function DashboardPage() {
   const [responsibleFilter, setResponsibleFilter] = useState<"all"|"laura"|"diseno">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({ overdue: false, active: false, completed: true });
+  const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({ draft: false, overdue: false, active: false, completed: true });
 
   const thisMonthKey = todayIso().slice(0, 7);
   // "This month" is based on when a brief was completed, not when it started — a brief that
@@ -57,7 +59,7 @@ export default function DashboardPage() {
     if (statusFilter !== "all" && b.status !== statusFilter) return false;
     if (responsibleFilter !== "all") {
       const stage = b.stages.find(s => s.key === b.currentStage);
-      if (b.status === "completed" || !stage || stage.role !== responsibleFilter) return false;
+      if (b.status !== "in_progress" || !stage || stage.role !== responsibleFilter) return false;
     }
     if (dateFrom && b.startDate < dateFrom) return false;
     if (dateTo && b.startDate > dateTo) return false;
@@ -185,9 +187,9 @@ export default function DashboardPage() {
                     {!isCollapsed && g.rows.map(b => {
                       const stage = b.stages.find(s => s.key === b.currentStage);
                       const overdue = isOverdue(b);
-                      const role: MarketingRole | undefined = stage?.role;
-                      const statusColor = b.status === "completed" ? MT.primary : role ? ROLE_CFG[role].color : MT.text2;
-                      const rowAccent = b.status === "completed" ? "transparent" : role ? ROLE_CFG[role].color : "transparent";
+                      const role: MarketingRole | undefined = b.status === "draft" ? undefined : stage?.role;
+                      const statusColor = b.status === "completed" ? MT.primary : b.status === "draft" ? MT.text3 : role ? ROLE_CFG[role].color : MT.text2;
+                      const rowAccent = b.status === "in_progress" && role ? ROLE_CFG[role].color : "transparent";
                       return (
                         <tr key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{
                           borderBottom: `1px solid ${MT.border}`, borderLeft: `3px solid ${rowAccent}`, cursor: "pointer",
@@ -196,9 +198,11 @@ export default function DashboardPage() {
                           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                           <td style={{ padding: "0.55rem 0.9rem", fontWeight: 700, fontSize: 12.5, color: MT.text1 }}>{b.reference}</td>
                           <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{b.productLine || "—"}</td>
-                          <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{formatDateHuman(b.startDate)}</td>
+                          <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>
+                            {b.status === "draft" ? formatDateHuman(b.estimatedStartDate) : formatDateHuman(b.startDate)}
+                          </td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
-                            <StatusPill solid color={statusColor} label={b.status === "completed" ? "✓ Completado" : stageLabel(b.currentStage)} />
+                            <StatusPill solid color={statusColor} label={b.status === "completed" ? "✓ Completado" : b.status === "draft" ? "Pendiente" : stageLabel(b.currentStage)} />
                           </td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
                             {role ? (
@@ -208,11 +212,11 @@ export default function DashboardPage() {
                               </div>
                             ) : "—"}
                           </td>
-                          <td style={{ padding: "0.55rem 0.9rem" }}>{stage ? <DeadlineBadge deadline={stage.deadline} compact /> : "—"}</td>
+                          <td style={{ padding: "0.55rem 0.9rem" }}>{stage?.deadline ? <DeadlineBadge deadline={stage.deadline} compact /> : "—"}</td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
                             {overdue ? (
                               <StatusPill solid color={MT.danger} label="⚠ Urgente" />
-                            ) : b.status === "completed" ? (
+                            ) : b.status !== "in_progress" ? (
                               <span style={{ fontSize: 11.5, color: MT.text3 }}>—</span>
                             ) : (
                               <StatusPill color={MT.moss} label="A tiempo" />

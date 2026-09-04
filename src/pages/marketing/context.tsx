@@ -14,6 +14,7 @@ import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   laura: "amazonassistant@formatucuerpo.com",
+  carol: "",
   diseno_1: "marketplaces@formatucuerpo.com",
   diseno_2: "",
   diseno_3: "",
@@ -42,12 +43,14 @@ interface MarketingCtx {
   reload: () => Promise<void>;
 
   createBrief: (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => Promise<void>;
+  createDraftBrief: (reference: string, productLine: string, estimatedStartDate: string, briefLink: string) => Promise<void>;
+  publishBrief: (briefId: number, assignedDisenoEmail?: string) => Promise<void>;
   submitDesignStage: (briefId: number, link: string, note?: string) => Promise<void>;
   lauraReview: (briefId: number, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => Promise<void>;
   requestExtraRevision: (briefId: number, note?: string) => Promise<void>;
   confirmPublish: (briefId: number, note?: string) => Promise<void>;
   updateStageLink: (briefId: number, stageKey: StageKey, link: string) => Promise<void>;
-  claimBrief: (briefId: number, email: string) => Promise<void>;
+  assignBrief: (briefId: number, email: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
 
   unreadCount: number;
@@ -74,6 +77,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const role = getRole("MARKETING");
     if (role === "admin") return { role: "laura", name: "Laura" };
     if (role === "staff") return { role: "diseno", name: "Diseño" };
+    if (role === "carol") return { role: "carol", name: "Carol" };
     return null;
   }, [getRole]);
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
@@ -97,6 +101,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     getMarketingNotifyEmails()
       .then(emails => setNotifyEmails(prev => ({
         laura: emails.laura || prev.laura,
+        carol: emails.carol || prev.carol,
         diseno_1: emails.diseno_1 || prev.diseno_1,
         diseno_2: emails.diseno_2 || prev.diseno_2,
         diseno_3: emails.diseno_3 || prev.diseno_3,
@@ -118,40 +123,77 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await createMarketingNotification(briefId, message);
   };
 
-  const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => {
-    const stages = STAGE_DEFS.map((def, i) => {
-      if (i === 0) {
-        return { ...def, deadline: startDate, link: briefLink || null, completedAt: startDate, status: "done" as const };
-      }
-      if (i === 1) {
-        return { ...def, deadline: addWorkDaysIso(startDate, def.gapDays), link: null, completedAt: null, status: "pending" as const };
-      }
-      return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
-    });
-    await createMarketingBrief({
-      reference, productLine, startDate, currentStage: "proposal", status: "in_progress",
-      stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
-      completedAt: null, assignedDisenoEmail: assignedDisenoEmail || null,
-    });
-    await notify(null, `Laura creó un nuevo brief: ${reference}.`);
-    const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
-    // Laura may already know who's taking it — in that case only that person gets the email,
-    // skipping the broadcast-and-claim flow entirely. Otherwise it goes to everyone in Diseño.
-    const recipients = assignedDisenoEmail ? [assignedDisenoEmail] : disenoEmailList;
-    for (const email of recipients) {
+  // A brief going live either has someone assigned already (Laura picked at creation/publish, or
+  // Carol picked later) — that person gets emailed directly — or it doesn't, in which case Carol
+  // gets notified and has 24h to assign it before the round-robin job picks someone automatically.
+  const notifyBriefLive = async (reference: string, assignedDisenoEmail: string | undefined, deadline: string | null) => {
+    if (assignedDisenoEmail) {
       await sendMarketingEmail(
-        email,
+        assignedDisenoEmail,
         `Nuevo brief — ${reference}`,
+        emailHtml({ intro: "Te asignaron un nuevo brief.", reference, nextTask: stageLabel("proposal"), deadline }),
+      );
+      return { assignedDisenoEmail, carolNotifiedAt: null as string | null };
+    }
+    if (notifyEmails.carol) {
+      await sendMarketingEmail(
+        notifyEmails.carol,
+        `Nuevo brief sin asignar — ${reference}`,
         emailHtml({
-          intro: assignedDisenoEmail
-            ? "Laura creó un nuevo brief y te lo asignó directamente."
-            : "Laura creó un nuevo brief. Entra a la plataforma y elige tu correo para tomarlo.",
-          reference,
-          nextTask: stageLabel("proposal"),
-          deadline: nextDeadline,
+          intro: "Hay un nuevo brief sin asignar. Entra a la plataforma y asígnalo a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
+          reference, nextTask: stageLabel("proposal"), deadline,
         }),
       );
     }
+    return { assignedDisenoEmail: null as string | null, carolNotifiedAt: new Date().toISOString() };
+  };
+
+  const buildStages = (startDate: string, briefLink: string) => STAGE_DEFS.map((def, i) => {
+    if (i === 0) {
+      return { ...def, deadline: startDate, link: briefLink || null, completedAt: startDate, status: "done" as const };
+    }
+    if (i === 1) {
+      return { ...def, deadline: addWorkDaysIso(startDate, def.gapDays), link: null, completedAt: null, status: "pending" as const };
+    }
+    return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
+  });
+
+  const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => {
+    const stages = buildStages(startDate, briefLink);
+    const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
+    const assignment = await notifyBriefLive(reference, assignedDisenoEmail, nextDeadline);
+    await createMarketingBrief({
+      reference, productLine, startDate, estimatedStartDate: null, currentStage: "proposal", status: "in_progress",
+      stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
+      completedAt: null, ...assignment,
+    });
+    await notify(null, `Laura creó un nuevo brief: ${reference}.`);
+    await reload();
+  };
+
+  // A draft is a private planning placeholder — no stages run, nobody is notified, until Laura
+  // publishes it (see publishBrief).
+  const createDraftBrief = async (reference: string, productLine: string, estimatedStartDate: string, briefLink: string) => {
+    const stages = STAGE_DEFS.map(def => ({ ...def, deadline: null, link: def.key === "brief" ? (briefLink || null) : null, completedAt: null, status: "pending" as const }));
+    await createMarketingBrief({
+      reference, productLine, startDate: estimatedStartDate, estimatedStartDate, currentStage: "brief", status: "draft",
+      stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
+      completedAt: null, assignedDisenoEmail: null, carolNotifiedAt: null,
+    });
+    await reload();
+  };
+
+  const publishBrief = async (briefId: number, assignedDisenoEmail?: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || brief.status !== "draft") return;
+    const today = todayIso();
+    const stages = buildStages(today, brief.stages.find(s => s.key === "brief")?.link ?? "");
+    const nextDeadline = addWorkDaysIso(today, STAGE_DEFS[1].gapDays);
+    const assignment = await notifyBriefLive(brief.reference, assignedDisenoEmail, nextDeadline);
+    await updateMarketingBrief(briefId, {
+      startDate: today, estimatedStartDate: null, currentStage: "proposal", status: "in_progress", stages, ...assignment,
+    });
+    await notify(null, `Laura publicó el brief: ${brief.reference}.`);
     await reload();
   };
 
@@ -330,8 +372,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
-  const claimBrief = async (briefId: number, email: string) => {
-    await updateMarketingBrief(briefId, { assignedDisenoEmail: email });
+  const assignBrief = async (briefId: number, email: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    await updateMarketingBrief(briefId, { assignedDisenoEmail: email, carolNotifiedAt: null });
+    if (brief) {
+      const stage = brief.stages.find(s => s.key === brief.currentStage);
+      await sendMarketingEmail(
+        email,
+        `Te asignaron un brief — ${brief.reference}`,
+        emailHtml({ intro: "Te asignaron este brief.", reference: brief.reference, nextTask: stage ? stageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
+      );
+    }
     await reload();
   };
 
@@ -341,15 +392,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  const readField = (role: MarketingRole) => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
+
   const unreadCount = useMemo(() => {
     if (!authedUser) return 0;
-    const field = authedUser.role === "laura" ? "readLaura" : "readDiseno";
+    const field = readField(authedUser.role);
     return notifications.filter(n => !n[field]).length;
   }, [notifications, authedUser]);
 
   const markNotificationRead = async (id: number) => {
     if (!authedUser) return;
-    const field = authedUser.role === "laura" ? "readLaura" : "readDiseno";
+    const field = readField(authedUser.role);
     const notif = notifications.find(n => n.id === id);
     if (!notif || notif[field]) return;
     await markMarketingNotificationsRead(authedUser.role, [id]);
@@ -371,7 +424,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, claimBrief, deleteBrief,
+      createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       notifyEmails, disenoEmailList, updateNotifyEmail,
     }}>

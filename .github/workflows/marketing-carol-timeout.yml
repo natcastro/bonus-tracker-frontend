@@ -1,0 +1,15 @@
+name: Marketing Carol assignment timeout
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Carol timeout check
+        run: |
+          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-carol-assignment-timeout" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

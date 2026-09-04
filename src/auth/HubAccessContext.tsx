@@ -4,7 +4,7 @@ import { useMsal } from "@azure/msal-react";
 import { getHubAccessForEmail } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
 
-export type TeamRole = "admin" | "staff";
+export type TeamRole = "admin" | "staff" | "carol";
 export interface ViewAs { team: string; role: TeamRole }
 
 const VIEW_AS_KEY = "hub_view_as";

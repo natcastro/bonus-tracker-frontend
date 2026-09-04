@@ -10,6 +10,8 @@ import { TrashIcon, PencilIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline, normalizeUrl } from "../types";
 import type { StageKey } from "../types";
 
+const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
+
 const REVIEW_STAGES = new Set(["review1", "review2", "final"]);
 const DESIGN_STAGES = new Set(["proposal", "adjustments", "adjustments2"]);
 const LINK_STAGES = new Set<StageKey>(["brief", "proposal", "review1", "adjustments", "review2", "adjustments2"]);
@@ -22,11 +24,12 @@ const UPLOAD_LABELS: Record<string, string> = {
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, claimBrief, disenoEmailList, deleteBrief } = useMarketing();
+  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, assignBrief, publishBrief, disenoEmailList, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
   const [reviewLinkInput, setReviewLinkInput] = useState("");
+  const [publishAssignEmail, setPublishAssignEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -46,7 +49,10 @@ export default function BriefDetailPage() {
   const canAct = brief.status === "in_progress" && currentStage?.role === myRole;
   const isFinal = brief.currentStage === "final";
   const isPublish = brief.currentStage === "publish";
-  const needsClaim = canAct && myRole === "diseno" && !brief.assignedDisenoEmail && disenoEmailList.length > 0;
+  // Only Laura or Carol can assign — Diseño no longer picks itself. Independent of canAct/turn,
+  // since assignment needs to happen as soon as possible, not just when it's Diseño's turn.
+  const canAssign = myRole === "laura" || myRole === "carol";
+  const showAssignPanel = brief.status === "in_progress" && !brief.assignedDisenoEmail && canAssign;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -104,12 +110,14 @@ export default function BriefDetailPage() {
             <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
             <StatusPill
               solid
-              color={brief.status === "completed" ? MT.primary : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
-              label={brief.status === "completed" ? "✓ Completado" : stageLabel(brief.currentStage)}
+              color={brief.status === "completed" ? MT.primary : brief.status === "draft" ? MT.text3 : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
+              label={brief.status === "completed" ? "✓ Completado" : brief.status === "draft" ? "Pendiente (privada)" : stageLabel(brief.currentStage)}
             />
           </div>
           <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>
-            {brief.productLine && <>{brief.productLine} · </>}Inicio: {formatDateHuman(brief.startDate)}
+            {brief.productLine && <>{brief.productLine} · </>}
+            {brief.status === "draft" ? <>Inicio estimado: {formatDateHuman(brief.estimatedStartDate)}</> : <>Inicio: {formatDateHuman(brief.startDate)}</>}
+            {brief.status === "in_progress" && brief.assignedDisenoEmail && <> · Asignado a {brief.assignedDisenoEmail}</>}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -129,6 +137,47 @@ export default function BriefDetailPage() {
       </div>
 
       {deleteError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{deleteError}</p>}
+
+      {brief.status === "draft" ? (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
+          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
+            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Carol.
+          </p>
+          {myRole === "laura" ? (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
+              <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
+                <option value="">Sin asignar — avisar a Carol</option>
+                {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
+              </select>
+              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+              <button disabled={busy} onClick={() => run(() => publishBrief(brief.id, publishAssignEmail || undefined))} style={{
+                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+              }}>{busy ? "Publicando..." : "Publicar ahora"}</button>
+            </>
+          ) : (
+            <p style={{ fontSize: 12.5, color: MT.text3 }}>Solo Laura puede publicar esta tarea.</p>
+          )}
+        </div>
+      ) : (
+      <>
+      {showAssignPanel && (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Asignar a Diseño</p>
+          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>{ASSIGN_HELP_TEXT}</p>
+          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {disenoEmailList.map(email => (
+              <button key={email} disabled={busy} onClick={() => run(() => assignBrief(brief.id, email))} style={{
+                fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "9px 14px",
+              }}>{email}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
         <Timeline brief={brief} />
@@ -210,24 +259,6 @@ export default function BriefDetailPage() {
           </div>
           {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
         </div>
-      ) : needsClaim ? (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
-            ¿Quién de Diseño toma este brief?
-          </p>
-          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
-            Elige tu correo — los siguientes avisos de este brief (ajustes, aprobación, etc.) te llegarán solo a ti.
-          </p>
-          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {disenoEmailList.map(email => (
-              <button key={email} disabled={busy} onClick={() => run(() => claimBrief(brief.id, email))} style={{
-                fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "9px 14px",
-              }}>{email}</button>
-            ))}
-          </div>
-        </div>
       ) : isPublish ? (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
@@ -308,6 +339,8 @@ export default function BriefDetailPage() {
         <p style={{ marginTop: 12, fontSize: 12, color: MT.danger, fontWeight: 600 }}>
           ⚠ Esta etapa está atrasada — venció el {formatDateHuman(currentStage.deadline)}.
         </p>
+      )}
+      </>
       )}
     </div>
   );

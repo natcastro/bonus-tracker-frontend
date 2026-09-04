@@ -1,4 +1,4 @@
-export type MarketingRole = "laura" | "diseno";
+export type MarketingRole = "laura" | "diseno" | "carol";
 
 export const PRODUCT_LINES = [
   "Línea Oro",
@@ -31,8 +31,11 @@ export interface MarketingBrief {
   reference: string;
   productLine: string;
   startDate: string;
+  // Only set while status is "draft" — Laura's planning estimate, not a real deadline anchor.
+  estimatedStartDate: string | null;
   currentStage: StageKey | "completed";
-  status: "in_progress" | "completed";
+  // "draft" = private pending task, not yet started and not visible/notified to anyone else.
+  status: "draft" | "in_progress" | "completed";
   stages: MarketingStage[];
   shiftDays: number;
   lauraDelayDays: number;
@@ -41,9 +44,12 @@ export interface MarketingBrief {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  // Which Diseño team member's email this brief's notifications go to, once someone claims
-  // it — null means unclaimed, so Diseño-directed emails still broadcast to everyone.
+  // Which Diseño team member this brief is assigned to — set by Laura (at creation/publish) or
+  // by Carol afterward. Diseño people can no longer self-assign; null just means "not assigned yet".
   assignedDisenoEmail: string | null;
+  // Timestamp set when a brief goes public unassigned (Carol gets notified) — used by the 24h
+  // auto-assign job to detect briefs Carol hasn't picked up in time.
+  carolNotifiedAt: string | null;
 }
 
 export interface MarketingNotification {
@@ -53,6 +59,7 @@ export interface MarketingNotification {
   createdAt: string;
   readLaura: boolean;
   readDiseno: boolean;
+  readCarol: boolean;
 }
 
 export interface MarketingUser {

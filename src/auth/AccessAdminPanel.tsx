@@ -17,12 +17,13 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
 const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];
 
 // Teams where access also needs a role — stored in hub_access as "TEAM:role" (e.g. "MEX:admin").
-const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string }[] = [
+// extraRole lets a team offer a third role button beyond admin/staff (only Marketing needs this, for Carol).
+const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string; extraRole?: { value: string; label: string } }[] = [
   { key: "MEX",       label: "FTC México", adminLabel: "Administrador", staffLabel: "Staff" },
-  { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño" },
+  { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRole: { value: "carol", label: "Carol (coordinación)" } },
 ];
 
-type RoleValue = "admin" | "staff" | "";
+type RoleValue = "admin" | "staff" | "carol" | "";
 
 function parseTeams(teams: string[]) {
   const plain = teams.filter((t) => t !== "ALL" && !ROLE_TEAMS.some((rt) => t.startsWith(`${rt.key}:`)));
@@ -38,7 +39,8 @@ function formatTeamEntry(t: string): string {
   const roleTeam = ROLE_TEAMS.find((rt) => t.startsWith(`${rt.key}:`));
   if (roleTeam) {
     const role = t.split(":")[1];
-    return `${roleTeam.label} (${role === "admin" ? roleTeam.adminLabel : roleTeam.staffLabel})`;
+    const label = role === "admin" ? roleTeam.adminLabel : role === "staff" ? roleTeam.staffLabel : roleTeam.extraRole?.label ?? role;
+    return `${roleTeam.label} (${label})`;
   }
   return TEAM_OPTIONS.find((o) => o.key === t)?.label ?? t;
 }
@@ -105,8 +107,8 @@ function EntryForm({
               <div key={rt.key} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "0.5rem 0.7rem" }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{rt.label}</div>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
-                  {(["", "staff", "admin"] as RoleValue[]).map(r => {
-                    const label = r === "" ? "Sin acceso" : r === "staff" ? rt.staffLabel : rt.adminLabel;
+                  {(["", "staff", "admin", ...(rt.extraRole ? [rt.extraRole.value] : [])] as RoleValue[]).map(r => {
+                    const label = r === "" ? "Sin acceso" : r === "staff" ? rt.staffLabel : r === "admin" ? rt.adminLabel : rt.extraRole?.label ?? r;
                     const active = roles[rt.key] === r || (r === "" && !roles[rt.key]);
                     return (
                       <button
@@ -166,7 +168,7 @@ function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => 
         </select>
         {isRoleTeam && roleTeam && (
           <div style={{ display: "flex", gap: "0.3rem" }}>
-            {(["staff", "admin"] as TeamRole[]).map((r) => (
+            {([...(["staff", "admin"] as TeamRole[]), ...(roleTeam.extraRole ? [roleTeam.extraRole.value as TeamRole] : [])]).map((r) => (
               <button
                 key={r}
                 type="button"
@@ -178,7 +180,7 @@ function ViewAsPicker({ onStart }: { onStart: (team: string, role: TeamRole) => 
                   color: role === r ? "#fff" : "#6B7280",
                 }}
               >
-                {r === "staff" ? roleTeam.staffLabel : roleTeam.adminLabel}
+                {r === "staff" ? roleTeam.staffLabel : r === "admin" ? roleTeam.adminLabel : roleTeam.extraRole?.label}
               </button>
             ))}
           </div>

@@ -14,6 +14,11 @@ export default function MyTasksPage() {
   const myRole = authedUser?.role;
 
   const myPending = useMemo(() => {
+    if (myRole === "carol") {
+      return briefs
+        .filter(b => b.status === "in_progress" && !b.assignedDisenoEmail)
+        .sort((a, b) => (a.carolNotifiedAt ?? "").localeCompare(b.carolNotifiedAt ?? ""));
+    }
     return briefs
       .filter(b => b.status === "in_progress")
       .filter(b => {
@@ -33,7 +38,9 @@ export default function MyTasksPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: MT.text1, letterSpacing: "-0.02em" }}>Mis tareas</h1>
           <p style={{ margin: "0.3rem 0 0", fontSize: 13.5, color: MT.text2 }}>
-            {myRole === "laura" ? "Revisiones y briefs que necesitan tu atención" : "Entregas pendientes de Diseño"}
+            {myRole === "laura" ? "Revisiones y briefs que necesitan tu atención"
+              : myRole === "carol" ? "Briefs esperando que asignes a alguien de Diseño"
+              : "Entregas pendientes de Diseño"}
           </p>
         </div>
         {myRole === "laura" && (
@@ -62,7 +69,7 @@ export default function MyTasksPage() {
           {myPending.map(b => {
             const stage = b.stages.find(s => s.key === b.currentStage)!;
             const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
-            const color = overdue ? MT.danger : myRole === "laura" ? MT.primary : MT.clay;
+            const color = overdue ? MT.danger : myRole === "laura" ? MT.primary : myRole === "carol" ? MT.info : MT.clay;
             const Icon = stage.role === "diseno" ? PencilIcon : EyeIcon;
             return (
               <button

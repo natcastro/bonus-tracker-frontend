@@ -4,7 +4,8 @@ import { useMarketing } from "../context";
 import { PRODUCT_LINES, todayIso } from "../types";
 
 export default function NewBriefModal({ onClose }: { onClose: () => void }) {
-  const { createBrief, disenoEmailList } = useMarketing();
+  const { createBrief, createDraftBrief, disenoEmailList } = useMarketing();
+  const [mode, setMode] = useState<"public" | "draft">("public");
   const [reference, setReference] = useState("");
   const [productLine, setProductLine] = useState("");
   const [startDate, setStartDate] = useState(todayIso());
@@ -19,7 +20,11 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
     if (!productLine) { setError("La línea de producto es obligatoria."); return; }
     setSaving(true);
     try {
-      await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined);
+      if (mode === "draft") {
+        await createDraftBrief(reference.trim(), productLine, startDate, briefLink.trim());
+      } else {
+        await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined);
+      }
       onClose();
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear el brief.");
@@ -42,7 +47,19 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
           Nuevo brief
         </div>
-        <h3 style={{ margin: "0 0 20px", color: MT.text1, fontSize: 18 }}>Crear brief de producto</h3>
+        <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>Crear brief de producto</h3>
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 18, background: MT.surfaceAlt, borderRadius: 8, padding: 3 }}>
+          {([["public", "Tarea pública"], ["draft", "Tarea pendiente (privada)"]] as const).map(([m, label]) => (
+            <button key={m} type="button" onClick={() => setMode(m)} style={{
+              flex: 1, fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+              padding: "8px 10px", borderRadius: 6, border: "none",
+              background: mode === m ? MT.surface : "transparent",
+              color: mode === m ? MT.text1 : MT.text2,
+              boxShadow: mode === m ? MT.shadow : "none",
+            }}>{label}</button>
+          ))}
+        </div>
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
@@ -57,20 +74,26 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Fecha de inicio (Día 1)</label>
+            <label style={labelStyle}>{mode === "draft" ? "Fecha estimada de inicio" : "Fecha de inicio (Día 1)"}</label>
             <input type="date" style={inputStyle} value={startDate} onChange={e => setStartDate(e.target.value)} required />
           </div>
           <div>
             <label style={labelStyle}>Link de SharePoint del brief</label>
             <input style={inputStyle} value={briefLink} onChange={e => setBriefLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
           </div>
-          <div>
-            <label style={labelStyle}>Asignar a Diseño (opcional)</label>
-            <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
-              <option value="">Sin asignar — avisar a todos</option>
-              {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
-            </select>
-          </div>
+          {mode === "public" ? (
+            <div>
+              <label style={labelStyle}>Asignar a Diseño (opcional)</label>
+              <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
+                <option value="">Sin asignar — avisar a Carol</option>
+                {disenoEmailList.map(email => <option key={email} value={email}>{email}</option>)}
+              </select>
+            </div>
+          ) : (
+            <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>
+              Nadie es notificado todavía. La podrás publicar cuando quieras desde el detalle del brief.
+            </p>
+          )}
 
           {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}
 
@@ -82,7 +105,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             <button type="submit" disabled={saving} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
               background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>{saving ? "Creando..." : "Crear brief"}</button>
+            }}>{saving ? "Creando..." : mode === "draft" ? "Crear tarea pendiente" : "Crear brief"}</button>
           </div>
         </form>
       </div>

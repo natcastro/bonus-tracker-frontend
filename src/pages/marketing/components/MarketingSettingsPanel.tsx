@@ -5,6 +5,7 @@ import { useMarketing } from "../context";
 export default function MarketingSettingsPanel({ onClose }: { onClose: () => void }) {
   const { notifyEmails, updateNotifyEmail } = useMarketing();
   const [laura, setLaura] = useState(notifyEmails.laura);
+  const [carol, setCarol] = useState(notifyEmails.carol);
   const [diseno1, setDiseno1] = useState(notifyEmails.diseno_1);
   const [diseno2, setDiseno2] = useState(notifyEmails.diseno_2);
   const [diseno3, setDiseno3] = useState(notifyEmails.diseno_3);
@@ -16,6 +17,7 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
     setSaving(true); setError(""); setSaved(false);
     try {
       await updateNotifyEmail("laura", laura.trim());
+      await updateNotifyEmail("carol", carol.trim());
       await updateNotifyEmail("diseno_1", diseno1.trim());
       await updateNotifyEmail("diseno_2", diseno2.trim());
       await updateNotifyEmail("diseno_3", diseno3.trim());
@@ -44,15 +46,19 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
         </div>
         <h3 style={{ margin: "0 0 6px", color: MT.text1, fontSize: 18 }}>Correos de notificación</h3>
         <p style={{ margin: "0 0 20px", color: MT.text2, fontSize: 12.5 }}>
-          A dónde llegan los avisos automáticos de Marketing. Los 3 correos de Diseño reciben el
-          aviso de brief nuevo; una vez alguien lo toma dentro de la plataforma, los siguientes
-          avisos de ese brief le llegan solo a esa persona.
+          A dónde llegan los avisos automáticos de Marketing. Si Laura no asigna un brief nuevo a
+          alguien de Diseño, se le avisa a Carol para que lo asigne — los 3 correos de Diseño solo
+          reciben el aviso una vez que alguien (Laura o Carol) se lo asigna directamente.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Laura</label>
             <input style={fieldStyle} value={laura} onChange={e => setLaura(e.target.value)} placeholder="laura@formatucuerpo.com" />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Carol</label>
+            <input style={fieldStyle} value={carol} onChange={e => setCarol(e.target.value)} placeholder="carol@formatucuerpo.com" />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Correo de Diseño 1</label>
