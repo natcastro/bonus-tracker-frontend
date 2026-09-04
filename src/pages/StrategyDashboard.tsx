@@ -2573,7 +2573,7 @@ export default function StrategyDashboard() {
                       <p style={{margin:0,fontSize:"0.8rem",color:"var(--text-muted)"}}>{answeredCount}/{QA_ITEMS.length} preguntas respondidas</p>
                     </div>
                     <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
-                      <img src={bunny.src} alt={bunny.label} title={bunny.label} style={{width:44,height:44,objectFit:"contain"}} />
+                      <img src={bunny.src} alt={bunny.label} title={bunny.label} style={{width:90,height:90,objectFit:"contain"}} />
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:"0.85rem",color:C.operative,fontWeight:700}}>{Math.round(compliancePct)}% cumplimiento</div>
                         <div style={{fontSize:"1.2rem",fontWeight:800,color:C.operative}}>${cop(earned)} de ${cop(IND4_MAX)} COP</div>
