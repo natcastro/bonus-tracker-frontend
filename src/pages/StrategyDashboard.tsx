@@ -430,15 +430,25 @@ export default function StrategyDashboard() {
     return { from: productFilterFrom || "0000-01-01", to: productFilterTo || "9999-12-31" };
   }, [productFilterMode, productFilterMonth, productFilterFrom, productFilterTo, officialPeriod]);
 
-  const productBreakdown = useMemo(() => {
+  const rowsInProductWindow = useMemo(() => {
     const periodIds = new Set(
       analysisPeriods
         .filter(p => p.periodStart <= productFilterWindow.to && p.periodEnd >= productFilterWindow.from)
         .map(p => p.id)
     );
-    const rowsInWindow = analysisRows.filter(r => periodIds.has(r.periodId));
+    return analysisRows.filter(r => periodIds.has(r.periodId));
+  }, [analysisPeriods, analysisRows, productFilterWindow]);
+
+  // The true total for this window — computed once from the raw rows, so catalog references
+  // that happen to share the same Product ID (tracked twice on purpose) never get double-counted.
+  const productWindowShippedTotal = useMemo(
+    () => rowsInProductWindow.reduce((s, r) => s + (r.samplesShipped ?? 0), 0),
+    [rowsInProductWindow],
+  );
+
+  const productBreakdown = useMemo(() => {
     return catalog.filter(c => c.active).map(item => {
-      const matches = rowsInWindow.filter(r => r.productId === item.productId);
+      const matches = rowsInProductWindow.filter(r => r.productId === item.productId);
       const sent = matches.reduce((s, r) => s + (r.samplesShipped ?? 0), 0);
       const gmv = matches.reduce((s, r) => s + (r.contentGmv ?? 0), 0);
       const latestRoi = matches.length > 0 ? matches[matches.length - 1].roi45d : null;
@@ -448,7 +458,23 @@ export default function StrategyDashboard() {
         done: sent >= item.monthlyQuota,
       };
     });
-  }, [catalog, analysisPeriods, analysisRows, productFilterWindow]);
+  }, [catalog, rowsInProductWindow]);
+
+  // Anything shipped under a Product ID that isn't tracked in the 19-reference catalog at
+  // all — flagged in red so it's obvious these are outside the plan, but still counted.
+  const unmatchedProducts = useMemo(() => {
+    const catalogIds = new Set(catalog.map(c => c.productId).filter((id): id is string => !!id));
+    const byId = new Map<string, { productId: string; productName: string; sent: number; gmv: number; roi45d: number | null }>();
+    for (const r of rowsInProductWindow) {
+      if (!r.productId || catalogIds.has(r.productId)) continue;
+      const cur = byId.get(r.productId) ?? { productId: r.productId, productName: r.productName, sent: 0, gmv: 0, roi45d: null };
+      cur.sent += r.samplesShipped ?? 0;
+      cur.gmv += r.contentGmv ?? 0;
+      cur.roi45d = r.roi45d ?? cur.roi45d;
+      byId.set(r.productId, cur);
+    }
+    return Array.from(byId.values()).sort((a, b) => b.sent - a.sent);
+  }, [catalog, rowsInProductWindow]);
 
   // ── Incident log state ────────────────────────────────────────────────────────
   type IncidentKey = string; // `${agentId}-${'non_buyer'|'neg_review'}`
@@ -1301,12 +1327,28 @@ export default function StrategyDashboard() {
                           <td style={{padding:"0.6rem 0.85rem"}}>{roi45d ?? "—"}</td>
                         </tr>
                       ))}
+                      {unmatchedProducts.map(u => (
+                        <tr key={u.productId} style={{borderBottom:"1px solid #f1f5f9",background:"#fef2f2"}}>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#b91c1c",maxWidth:280}}>{u.productName}</td>
+                          <td style={{padding:"0.6rem 0.85rem",color:"#b91c1c",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{u.productId}</td>
+                          <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:"#b91c1c"}}>—</td>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center",color:"#b91c1c"}}>{u.sent}</td>
+                          <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:"#b91c1c"}}>—</td>
+                          <td style={{padding:"0.6rem 0.85rem"}}>
+                            <span style={{display:"inline-block",padding:"0.15rem 0.65rem",borderRadius:20,fontSize:"0.68rem",fontWeight:700,background:"#fee2e2",color:"#b91c1c"}}>
+                              ⚠ Fuera de catálogo
+                            </span>
+                          </td>
+                          <td style={{padding:"0.6rem 0.85rem",whiteSpace:"nowrap",color:"#b91c1c"}}>{u.gmv>0?`$${u.gmv.toLocaleString("en-US",{maximumFractionDigits:0})}`:"—"}</td>
+                          <td style={{padding:"0.6rem 0.85rem",color:"#b91c1c"}}>{u.roi45d ?? "—"}</td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
                         <td colSpan={2} style={{padding:"0.6rem 0.85rem",fontWeight:700,color:"#64748b"}}>TOTAL</td>
                         <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center"}}>{productBreakdown.reduce((s,r)=>s+r.item.monthlyQuota,0)}</td>
-                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center",color:C.samples}}>{productBreakdown.reduce((s,r)=>s+r.sent,0)}</td>
+                        <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center",color:C.samples}}>{productWindowShippedTotal}</td>
                         <td colSpan={4} />
                       </tr>
                     </tfoot>
