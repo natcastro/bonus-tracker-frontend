@@ -89,10 +89,10 @@ export interface MarketingUser {
 // brief's original start date — so a fast (or slow) turnaround never shrinks or balloons the next deadline.
 export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; gapDays: number }[] = [
   { key: "brief",       label: "Brief",        role: "laura",  gapDays: 0 },
-  { key: "proposal",    label: "Propuesta inicial", role: "diseno", gapDays: 2 },
+  { key: "proposal",    label: "Propuesta inicial", role: "diseno", gapDays: 4 },
   { key: "review1",     label: "Revisión 1",   role: "laura",  gapDays: 2 },
   { key: "adjustments", label: "Ajuste 1",     role: "diseno", gapDays: 2 },
-  { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 1 },
+  { key: "review2",     label: "Revisión 2",   role: "laura",  gapDays: 2 },
   { key: "adjustments2", label: "Ajustes 2",   role: "diseno", gapDays: 2 },
   { key: "final",       label: "Revisión Final", role: "laura", gapDays: 1 },
   { key: "publish",     label: "Publicación",  role: "diseno", gapDays: 1 },
@@ -111,14 +111,16 @@ export function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Adds `days` counted from the given date, skipping Sundays entirely (no work happens on
-// Sunday, so it never counts toward the gap and a deadline never lands on one).
+// Adds `days` counted from the given date, skipping Saturdays and Sundays entirely — the
+// design team only works Monday through Friday, so weekends never count toward the gap and a
+// deadline never lands on one.
 export function addWorkDaysIso(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00");
   let remaining = days;
   while (remaining > 0) {
     d.setDate(d.getDate() + 1);
-    if (d.getDay() !== 0) remaining--;
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) remaining--;
   }
   return d.toISOString().slice(0, 10);
 }
