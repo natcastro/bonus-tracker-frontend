@@ -113,15 +113,17 @@ export const handler = async (event) => {
     if (deadlineMs < now || deadlineMs > in24h) continue;
 
     // Laura always gets her own configured address; Diseño reminders go to whoever this brief
-    // is actually assigned to — falling back to all 3 Diseño slots only if somehow unassigned.
+    // is actually assigned to. If somehow still unassigned, this follows the same rule as
+    // everywhere else in Marketing: Karol gets notified to assign it (not a broadcast to all 3) —
+    // the 24h auto-assign job takes over from there if she doesn't.
     let recipients = [];
     if (stage.role === "laura") {
       if (notifyEmails.laura) recipients = [notifyEmails.laura];
     } else if (stage.role === "diseno") {
       if (brief.assigned_diseno_email) {
         recipients = [brief.assigned_diseno_email];
-      } else {
-        recipients = [notifyEmails.diseno_1, notifyEmails.diseno_2, notifyEmails.diseno_3].filter(Boolean);
+      } else if (notifyEmails.carol) {
+        recipients = [notifyEmails.carol];
       }
     }
     if (recipients.length === 0) continue;
