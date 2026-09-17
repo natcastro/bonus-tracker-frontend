@@ -1,8 +1,3 @@
-const NOTIFY_EMAILS = {
-  laura: "amazonassistant@formatucuerpo.com",
-  diseno: "marketplaces@formatucuerpo.com",
-};
-
 function deadlineTimestamp(dateIso) {
   return new Date(`${dateIso}T17:00:00-05:00`).getTime();
 }
@@ -17,6 +12,18 @@ async function getInProgressBriefs() {
   const resp = await fetch(url, { headers: supabaseHeaders() });
   if (!resp.ok) throw new Error(`Supabase fetch failed: ${resp.status} ${await resp.text()}`);
   return resp.json();
+}
+
+// Pulls the real, admin-configured recipients — the old hardcoded map here was from before
+// Marketing had a proper notify-emails table and 3 Diseño slots, and never got updated.
+async function getNotifyEmails() {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_notify_emails?select=role,email`;
+  const resp = await fetch(url, { headers: supabaseHeaders() });
+  if (!resp.ok) throw new Error(`Supabase fetch failed: ${resp.status} ${await resp.text()}`);
+  const rows = await resp.json();
+  const map = {};
+  rows.forEach((r) => { if (r.email) map[r.role] = r.email; });
+  return map;
 }
 
 async function updateBriefStages(id, stages) {
@@ -84,9 +91,9 @@ export const handler = async (event) => {
     return { statusCode: 401, body: "Unauthorized" };
   }
 
-  let briefs;
+  let briefs, notifyEmails;
   try {
-    briefs = await getInProgressBriefs();
+    [briefs, notifyEmails] = await Promise.all([getInProgressBriefs(), getNotifyEmails()]);
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
@@ -105,21 +112,34 @@ export const handler = async (event) => {
     const deadlineMs = deadlineTimestamp(stage.deadline);
     if (deadlineMs < now || deadlineMs > in24h) continue;
 
-    const email = NOTIFY_EMAILS[stage.role];
-    if (!email) continue;
+    // Laura always gets her own configured address; Diseño reminders go to whoever this brief
+    // is actually assigned to — falling back to all 3 Diseño slots only if somehow unassigned.
+    let recipients = [];
+    if (stage.role === "laura") {
+      if (notifyEmails.laura) recipients = [notifyEmails.laura];
+    } else if (stage.role === "diseno") {
+      if (brief.assigned_diseno_email) {
+        recipients = [brief.assigned_diseno_email];
+      } else {
+        recipients = [notifyEmails.diseno_1, notifyEmails.diseno_2, notifyEmails.diseno_3].filter(Boolean);
+      }
+    }
+    if (recipients.length === 0) continue;
 
     try {
-      await sendGraphMail(
-        email,
-        `Faltan 24 horas — ${brief.reference}`,
-        `<div style="font-family:-apple-system,sans-serif;color:#2C2A20;">
-          <p>Faltan 24 horas para completar tu tarea.</p>
-          <p><strong>Referencia:</strong> ${brief.reference}</p>
-          <p><strong>Tarea:</strong> ${stage.label}</p>
-          <p><strong>Deadline:</strong> ${stage.deadline}, 5:00 PM hora de Colombia</p>
-          <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
-        </div>`,
-      );
+      for (const email of recipients) {
+        await sendGraphMail(
+          email,
+          `Faltan 24 horas — ${brief.reference}`,
+          `<div style="font-family:-apple-system,sans-serif;color:#2C2A20;">
+            <p>Faltan 24 horas para completar tu tarea.</p>
+            <p><strong>Referencia:</strong> ${brief.reference}</p>
+            <p><strong>Tarea:</strong> ${stage.label}</p>
+            <p><strong>Deadline:</strong> ${stage.deadline}, 5:00 PM hora de Colombia</p>
+            <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
+          </div>`,
+        );
+      }
       sent++;
       const newStages = stages.map((s, i) => (i === idx ? { ...s, reminded24h: true } : s));
       await updateBriefStages(brief.id, newStages);
