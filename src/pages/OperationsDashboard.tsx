@@ -11,6 +11,7 @@ import {
   getCyclesForYear, getCurrentCycleDefault, getCycleFromDate, calcTikTokBonus,
 } from "../services/usaCycles";
 import { OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus } from "../services/opsBonus";
+import { useHubAccess } from "../auth/HubAccessContext";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
 const ADMIN_PASSWORD = "ops2026!";
@@ -39,6 +40,8 @@ const TABS: [string, string][] = [
 
 export default function OperationsDashboard() {
   const navigate = useNavigate();
+  const { access } = useHubAccess();
+  const isAdmin = !!access?.isAdmin;
   const [activeTab, setActiveTab] = useState("summary");
   const defaultCycle = getCurrentCycleDefault();
   const [year, setYear] = useState(defaultCycle.year);
@@ -389,9 +392,9 @@ export default function OperationsDashboard() {
                           <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
                           <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
                           {a.invalidated ? (
-                            <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(async () => { await revalidateOpsAppeal(a.id); await load(); })}>Revalidar</button>
+                            <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : "Solo el administrador puede revalidar"} onClick={async () => { await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
                           ) : (
-                            <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); })}>Invalidar</button>
+                            <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : "Solo el administrador puede invalidar"} onClick={() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
                           )}
                         </td>
                       </tr>
