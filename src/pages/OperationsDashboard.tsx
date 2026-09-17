@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
-  getOpsAppeals, addOpsAppeal, updateOpsAppeal, deleteOpsAppeal,
+  getOpsAppeals, addOpsAppeal, updateOpsAppeal, deleteOpsAppeal, invalidateOpsAppeal, revalidateOpsAppeal,
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
 } from "../services/api";
@@ -55,6 +55,9 @@ export default function OperationsDashboard() {
   const [passwordError, setPasswordError] = useState("");
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [editingAppeal, setEditingAppeal] = useState<OpsAppeal | null>(null);
+  const [invalidatingAppeal, setInvalidatingAppeal] = useState<OpsAppeal | null>(null);
+  const [invalidateNote, setInvalidateNote] = useState("");
+  const [invalidateError, setInvalidateError] = useState("");
 
   const load = useCallback(async () => {
     const [ag, ap, ht, tk] = await Promise.all([
@@ -94,7 +97,7 @@ export default function OperationsDashboard() {
   const tiktokBonus = calcTikTokBonus(tiktokScores, cycleDays);
 
   const agentTotals = agents.map((ag) => {
-    const agAppeals = appeals.filter((a) => a.agentId === ag.id && a.status === "completed");
+    const agAppeals = appeals.filter((a) => a.agentId === ag.id && a.status === "completed" && !a.invalidated);
     const appealRaw = agAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
     const appealCapped = Math.min(appealRaw, OPS_APPEALS_CAP);
     const ht = handlingTimes.find((h) => h.agentId === ag.id);
@@ -121,6 +124,7 @@ export default function OperationsDashboard() {
       appealType: appealForm.appealType as any,
       status: appealForm.status as any, outcome: appealForm.outcome as any,
       year: ay, cycleId: ac,
+      invalidated: false, invalidationNote: null,
     });
     await load();
     setAppealForm({ agentId: 0, date: "", orderNumber: "", appealType: "tiktok", status: "pending", outcome: "fullRefund" });
@@ -334,7 +338,7 @@ export default function OperationsDashboard() {
                 <h3>Appeals for Selected Cycle</h3>
                 <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
                   Total Bonus: ${Math.min(
-                    appeals.filter((a) => a.status === "completed").reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0),
+                    appeals.filter((a) => a.status === "completed" && !a.invalidated).reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0),
                     OPS_APPEALS_CAP
                   ).toFixed(2)} (cap $200)
                 </div>
@@ -364,17 +368,31 @@ export default function OperationsDashboard() {
                     .filter((a) => filterAgentId === 0 || a.agentId === filterAgentId)
                     .sort((a, b) => b.date.localeCompare(a.date))
                     .map((a) => (
-                      <tr key={a.id}>
+                      <tr key={a.id} style={a.invalidated ? { opacity: 0.6 } : undefined}>
                         <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
                         <td>{a.date}</td>
                         <td>{a.orderNumber}</td>
                         <td>{APPEAL_TYPES.find((t) => t.value === a.appealType)?.label ?? "TikTok Appeals"}</td>
-                        <td><span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span></td>
-                        <td>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
-                        <td>${a.status === "completed" ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
+                        <td>
+                          {a.invalidated ? (
+                            <span className="badge badge-danger" title={a.invalidationNote ?? ""} style={{ background: "#fee2e2", color: "#991b1b", border: "none" }}>Invalidated</span>
+                          ) : (
+                            <span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "pending" ? "badge-warning" : "badge-warning"}`} style={a.status === "pending" ? { background: "#fed7aa", color: "#9a3412", border: "none" } : {}}>{a.status === "completed" ? "Completed" : a.status === "pending" ? "Pending" : "In Progress"}</span>
+                          )}
+                          {a.invalidated && a.invalidationNote && (
+                            <div style={{ fontSize: "0.72rem", color: "#991b1b", marginTop: "0.25rem", maxWidth: 220 }}>{a.invalidationNote}</div>
+                          )}
+                        </td>
+                        <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
+                        <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>${a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                         <td>
                           <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
-                          <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
+                          {a.invalidated ? (
+                            <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(async () => { await revalidateOpsAppeal(a.id); await load(); })}>Revalidar</button>
+                          ) : (
+                            <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); })}>Invalidar</button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -602,6 +620,39 @@ export default function OperationsDashboard() {
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setEditingAppeal(null)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invalidate Appeal Modal — admin-only, requires a note */}
+      {invalidatingAppeal && (
+        <div className="modal-overlay active">
+          <div className="modal">
+            <div className="modal-header"><h3>Invalidar Appeal</h3></div>
+            <p style={{ marginBottom: "1rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+              Orden {invalidatingAppeal.orderNumber} — deja una nota explicando por qué se invalida. Ya no contará para el bono.
+            </p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!invalidateNote.trim()) { setInvalidateError("La nota es obligatoria."); return; }
+              try {
+                await invalidateOpsAppeal(invalidatingAppeal.id, invalidateNote.trim());
+                setInvalidatingAppeal(null);
+                await load();
+              } catch (err: any) {
+                setInvalidateError(err?.message ?? "No se pudo invalidar.");
+              }
+            }}>
+              <div className="form-group">
+                <label>Nota</label>
+                <textarea className="form-control" rows={3} value={invalidateNote} onChange={(e) => setInvalidateNote(e.target.value)} placeholder="Motivo de la invalidación..." autoFocus required />
+              </div>
+              {invalidateError && <p className="error-msg">{invalidateError}</p>}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setInvalidatingAppeal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-danger">Invalidar</button>
               </div>
             </form>
           </div>

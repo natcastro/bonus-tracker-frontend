@@ -401,6 +401,22 @@ export async function deleteOpsAppeal(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function invalidateOpsAppeal(id: number, note: string): Promise<OpsAppeal> {
+  const { data, error } = await supabase.from("ops_appeals")
+    .update({ invalidated: true, invalidation_note: note })
+    .eq("id", id).select().single();
+  if (error) throw error;
+  return mapOpsAppeal(data);
+}
+
+export async function revalidateOpsAppeal(id: number): Promise<OpsAppeal> {
+  const { data, error } = await supabase.from("ops_appeals")
+    .update({ invalidated: false, invalidation_note: null })
+    .eq("id", id).select().single();
+  if (error) throw error;
+  return mapOpsAppeal(data);
+}
+
 // ── Operations: Handling Time ─────────────────────────────────────────────────
 
 export async function getOpsHandlingTime(year: number, cycleId: string): Promise<OpsHandlingTime[]> {
@@ -666,7 +682,7 @@ function mapMexScheduleEvent(r: any): MexScheduleEvent {
 }
 
 function mapOpsAppeal(r: any): OpsAppeal {
-  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, orderNumber: r.order_number, appealType: r.appeal_type ?? "tiktok", status: r.status, outcome: r.outcome, year: r.year, cycleId: r.cycle_id };
+  return { id: r.id, agentId: r.agent_id, agent: r.agent ?? undefined, date: r.date, orderNumber: r.order_number, appealType: r.appeal_type ?? "tiktok", status: r.status, outcome: r.outcome, year: r.year, cycleId: r.cycle_id, invalidated: r.invalidated ?? false, invalidationNote: r.invalidation_note ?? null };
 }
 
 function mapOpsHandlingTime(r: any): OpsHandlingTime {

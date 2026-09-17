@@ -147,6 +147,10 @@ export interface OpsAppeal {
   outcome: "fullRefund" | "partialRefund" | "fee" | "lost";
   year: number;
   cycleId: string;
+  // Only the super-admin can invalidate an appeal — once invalidated, it no longer counts
+  // toward the bonus, and the note explains why.
+  invalidated: boolean;
+  invalidationNote: string | null;
 }
 
 export interface OpsHandlingTime {
