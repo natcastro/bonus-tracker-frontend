@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { DevolucionesUpload, DevolucionesRow } from "../types";
 import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload } from "../services/api";
+import { useHubAccess } from "../auth/HubAccessContext";
 
 const COLOR = "#be123c";
+const UPLOAD_ALLOWED_EMAIL = "amazonassistant@formatucuerpo.com";
 
 // Only these columns are kept from an uploaded file — everything else in the
 // source export is dropped on upload.
@@ -12,6 +14,8 @@ const WANTED_COLUMNS = ["Return Order ID", "Order ID", "Seller SKU", "Return Log
 
 export default function DevolucionesDashboard() {
   const navigate = useNavigate();
+  const { email } = useHubAccess();
+  const canUpload = email.toLowerCase() === UPLOAD_ALLOWED_EMAIL;
   const [uploads, setUploads] = useState<DevolucionesUpload[]>([]);
   const [rows, setRows] = useState<DevolucionesRow[]>([]);
   const [search, setSearch] = useState("");
@@ -86,38 +90,40 @@ export default function DevolucionesDashboard() {
       <main className="content-area">
         <header className="section-header"><h2>Devoluciones</h2></header>
 
-        <div className="card">
-          <h3 style={{ marginBottom: "0.75rem" }}>Subir archivo</h3>
-          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-            Sube un Excel (.xlsx/.xls) o CSV. Las columnas se detectan automáticamente y se agregan a la tabla de abajo.
-          </p>
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            disabled={uploading}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-          />
-          {uploading && <p style={{ marginTop: "0.5rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>Subiendo…</p>}
-          {uploadErr && <p className="error-msg">{uploadErr}</p>}
+        {canUpload && (
+          <div className="card">
+            <h3 style={{ marginBottom: "0.75rem" }}>Subir archivo</h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+              Sube un Excel (.xlsx/.xls) o CSV. Las columnas se detectan automáticamente y se agregan a la tabla de abajo.
+            </p>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              disabled={uploading}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+            />
+            {uploading && <p style={{ marginTop: "0.5rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>Subiendo…</p>}
+            {uploadErr && <p className="error-msg">{uploadErr}</p>}
 
-          {uploads.length > 0 && (
-            <div style={{ marginTop: "1rem" }}>
-              <h4 style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Archivos subidos</h4>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {uploads.map((u) => (
-                  <div key={u.id} className="badge" style={{ background: "#f1f5f9", color: "#334155", border: "none", display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.75rem" }}>
-                    <span>{u.filename} ({new Date(u.uploadedAt).toLocaleDateString()})</span>
-                    <button
-                      onClick={() => removeUpload(u.id)}
-                      title="Eliminar este archivo y sus filas"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, lineHeight: 1 }}
-                    >×</button>
-                  </div>
-                ))}
+            {uploads.length > 0 && (
+              <div style={{ marginTop: "1rem" }}>
+                <h4 style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Archivos subidos</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {uploads.map((u) => (
+                    <div key={u.id} className="badge" style={{ background: "#f1f5f9", color: "#334155", border: "none", display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.75rem" }}>
+                      <span>{u.filename} ({new Date(u.uploadedAt).toLocaleDateString()})</span>
+                      <button
+                        onClick={() => removeUpload(u.id)}
+                        title="Eliminar este archivo y sus filas"
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, lineHeight: 1 }}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <div className="card" style={{ overflowX: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
