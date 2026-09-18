@@ -27,11 +27,16 @@ export default function DevolucionesDashboard() {
     setUploading(true);
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const json: Record<string, string>[] = wb.SheetNames.flatMap((name) =>
-        XLSX.utils.sheet_to_json<Record<string, string>>(wb.Sheets[name], { defval: "" })
+      // raw:true keeps every cell as its literal text — without it, long numeric IDs
+      // (order IDs, SKU IDs) get parsed as JS numbers and lose precision past ~15-16 digits.
+      const wb = XLSX.read(buf, { type: "array", raw: true });
+      const rawJson: Record<string, unknown>[] = wb.SheetNames.flatMap((name) =>
+        XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name], { defval: "", raw: true })
       );
-      if (json.length === 0) { setUploadErr("El archivo no tiene filas."); return; }
+      if (rawJson.length === 0) { setUploadErr("El archivo no tiene filas."); return; }
+      const json: Record<string, string>[] = rawJson.map((row) =>
+        Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v ?? "").trim()]))
+      );
       const columns = Array.from(new Set(json.flatMap((row) => Object.keys(row))));
       await createDevolucionesUpload(file.name, columns, json.map((data) => ({ data })));
       await load();
