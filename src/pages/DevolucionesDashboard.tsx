@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { DevolucionesUpload, DevolucionesRow } from "../types";
-import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload } from "../services/api";
+import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload, updateDevolucionesRowStatus } from "../services/api";
 import { useHubAccess } from "../auth/HubAccessContext";
 
 const COLOR = "#be123c";
@@ -68,6 +68,17 @@ export default function DevolucionesDashboard() {
   const removeUpload = async (id: number) => {
     await deleteDevolucionesUpload(id);
     await load();
+  };
+
+  // Click cycles a row through: none → green → red → none.
+  const cycleRowStatus = async (row: DevolucionesRow) => {
+    const next: "green" | "red" | null = row.status === null ? "green" : row.status === "green" ? "red" : null;
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)));
+    try {
+      await updateDevolucionesRowStatus(row.id, next);
+    } catch {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
+    }
   };
 
   // Union of every column seen across all uploads, in first-seen order.
@@ -157,7 +168,15 @@ export default function DevolucionesDashboard() {
               </thead>
               <tbody>
                 {filteredRows.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    onClick={() => cycleRowStatus(r)}
+                    title="Click para marcar: verde → rojo → sin marcar"
+                    style={{
+                      cursor: "pointer",
+                      background: r.status === "green" ? "#dcfce7" : r.status === "red" ? "#fee2e2" : undefined,
+                    }}
+                  >
                     {allColumns.map((c) => <td key={c}>{r.data[c] ?? ""}</td>)}
                     <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{uploadById.get(r.uploadId)?.filename ?? "—"}</td>
                   </tr>

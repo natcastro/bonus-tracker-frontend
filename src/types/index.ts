@@ -374,6 +374,7 @@ export interface DevolucionesRow {
   id: number;
   uploadId: number;
   data: Record<string, string>;
+  status: "green" | "red" | null;
 }
 
 export interface SampleAnalysisRow {

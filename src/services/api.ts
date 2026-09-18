@@ -1234,7 +1234,12 @@ export async function getDevolucionesRows(): Promise<DevolucionesRow[]> {
     .select("*")
     .order("id", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => ({ id: r.id, uploadId: r.upload_id, data: r.data ?? {} }));
+  return (data ?? []).map((r) => ({ id: r.id, uploadId: r.upload_id, data: r.data ?? {}, status: r.status ?? null }));
+}
+
+export async function updateDevolucionesRowStatus(rowId: number, status: "green" | "red" | null): Promise<void> {
+  const { error } = await supabase.from("devoluciones_rows").update({ status }).eq("id", rowId);
+  if (error) throw error;
 }
 
 export async function createDevolucionesUpload(
