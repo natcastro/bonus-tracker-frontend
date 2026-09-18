@@ -1,20 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore } from "../types";
+import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore, OpsAmazonPerformance } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
   getOpsAppeals, addOpsAppeal, updateOpsAppeal, deleteOpsAppeal, invalidateOpsAppeal, revalidateOpsAppeal,
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
+  getOpsAmazonPerformance, upsertOpsAmazonPerformance,
 } from "../services/api";
 import {
-  getCyclesForYear, getCurrentCycleDefault, getCycleFromDate, calcTikTokBonus,
+  getCyclesForYear, getCurrentCycleDefault, getCycleFromDate, getCycleDatesFromId, calcTikTokBonus,
 } from "../services/usaCycles";
-import { OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus } from "../services/opsBonus";
+import {
+  OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus,
+  FULLTIME_EFFECTIVE_CYCLE_START, FULLTIME_APPEALS_CAP, FULLTIME_HANDLING_CAP, FULLTIME_TIKTOK_CAP,
+  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime,
+} from "../services/opsBonus";
 import { useHubAccess } from "../auth/HubAccessContext";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
 const ADMIN_PASSWORD = "ops2026!";
+
+// Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
+// so historical records/cycles before the cutoffs stay untouched.
+const THOMAS_AGENT_ID = 5;
+const LINDA_AGENT_ID = 17;
+const LINDA_LAST_CYCLE_START = "2026-09-12";
+const THOMAS_BLUE_DOT_RANGE: [string, string] = ["2026-08-24", "2026-09-11"];
+const THOMAS_YELLOW_DOT_RANGE: [string, string] = ["2026-09-12", "2026-09-23"];
 
 const OUTCOME_LABELS: Record<string, string> = {
   fullRefund: "Full Refund",
@@ -52,6 +65,7 @@ export default function OperationsDashboard() {
   const [appeals, setAppeals] = useState<OpsAppeal[]>([]);
   const [handlingTimes, setHandlingTimes] = useState<OpsHandlingTime[]>([]);
   const [tiktokScores, setTiktokScores] = useState<OpsTikTokScore[]>([]);
+  const [amazonPerformance, setAmazonPerformance] = useState<OpsAmazonPerformance[]>([]);
 
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -63,16 +77,18 @@ export default function OperationsDashboard() {
   const [invalidateError, setInvalidateError] = useState("");
 
   const load = useCallback(async () => {
-    const [ag, ap, ht, tk] = await Promise.all([
+    const [ag, ap, ht, tk, apf] = await Promise.all([
       getAgents("OPS"),
       getOpsAppeals(Number(year), cycleId),
       getOpsHandlingTime(Number(year), cycleId),
       getOpsTikTokScores(Number(year), cycleId),
+      getOpsAmazonPerformance(Number(year), cycleId),
     ]);
     setAgents(ag);
     setAppeals(ap);
     setHandlingTimes(ht);
     setTiktokScores(tk);
+    setAmazonPerformance(apf);
   }, [year, cycleId]);
 
   useEffect(() => { load(); }, [load]);
@@ -99,15 +115,34 @@ export default function OperationsDashboard() {
   const cycleDays = cycleInfo?.days ?? 15;
   const tiktokBonus = calcTikTokBonus(tiktokScores, cycleDays);
 
+  const cycleFrom = getCycleDatesFromId(year, cycleId).from;
+  const isFullTimeCycle = cycleFrom >= FULLTIME_EFFECTIVE_CYCLE_START;
+  // Linda left Sep 12, 2026 — hide her from any cycle starting on/after that date.
+  // Her historical records and past cycles remain fully visible/unaffected.
+  const visibleAgents = agents.filter((ag) => ag.id !== LINDA_AGENT_ID || cycleFrom < LINDA_LAST_CYCLE_START);
+
   const agentTotals = agents.map((ag) => {
     const agAppeals = appeals.filter((a) => a.agentId === ag.id && a.status === "completed" && !a.invalidated);
     const appealRaw = agAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
-    const appealCapped = Math.min(appealRaw, OPS_APPEALS_CAP);
     const ht = handlingTimes.find((h) => h.agentId === ag.id);
+    const isThomasFullTime = ag.id === THOMAS_AGENT_ID && isFullTimeCycle;
+
+    if (isThomasFullTime) {
+      const appealCapped = Math.min(appealRaw, FULLTIME_APPEALS_CAP);
+      const handling = ht ? calcHandlingTimeBonusFullTime(ht.hours) : 0;
+      const tiktok = Math.min(tiktokBonus, FULLTIME_TIKTOK_CAP);
+      const perf = amazonPerformance.find((p) => p.agentId === ag.id);
+      const amazonPerf = perf ? Math.min(AMAZON_PERFORMANCE_BONUS[perf.rating] ?? 0, FULLTIME_AMAZON_PERF_CAP) : 0;
+      const raw = appealCapped + handling + tiktok + amazonPerf;
+      const total = Math.min(raw, FULLTIME_TOTAL_CAP);
+      return { agent: ag, appealRaw, appealCapped, handling, tiktok, amazonPerf, raw, total, isFullTime: true };
+    }
+
+    const appealCapped = Math.min(appealRaw, OPS_APPEALS_CAP);
     const handling = ht ? calcHandlingTimeBonus(ht.hours) : 0;
     const raw = appealCapped + handling + tiktokBonus;
     const total = Math.min(raw, OPS_TOTAL_CAP);
-    return { agent: ag, appealRaw, appealCapped, handling, tiktok: tiktokBonus, raw, total };
+    return { agent: ag, appealRaw, appealCapped, handling, tiktok: tiktokBonus, amazonPerf: 0, raw, total, isFullTime: false };
   });
 
   // ── Appeal filter
@@ -161,6 +196,25 @@ export default function OperationsDashboard() {
     await load();
     setHandlingSaved((prev) => ({ ...prev, [agentId]: true }));
     setTimeout(() => setHandlingSaved((prev) => ({ ...prev, [agentId]: false })), 2000);
+  };
+
+  // ── Amazon Performance form per agent (full-time bonus structure only)
+  const [amazonForms, setAmazonForms] = useState<Record<number, string>>({});
+  const [amazonSaved, setAmazonSaved] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    const forms: Record<number, string> = {};
+    amazonPerformance.forEach((p) => { forms[p.agentId] = p.rating; });
+    setAmazonForms(forms);
+  }, [amazonPerformance]);
+
+  const saveAmazonPerformance = async (agentId: number) => {
+    const rating = amazonForms[agentId];
+    if (!rating) return;
+    await upsertOpsAmazonPerformance({ agentId, year: Number(year), cycleId, rating: rating as any });
+    await load();
+    setAmazonSaved((prev) => ({ ...prev, [agentId]: true }));
+    setTimeout(() => setAmazonSaved((prev) => ({ ...prev, [agentId]: false })), 2000);
   };
 
   // ── TikTok form
@@ -225,6 +279,13 @@ export default function OperationsDashboard() {
     }
   };
 
+  const thomasPeriodDot = (agentId: number, date: string): { color: string; label: string } | null => {
+    if (agentId !== THOMAS_AGENT_ID) return null;
+    if (date >= THOMAS_BLUE_DOT_RANGE[0] && date <= THOMAS_BLUE_DOT_RANGE[1]) return { color: "#3b82f6", label: "36-hour work period" };
+    if (date >= THOMAS_YELLOW_DOT_RANGE[0] && date <= THOMAS_YELLOW_DOT_RANGE[1]) return { color: "#eab308", label: "New full-time bonus period" };
+    return null;
+  };
+
   return (
     <div>
       <nav className="top-nav">
@@ -256,8 +317,8 @@ export default function OperationsDashboard() {
                 <div key={t.agent.id} className="stat-card" style={{ borderTopColor: "#7c3aed" }}>
                   <h3>{t.agent.name}</h3>
                   <div className="amount" style={{ color: "#7c3aed" }}>${t.total.toFixed(2)}</div>
-                  {t.raw > OPS_TOTAL_CAP && (
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Raw: ${t.raw.toFixed(2)} (capped at $300)</div>
+                  {t.raw > (t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP) && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Raw: ${t.raw.toFixed(2)} (capped at ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</div>
                   )}
                 </div>
               ))}
@@ -268,19 +329,20 @@ export default function OperationsDashboard() {
                 <thead><tr><th>Category</th>{agents.map((a) => <th key={a.id}>{a.name}</th>)}</tr></thead>
                 <tbody>
                   <tr>
-                    <td>Appeals TikTok (cap $200)</td>
+                    <td>Appeals</td>
                     {agentTotals.map((t) => (
                       <td key={t.agent.id}>
-                        ${t.appealCapped.toFixed(2)}
-                        {t.appealRaw > OPS_APPEALS_CAP && <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}> (raw ${t.appealRaw.toFixed(2)})</span>}
+                        ${t.appealCapped.toFixed(2)} <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>(cap ${t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP})</span>
+                        {t.appealRaw > (t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP) && <div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>raw ${t.appealRaw.toFixed(2)}</div>}
                       </td>
                     ))}
                   </tr>
                   <tr><td>Handling Time</td>{agentTotals.map((t) => <td key={t.agent.id}>${t.handling.toFixed(2)}</td>)}</tr>
+                  <tr><td>Amazon Performance</td>{agentTotals.map((t) => <td key={t.agent.id}>{t.isFullTime ? `$${t.amazonPerf.toFixed(2)}` : "—"}</td>)}</tr>
                   <tr><td>TikTok Score (shared)</td>{agentTotals.map((t) => <td key={t.agent.id}>${t.tiktok.toFixed(2)}</td>)}</tr>
                   <tr style={{ fontWeight: 600 }}>
-                    <td>Total (cap $300)</td>
-                    {agentTotals.map((t) => <td key={t.agent.id}>${t.total.toFixed(2)}</td>)}
+                    <td>Total</td>
+                    {agentTotals.map((t) => <td key={t.agent.id}>${t.total.toFixed(2)} <span style={{ fontSize: "0.72rem", fontWeight: 400, color: "var(--text-muted)" }}>(cap ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</span></td>)}
                   </tr>
                 </tbody>
               </table>
@@ -299,7 +361,7 @@ export default function OperationsDashboard() {
                   <label>Agent</label>
                   <select className="form-control" value={appealForm.agentId} onChange={(e) => setAppealForm({ ...appealForm, agentId: Number(e.target.value) })} required>
                     <option value={0} disabled>Select agent</option>
-                    {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {visibleAgents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -339,11 +401,38 @@ export default function OperationsDashboard() {
             <div className="card" style={{ overflowX: "auto" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3>Appeals for Selected Cycle</h3>
-                <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
-                  Total Bonus: ${Math.min(
-                    appeals.filter((a) => a.status === "completed" && !a.invalidated).reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0),
-                    OPS_APPEALS_CAP
-                  ).toFixed(2)} (cap $200)
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  {(() => {
+                    const blueAppeals = appeals.filter((a) => a.agentId === THOMAS_AGENT_ID && a.status === "completed" && !a.invalidated && a.date >= THOMAS_BLUE_DOT_RANGE[0] && a.date <= THOMAS_BLUE_DOT_RANGE[1]);
+                    if (blueAppeals.length === 0) return null;
+                    const sum = blueAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
+                    return (
+                      <div className="badge" style={{ fontSize: "0.9rem", padding: "0.5rem 1rem", background: "#dbeafe", color: "#1e40af", border: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
+                        36-hour period ({THOMAS_BLUE_DOT_RANGE[0]} – {THOMAS_BLUE_DOT_RANGE[1]}): ${sum.toFixed(2)}
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const yellowAppeals = appeals.filter((a) => a.agentId === THOMAS_AGENT_ID && a.status === "completed" && !a.invalidated && a.date >= THOMAS_YELLOW_DOT_RANGE[0] && a.date <= THOMAS_YELLOW_DOT_RANGE[1]);
+                    if (yellowAppeals.length === 0) return null;
+                    const sum = yellowAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
+                    return (
+                      <div className="badge" style={{ fontSize: "0.9rem", padding: "0.5rem 1rem", background: "#fef9c3", color: "#854d0e", border: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#eab308" }} />
+                        Full-time period ({THOMAS_YELLOW_DOT_RANGE[0]} – {THOMAS_YELLOW_DOT_RANGE[1]}): ${sum.toFixed(2)}
+                      </div>
+                    );
+                  })()}
+                  <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
+                    {(() => {
+                      const raw = appeals
+                        .filter((a) => (filterAgentId === 0 || a.agentId === filterAgentId) && a.status === "completed" && !a.invalidated)
+                        .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
+                      const cap = filterAgentId === THOMAS_AGENT_ID && isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
+                      return <>Total Bonus: ${Math.min(raw, cap).toFixed(2)} (cap ${cap})</>;
+                    })()}
+                  </div>
                 </div>
               </div>
               {/* Agent filter pills */}
@@ -354,7 +443,7 @@ export default function OperationsDashboard() {
                 >
                   Todos
                 </button>
-                {agents.map((ag) => (
+                {visibleAgents.map((ag) => (
                   <button
                     key={ag.id}
                     onClick={() => setFilterAgentId(filterAgentId === ag.id ? 0 : ag.id)}
@@ -373,7 +462,15 @@ export default function OperationsDashboard() {
                     .map((a) => (
                       <tr key={a.id} style={a.invalidated ? { opacity: 0.6 } : undefined}>
                         <td>{agents.find((ag) => ag.id === a.agentId)?.name ?? "—"}</td>
-                        <td>{a.date}</td>
+                        <td>
+                          {a.date}
+                          {(() => {
+                            const dot = thomasPeriodDot(a.agentId, a.date);
+                            return dot ? (
+                              <span title={dot.label} style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: dot.color, marginLeft: 6, verticalAlign: "middle" }} />
+                            ) : null;
+                          })()}
+                        </td>
                         <td>{a.orderNumber}</td>
                         <td>{APPEAL_TYPES.find((t) => t.value === a.appealType)?.label ?? "TikTok Appeals"}</td>
                         <td>
@@ -412,24 +509,25 @@ export default function OperationsDashboard() {
         {activeTab === "handling" && (
           <section>
             <header className="section-header"><h2>Handling Time</h2></header>
-            <div className="card" style={{ background: "#f9fafb", marginBottom: "1rem" }}>
-              <h3 style={{ marginBottom: "0.75rem" }}>Bonus Table</h3>
-              <table className="data-table">
-                <thead><tr><th>Handling Time</th><th>Bonus</th></tr></thead>
-                <tbody>
-                  {[["≤ 30 h","$50"],["30 – 32 h","$40"],["32 – 34 h","$30"],["34 – 36 h","$20"],["36 – 38.5 h","$10"],["> 38.5 h","$0"]].map(([r, b]) => (
-                    <tr key={r}><td>{r}</td><td>{b}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {agents.map((ag) => {
+            {visibleAgents.map((ag) => {
               const ht = handlingTimes.find((h) => h.agentId === ag.id);
               const val = handlingForms[ag.id] ?? "";
-              const preview = val !== "" && !isNaN(Number(val)) ? calcHandlingTimeBonus(Number(val)) : null;
+              const isThomasFullTime = ag.id === THOMAS_AGENT_ID && isFullTimeCycle;
+              const calcFn = isThomasFullTime ? calcHandlingTimeBonusFullTime : calcHandlingTimeBonus;
+              const rows = isThomasFullTime
+                ? [["≤ 30 h", "$40"], ["30 – 32 h", "$32"], ["32 – 34 h", "$24"], ["34 – 36 h", "$16"], ["36 – 38.5 h", "$8"], ["> 38.5 h", "$0"]]
+                : [["≤ 30 h", "$50"], ["30 – 32 h", "$40"], ["32 – 34 h", "$30"], ["34 – 36 h", "$20"], ["36 – 38.5 h", "$10"], ["> 38.5 h", "$0"]];
+              const preview = val !== "" && !isNaN(Number(val)) ? calcFn(Number(val)) : null;
               return (
                 <div key={ag.id} className="card">
-                  <h3 style={{ marginBottom: "1rem" }}>{ag.name}</h3>
+                  <h3 style={{ marginBottom: "1rem" }}>
+                    {ag.name}
+                    {isThomasFullTime && <span className="badge" style={{ marginLeft: 8, fontSize: "0.7rem", background: "#fef9c3", color: "#854d0e", border: "none" }}>Full-time (cap ${FULLTIME_HANDLING_CAP})</span>}
+                  </h3>
+                  <table className="data-table" style={{ marginBottom: "1rem", maxWidth: 320 }}>
+                    <thead><tr><th>Handling Time</th><th>Bonus</th></tr></thead>
+                    <tbody>{rows.map(([r, b]) => <tr key={r}><td>{r}</td><td>{b}</td></tr>)}</tbody>
+                  </table>
                   <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
                     <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
                       <label>Handling Time (hours)</label>
@@ -445,7 +543,7 @@ export default function OperationsDashboard() {
                       {handlingSaved[ag.id] ? "Saved! ✓" : "Save"}
                     </button>
                   </div>
-                  {ht && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {ht.hours}h → ${calcHandlingTimeBonus(ht.hours).toFixed(2)}</p>}
+                  {ht && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {ht.hours}h → ${calcFn(ht.hours).toFixed(2)}</p>}
                 </div>
               );
             })}
@@ -455,10 +553,50 @@ export default function OperationsDashboard() {
         {/* PERFORMANCE */}
         {activeTab === "performance" && (
           <section>
-            <header className="section-header"><h2>Performance</h2></header>
-            <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--text-muted)" }}>
-              <p style={{ fontSize: "1rem" }}>Próximamente — en construcción</p>
-            </div>
+            <header className="section-header"><h2>Amazon Performance</h2></header>
+            {!isFullTimeCycle ? (
+              <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--text-muted)" }}>
+                <p style={{ fontSize: "1rem" }}>Amazon Performance bonus applies starting the full-time cycle beginning {FULLTIME_EFFECTIVE_CYCLE_START} onward.</p>
+              </div>
+            ) : (
+              <>
+                <div className="card" style={{ background: "#f9fafb", marginBottom: "1rem" }}>
+                  <h3 style={{ marginBottom: "0.75rem" }}>Bonus Table</h3>
+                  <table className="data-table">
+                    <thead><tr><th>Rating</th><th>Bonus</th></tr></thead>
+                    <tbody>
+                      <tr><td>Good</td><td>${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)}</td></tr>
+                      <tr><td>Regular</td><td>${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)}</td></tr>
+                      <tr><td>Poor</td><td>${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                {visibleAgents.filter((ag) => ag.id === THOMAS_AGENT_ID).map((ag) => {
+                  const current = amazonPerformance.find((p) => p.agentId === ag.id);
+                  const val = amazonForms[ag.id] ?? "";
+                  return (
+                    <div key={ag.id} className="card">
+                      <h3 style={{ marginBottom: "1rem" }}>{ag.name}</h3>
+                      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                          <label>Rating</label>
+                          <select className="form-control" value={val} onChange={(e) => setAmazonForms((p) => ({ ...p, [ag.id]: e.target.value }))}>
+                            <option value="" disabled>Select rating</option>
+                            <option value="good">Good (${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)})</option>
+                            <option value="regular">Regular (${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)})</option>
+                            <option value="poor">Poor (${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)})</option>
+                          </select>
+                        </div>
+                        <button className="btn btn-primary" style={{ background: amazonSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => saveAmazonPerformance(ag.id)}>
+                          {amazonSaved[ag.id] ? "Saved! ✓" : "Save"}
+                        </button>
+                      </div>
+                      {current && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {current.rating} → ${(AMAZON_PERFORMANCE_BONUS[current.rating] ?? 0).toFixed(2)}</p>}
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </section>
         )}
 

@@ -170,6 +170,15 @@ export interface OpsTikTokScore {
   cycleId: string;
 }
 
+// Full-time bonus structure only (Thomas, cycles starting 2026-09-24 onward).
+export interface OpsAmazonPerformance {
+  id: number;
+  agentId: number;
+  year: number;
+  cycleId: string;
+  rating: "good" | "regular" | "poor";
+}
+
 // ── Account Protection Team (Juan) ────────────────────────────────────────────
 
 export interface AptClaim {

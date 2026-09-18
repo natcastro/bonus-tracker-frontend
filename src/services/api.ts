@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import type {
   Agent, Appeal, UsaPeriodData, TikTokScore, UsaLiveSchedule,
   MexAttendance, MexAgentGoal, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent,
-  OpsAppeal, OpsHandlingTime, OpsTikTokScore,
+  OpsAppeal, OpsHandlingTime, OpsTikTokScore, OpsAmazonPerformance,
   AptClaim,
   AptA2zClaim, AptSafetyClaim, AptFeedback,
   AptAccountHealth, AptTikTokHealth, AptPerformance,
@@ -455,6 +455,21 @@ export async function deleteOpsTikTokScore(id: number): Promise<void> {
   if (error) throw error;
 }
 
+// ── Operations: Amazon Performance (full-time bonus structure only) ──────────
+
+export async function getOpsAmazonPerformance(year: number, cycleId: string): Promise<OpsAmazonPerformance[]> {
+  const { data, error } = await supabase
+    .from("ops_amazon_performance").select("*").eq("year", year).eq("cycle_id", cycleId);
+  if (error) throw error;
+  return (data ?? []).map(mapOpsAmazonPerformance);
+}
+
+export async function upsertOpsAmazonPerformance(d: Omit<OpsAmazonPerformance, "id">): Promise<void> {
+  const { error } = await supabase.from("ops_amazon_performance")
+    .upsert({ agent_id: d.agentId, year: d.year, cycle_id: d.cycleId, rating: d.rating }, { onConflict: "agent_id,year,cycle_id" });
+  if (error) throw error;
+}
+
 // ── Account Protection: Unified Claims ───────────────────────────────────────
 
 export async function getAptClaims(year: number, cycleId: string): Promise<AptClaim[]> {
@@ -691,6 +706,10 @@ function mapOpsHandlingTime(r: any): OpsHandlingTime {
 
 function mapOpsTikTokScore(r: any): OpsTikTokScore {
   return { id: r.id, date: r.date, score: r.score, duration: r.duration, year: r.year, cycleId: r.cycle_id };
+}
+
+function mapOpsAmazonPerformance(r: any): OpsAmazonPerformance {
+  return { id: r.id, agentId: r.agent_id, year: r.year, cycleId: r.cycle_id, rating: r.rating };
 }
 
 function mapAptClaim(r: any): AptClaim {
