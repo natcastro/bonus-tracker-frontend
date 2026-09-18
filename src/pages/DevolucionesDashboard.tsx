@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { DevolucionesUpload, DevolucionesRow } from "../types";
-import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload, updateDevolucionesRowStatus } from "../services/api";
+import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload, updateDevolucionesRowCompleted } from "../services/api";
 import { useHubAccess } from "../auth/HubAccessContext";
 
 const COLOR = "#be123c";
@@ -18,6 +18,7 @@ export default function DevolucionesDashboard() {
   const canUpload = email.toLowerCase() === UPLOAD_ALLOWED_EMAIL;
   const [uploads, setUploads] = useState<DevolucionesUpload[]>([]);
   const [rows, setRows] = useState<DevolucionesRow[]>([]);
+  const [view, setView] = useState<"pending" | "completed">("pending");
   const [search, setSearch] = useState("");
   const [uploadErr, setUploadErr] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -70,14 +71,13 @@ export default function DevolucionesDashboard() {
     await load();
   };
 
-  // Click cycles a row through: none → green → red → none.
-  const cycleRowStatus = async (row: DevolucionesRow) => {
-    const next: "green" | "red" | null = row.status === null ? "green" : row.status === "green" ? "red" : null;
-    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)));
+  // Checking a row moves it out of Pendientes and into Completados (and back if unchecked).
+  const toggleRowCompleted = async (row: DevolucionesRow, completed: boolean) => {
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, completed } : r)));
     try {
-      await updateDevolucionesRowStatus(row.id, next);
+      await updateDevolucionesRowCompleted(row.id, completed);
     } catch {
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, completed: row.completed } : r)));
     }
   };
 
@@ -92,9 +92,13 @@ export default function DevolucionesDashboard() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => Object.values(r.data).some((v) => String(v ?? "").toLowerCase().includes(q)));
-  }, [rows, search]);
+    return rows
+      .filter((r) => (view === "completed" ? r.completed : !r.completed))
+      .filter((r) => !q || Object.values(r.data).some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [rows, search, view]);
+
+  const pendingCount = useMemo(() => rows.filter((r) => !r.completed).length, [rows]);
+  const completedCount = useMemo(() => rows.filter((r) => r.completed).length, [rows]);
 
   return (
     <div>
@@ -142,6 +146,19 @@ export default function DevolucionesDashboard() {
           </div>
         )}
 
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+          <button className={`btn btn-sm ${view === "pending" ? "btn-primary" : "btn-secondary"}`}
+            style={view === "pending" ? { background: COLOR } : {}}
+            onClick={() => setView("pending")}>
+            Pendientes ({pendingCount})
+          </button>
+          <button className={`btn btn-sm ${view === "completed" ? "btn-primary" : "btn-secondary"}`}
+            style={view === "completed" ? { background: COLOR } : {}}
+            onClick={() => setView("completed")}>
+            Completados ({completedCount})
+          </button>
+        </div>
+
         <div className="card" style={{ overflowX: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
             <h3>Registros ({filteredRows.length})</h3>
@@ -160,25 +177,26 @@ export default function DevolucionesDashboard() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th></th>
                   {allColumns.map((c) => <th key={c}>{c}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((r) => (
-                  <tr
-                    key={r.id}
-                    onClick={() => cycleRowStatus(r)}
-                    title="Click para marcar: verde → rojo → sin marcar"
-                    style={{
-                      cursor: "pointer",
-                      background: r.status === "green" ? "#dcfce7" : r.status === "red" ? "#fee2e2" : undefined,
-                    }}
-                  >
+                  <tr key={r.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={r.completed}
+                        onChange={(e) => toggleRowCompleted(r, e.target.checked)}
+                        title={view === "pending" ? "Marcar como completado" : "Devolver a pendientes"}
+                      />
+                    </td>
                     {allColumns.map((c) => <td key={c}>{r.data[c] ?? ""}</td>)}
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
-                  <tr><td colSpan={allColumns.length} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
+                  <tr><td colSpan={allColumns.length + 1} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
                 )}
               </tbody>
             </table>
