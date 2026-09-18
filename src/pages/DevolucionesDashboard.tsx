@@ -6,6 +6,10 @@ import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, 
 
 const COLOR = "#be123c";
 
+// Only these columns are kept from an uploaded file — everything else in the
+// source export is dropped on upload.
+const WANTED_COLUMNS = ["Return Order ID", "Order ID", "Seller SKU", "Return Logistics Tracking ID"];
+
 export default function DevolucionesDashboard() {
   const navigate = useNavigate();
   const [uploads, setUploads] = useState<DevolucionesUpload[]>([]);
@@ -34,10 +38,12 @@ export default function DevolucionesDashboard() {
         XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name], { defval: "", raw: true })
       );
       if (rawJson.length === 0) { setUploadErr("El archivo no tiene filas."); return; }
-      const json: Record<string, string>[] = rawJson.map((row) =>
+      const trimmed: Record<string, string>[] = rawJson.map((row) =>
         Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v ?? "").trim()]))
       );
-      const columns = Array.from(new Set(json.flatMap((row) => Object.keys(row))));
+      const columns = WANTED_COLUMNS.filter((c) => trimmed.some((row) => c in row));
+      if (columns.length === 0) { setUploadErr(`El archivo no tiene ninguna de las columnas esperadas: ${WANTED_COLUMNS.join(", ")}.`); return; }
+      const json = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
       await createDevolucionesUpload(file.name, columns, json.map((data) => ({ data })));
       await load();
     } catch {
