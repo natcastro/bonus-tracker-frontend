@@ -33,6 +33,8 @@ export default function DevolucionesDashboard() {
   const handleFile = async (file: File) => {
     setUploadErr("");
     setUploading(true);
+    let columns: string[] = [];
+    let json: Record<string, string>[] = [];
     try {
       const buf = await file.arrayBuffer();
       // raw:true keeps every cell as its literal text — without it, long numeric IDs
@@ -41,17 +43,23 @@ export default function DevolucionesDashboard() {
       const rawJson: Record<string, unknown>[] = wb.SheetNames.flatMap((name) =>
         XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name], { defval: "", raw: true })
       );
-      if (rawJson.length === 0) { setUploadErr("El archivo no tiene filas."); return; }
+      if (rawJson.length === 0) { setUploadErr("El archivo no tiene filas."); setUploading(false); return; }
       const trimmed: Record<string, string>[] = rawJson.map((row) =>
         Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v ?? "").trim()]))
       );
-      const columns = WANTED_COLUMNS.filter((c) => trimmed.some((row) => c in row));
-      if (columns.length === 0) { setUploadErr(`El archivo no tiene ninguna de las columnas esperadas: ${WANTED_COLUMNS.join(", ")}.`); return; }
-      const json = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
+      columns = WANTED_COLUMNS.filter((c) => trimmed.some((row) => c in row));
+      if (columns.length === 0) { setUploadErr(`El archivo no tiene ninguna de las columnas esperadas: ${WANTED_COLUMNS.join(", ")}.`); setUploading(false); return; }
+      json = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
+    } catch (err: any) {
+      setUploadErr(`No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV válido. (${err?.message ?? "error desconocido"})`);
+      setUploading(false);
+      return;
+    }
+    try {
       await createDevolucionesUpload(file.name, columns, json.map((data) => ({ data })));
       await load();
-    } catch {
-      setUploadErr("No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV válido.");
+    } catch (err: any) {
+      setUploadErr(`El archivo se leyó bien, pero no se pudo guardar en la base de datos: ${err?.message ?? "error desconocido"}`);
     } finally {
       setUploading(false);
     }
