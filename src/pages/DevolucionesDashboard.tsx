@@ -90,8 +90,6 @@ export default function DevolucionesDashboard() {
     return cols;
   }, [uploads]);
 
-  const uploadById = useMemo(() => new Map(uploads.map((u) => [u.id, u])), [uploads]);
-
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -163,7 +161,6 @@ export default function DevolucionesDashboard() {
               <thead>
                 <tr>
                   {allColumns.map((c) => <th key={c}>{c}</th>)}
-                  <th>Archivo</th>
                 </tr>
               </thead>
               <tbody>
@@ -178,11 +175,10 @@ export default function DevolucionesDashboard() {
                     }}
                   >
                     {allColumns.map((c) => <td key={c}>{r.data[c] ?? ""}</td>)}
-                    <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{uploadById.get(r.uploadId)?.filename ?? "—"}</td>
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
-                  <tr><td colSpan={allColumns.length + 1} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
+                  <tr><td colSpan={allColumns.length} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
                 )}
               </tbody>
             </table>
