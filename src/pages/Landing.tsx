@@ -4,15 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
-import { GlobeIcon, ToolsIcon, ChartIcon, PackageIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon } from "../components/icons";
+import { GlobeIcon, ToolsIcon, ChartIcon, PackageIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon, ReturnIcon } from "../components/icons";
 
-type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING";
+type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING" | "DEVOLUCIONES";
 type View = "hub" | "ftc-usa" | "ops-tools";
 
 const ROUTES: Record<Team, string> = {
   MEX: "/mexico", OPS: "/operations",
   APT: "/strategy", TKLIVES: "/tiktok-lives", CSQUALITY: "/cs-quality",
   MGMT: "/management", LOGISTICS: "/logistics", MARKETING: "/marketing",
+  DEVOLUCIONES: "/devoluciones",
 };
 
 const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
@@ -242,8 +243,18 @@ export default function Landing() {
               onClick={() => directGo("MARKETING")}
             />
           )}
+          {hasTeam("DEVOLUCIONES") && (
+            <HubCard
+              icon={<ReturnIcon color="#be123c" />}
+              eyebrow="Equipo"
+              title="Devoluciones"
+              subtitle="Órdenes, tracking y cajas devueltas"
+              color="#be123c"
+              onClick={() => directGo("DEVOLUCIONES")}
+            />
+          )}
         </div>
-        {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && (
+        {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && !hasTeam("DEVOLUCIONES") && (
           <p style={{ color: "#6B7280", marginTop: "1.5rem", position: "relative", zIndex: 1 }}>No tienes ningún equipo asignado todavía.</p>
         )}
 

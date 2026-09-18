@@ -12,6 +12,7 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "CSQUALITY",  label: "Operational Tools" },
   { key: "MGMT",       label: "Management" },
   { key: "LOGISTICS",  label: "Logística" },
+  { key: "DEVOLUCIONES", label: "Devoluciones" },
 ];
 
 const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];

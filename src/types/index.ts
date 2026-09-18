@@ -361,6 +361,21 @@ export interface SampleAnalysisPeriod {
   uploadedAt: string;
 }
 
+// ── Devoluciones (returns tracker — bulk Excel upload + searchable table) ──────
+
+export interface DevolucionesUpload {
+  id: number;
+  filename: string;
+  uploadedAt: string;
+  columns: string[];
+}
+
+export interface DevolucionesRow {
+  id: number;
+  uploadId: number;
+  data: Record<string, string>;
+}
+
 export interface SampleAnalysisRow {
   id: number;
   periodId: number;

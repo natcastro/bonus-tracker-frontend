@@ -163,3 +163,12 @@ export function GearIcon({ size, color }: IconProps) {
     </svg>
   );
 }
+
+export function ReturnIcon({ size, color }: IconProps) {
+  return (
+    <svg {...base(size, color)}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v0a6 6 0 0 1-6 6h-3" />
+    </svg>
+  );
+}

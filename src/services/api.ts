@@ -9,6 +9,7 @@ import type {
   CSQualityCase, CSQualityPhoto,
   StrategyEntry, StrategySample, SampleCatalogItem, StrategyIncident, LogisticsOrder,
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
+  DevolucionesUpload, DevolucionesRow,
 } from "../types";
 import type { MarketingBrief, MarketingNotification } from "../pages/marketing/types";
 
@@ -1213,6 +1214,49 @@ export async function decideUploadRowsBulk(rowIds: number[], decision: "accepted
     .from("strategy_upload_rows")
     .update({ decision, decided_at: new Date().toISOString() })
     .in("id", rowIds);
+  if (error) throw error;
+}
+
+// ── Devoluciones (returns tracker — bulk Excel upload + searchable table) ──────
+
+export async function getDevolucionesUploads(): Promise<DevolucionesUpload[]> {
+  const { data, error } = await supabase
+    .from("devoluciones_uploads")
+    .select("*")
+    .order("uploaded_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ id: r.id, filename: r.filename, uploadedAt: r.uploaded_at, columns: r.columns ?? [] }));
+}
+
+export async function getDevolucionesRows(): Promise<DevolucionesRow[]> {
+  const { data, error } = await supabase
+    .from("devoluciones_rows")
+    .select("*")
+    .order("id", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ id: r.id, uploadId: r.upload_id, data: r.data ?? {} }));
+}
+
+export async function createDevolucionesUpload(
+  filename: string, columns: string[], rows: { data: Record<string, string> }[],
+): Promise<DevolucionesUpload> {
+  const { data: batch, error: batchErr } = await supabase
+    .from("devoluciones_uploads")
+    .insert({ filename, columns })
+    .select()
+    .single();
+  if (batchErr) throw batchErr;
+
+  const { error: rowsErr } = await supabase
+    .from("devoluciones_rows")
+    .insert(rows.map((r) => ({ upload_id: batch.id, data: r.data })));
+  if (rowsErr) throw rowsErr;
+
+  return { id: batch.id, filename: batch.filename, uploadedAt: batch.uploaded_at, columns: batch.columns ?? [] };
+}
+
+export async function deleteDevolucionesUpload(batchId: number): Promise<void> {
+  const { error } = await supabase.from("devoluciones_uploads").delete().eq("id", batchId);
   if (error) throw error;
 }
 
