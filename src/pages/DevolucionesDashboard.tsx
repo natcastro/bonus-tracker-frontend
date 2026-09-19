@@ -136,7 +136,9 @@ export default function DevolucionesDashboard() {
     const q = search.trim().toLowerCase();
     return rows
       .filter((r) => (view === "completed" ? r.completed : !r.completed))
-      .filter((r) => !q || Object.values(r.data).some((v) => String(v ?? "").toLowerCase().includes(q)));
+      .filter((r) => !q || Object.values(r.data).some((v) => String(v ?? "").toLowerCase().includes(q)))
+      // Devolución/Reembolso rows are urgent — surface them first.
+      .sort((a, b) => (a.tag === "devolucion" ? 0 : 1) - (b.tag === "devolucion" ? 0 : 1));
   }, [rows, search, view]);
 
   const pendingCount = useMemo(() => rows.filter((r) => !r.completed).length, [rows]);
@@ -235,7 +237,7 @@ export default function DevolucionesDashboard() {
               </thead>
               <tbody>
                 {filteredRows.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} style={r.tag === "devolucion" && !r.completed ? { background: "#fef2f2" } : undefined}>
                     <td>
                       <input
                         type="checkbox"
@@ -246,9 +248,15 @@ export default function DevolucionesDashboard() {
                     </td>
                     <td>
                       {r.tag ? (
-                        <span className="badge" style={{ background: TAG_COLORS[r.tag].bg, color: TAG_COLORS[r.tag].fg, border: "none", fontSize: "0.72rem" }}>
-                          {TAG_LABELS[r.tag]}
-                        </span>
+                        r.tag === "devolucion" ? (
+                          <span className="badge" title="Urgente — atender lo antes posible" style={{ background: "#fecaca", color: "#7f1d1d", border: "none", fontSize: "0.72rem", fontWeight: 700 }}>
+                            ⚠️ {TAG_LABELS.devolucion} — URGENTE
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: TAG_COLORS[r.tag].bg, color: TAG_COLORS[r.tag].fg, border: "none", fontSize: "0.72rem" }}>
+                            {TAG_LABELS[r.tag]}
+                          </span>
+                        )
                       ) : (
                         <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>—</span>
                       )}
