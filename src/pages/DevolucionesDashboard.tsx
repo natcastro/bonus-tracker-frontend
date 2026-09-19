@@ -143,6 +143,7 @@ export default function DevolucionesDashboard() {
 
   const pendingCount = useMemo(() => rows.filter((r) => !r.completed).length, [rows]);
   const completedCount = useMemo(() => rows.filter((r) => r.completed).length, [rows]);
+  const urgentPendingCount = useMemo(() => rows.filter((r) => r.tag === "devolucion" && !r.completed).length, [rows]);
 
   return (
     <div>
@@ -154,6 +155,17 @@ export default function DevolucionesDashboard() {
 
       <main className="content-area">
         <header className="section-header"><h2>Devoluciones</h2></header>
+
+        <div className="summary-cards" style={{ marginBottom: "1rem" }}>
+          <div className="stat-card" style={{ borderTopColor: "#16a34a" }}>
+            <h3>Completados</h3>
+            <div className="amount" style={{ color: "#16a34a" }}>{completedCount}</div>
+          </div>
+          <div className="stat-card" style={{ borderTopColor: "#dc2626" }}>
+            <h3>⚠️ Urgentes pendientes</h3>
+            <div className="amount" style={{ color: "#dc2626" }}>{urgentPendingCount}</div>
+          </div>
+        </div>
 
         {canUpload && (
           <div className="card">
