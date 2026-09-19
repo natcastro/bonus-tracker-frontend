@@ -12,6 +12,10 @@ const UPLOAD_ALLOWED_EMAIL = "amazonassistant@formatucuerpo.com";
 // source export is dropped on upload.
 const WANTED_COLUMNS = ["Return Order ID", "Order ID", "Seller SKU", "Return Logistics Tracking ID"];
 
+// Uploaded exports commonly overlap in date range, so the same return shows up again —
+// this is the field that uniquely identifies a return, used to skip re-adding it.
+const DEDUPE_KEY = "Return Order ID";
+
 export default function DevolucionesDashboard() {
   const navigate = useNavigate();
   const { email } = useHubAccess();
@@ -21,6 +25,7 @@ export default function DevolucionesDashboard() {
   const [view, setView] = useState<"pending" | "completed">("pending");
   const [search, setSearch] = useState("");
   const [uploadErr, setUploadErr] = useState("");
+  const [uploadInfo, setUploadInfo] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
@@ -33,9 +38,11 @@ export default function DevolucionesDashboard() {
 
   const handleFile = async (file: File) => {
     setUploadErr("");
+    setUploadInfo("");
     setUploading(true);
     let columns: string[] = [];
     let json: Record<string, string>[] = [];
+    let skippedCount = 0;
     try {
       const buf = await file.arrayBuffer();
       // raw:true keeps every cell as its literal text — without it, long numeric IDs
@@ -50,7 +57,18 @@ export default function DevolucionesDashboard() {
       );
       columns = WANTED_COLUMNS.filter((c) => trimmed.some((row) => c in row));
       if (columns.length === 0) { setUploadErr(`El archivo no tiene ninguna de las columnas esperadas: ${WANTED_COLUMNS.join(", ")}.`); setUploading(false); return; }
-      json = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
+      const allRows = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
+      // Skip rows already in the table (by DEDUPE_KEY) and duplicate rows within the file itself.
+      const existingKeys = new Set(rows.map((r) => r.data[DEDUPE_KEY]).filter(Boolean));
+      const seenInFile = new Set<string>();
+      json = allRows.filter((row) => {
+        const key = row[DEDUPE_KEY];
+        if (!key) return true;
+        if (existingKeys.has(key) || seenInFile.has(key)) { skippedCount++; return false; }
+        seenInFile.add(key);
+        return true;
+      });
+      if (json.length === 0) { setUploadErr("Todas las filas de este archivo ya estaban cargadas (duplicados)."); setUploading(false); return; }
     } catch (err: any) {
       setUploadErr(`No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV válido. (${err?.message ?? "error desconocido"})`);
       setUploading(false);
@@ -59,6 +77,7 @@ export default function DevolucionesDashboard() {
     try {
       await createDevolucionesUpload(file.name, columns, json.map((data) => ({ data })));
       await load();
+      if (skippedCount > 0) setUploadInfo(`Se agregaron ${json.length} filas nuevas. Se omitieron ${skippedCount} duplicadas.`);
     } catch (err: any) {
       setUploadErr(`El archivo se leyó bien, pero no se pudo guardar en la base de datos: ${err?.message ?? "error desconocido"}`);
     } finally {
@@ -125,6 +144,7 @@ export default function DevolucionesDashboard() {
             />
             {uploading && <p style={{ marginTop: "0.5rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>Subiendo…</p>}
             {uploadErr && <p className="error-msg">{uploadErr}</p>}
+            {uploadInfo && <p style={{ marginTop: "0.5rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>{uploadInfo}</p>}
 
             {uploads.length > 0 && (
               <div style={{ marginTop: "1rem" }}>
