@@ -28,7 +28,7 @@ export default function Timeline({ brief }: { brief: MarketingBrief }) {
               <div style={{ fontSize: isCurrent ? 12 : 11, fontWeight: isCurrent ? 800 : 600, color: isCurrent ? MT.text1 : MT.text3, marginTop: 6, textAlign: "center" }}>
                 {s.label}
               </div>
-              <div style={{ fontSize: 9.5, color: MT.text3, marginTop: 1 }}>{formatDateHuman(s.deadline)}</div>
+              <div style={{ fontSize: 9.5, color: MT.text3, marginTop: 1 }}>{formatDateHuman(done ? s.completedAt : s.deadline)}</div>
             </div>
             {i < brief.stages.length - 1 && (
               <div style={{ width: 22, height: 2, background: done ? MT.primary : MT.border, marginTop: isCurrent ? 19 : 14 }} />
