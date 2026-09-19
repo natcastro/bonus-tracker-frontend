@@ -1234,7 +1234,7 @@ export async function getDevolucionesRows(): Promise<DevolucionesRow[]> {
     .select("*")
     .order("id", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => ({ id: r.id, uploadId: r.upload_id, data: r.data ?? {}, completed: r.completed ?? false }));
+  return (data ?? []).map((r) => ({ id: r.id, uploadId: r.upload_id, data: r.data ?? {}, completed: r.completed ?? false, tag: r.tag ?? null }));
 }
 
 export async function updateDevolucionesRowCompleted(rowId: number, completed: boolean): Promise<void> {
@@ -1243,7 +1243,7 @@ export async function updateDevolucionesRowCompleted(rowId: number, completed: b
 }
 
 export async function createDevolucionesUpload(
-  filename: string, columns: string[], rows: { data: Record<string, string> }[],
+  filename: string, columns: string[], rows: { data: Record<string, string>; completed?: boolean }[], tag: "devolucion" | "cambio",
 ): Promise<DevolucionesUpload> {
   const { data: batch, error: batchErr } = await supabase
     .from("devoluciones_uploads")
@@ -1254,7 +1254,7 @@ export async function createDevolucionesUpload(
 
   const { error: rowsErr } = await supabase
     .from("devoluciones_rows")
-    .insert(rows.map((r) => ({ upload_id: batch.id, data: r.data })));
+    .insert(rows.map((r) => ({ upload_id: batch.id, data: r.data, tag, completed: r.completed ?? false })));
   if (rowsErr) throw rowsErr;
 
   return { id: batch.id, filename: batch.filename, uploadedAt: batch.uploaded_at, columns: batch.columns ?? [] };
@@ -1262,6 +1262,12 @@ export async function createDevolucionesUpload(
 
 export async function deleteDevolucionesUpload(batchId: number): Promise<void> {
   const { error } = await supabase.from("devoluciones_uploads").delete().eq("id", batchId);
+  if (error) throw error;
+}
+
+export async function deleteDevolucionesRows(rowIds: number[]): Promise<void> {
+  if (rowIds.length === 0) return;
+  const { error } = await supabase.from("devoluciones_rows").delete().in("id", rowIds);
   if (error) throw error;
 }
 

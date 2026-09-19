@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import type { DevolucionesUpload, DevolucionesRow } from "../types";
-import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload, updateDevolucionesRowCompleted } from "../services/api";
+import { getDevolucionesUploads, getDevolucionesRows, createDevolucionesUpload, deleteDevolucionesUpload, deleteDevolucionesRows, updateDevolucionesRowCompleted } from "../services/api";
 import { useHubAccess } from "../auth/HubAccessContext";
 
 const COLOR = "#be123c";
@@ -16,6 +16,12 @@ const WANTED_COLUMNS = ["Return Order ID", "Order ID", "Seller SKU", "Return Log
 // this is the field that uniquely identifies a return, used to skip re-adding it.
 const DEDUPE_KEY = "Return Order ID";
 
+const TAG_LABELS: Record<"devolucion" | "cambio", string> = { devolucion: "Devolución / Reembolso", cambio: "Cambio / Exchange" };
+const TAG_COLORS: Record<"devolucion" | "cambio", { bg: string; fg: string }> = {
+  devolucion: { bg: "#fee2e2", fg: "#991b1b" },
+  cambio: { bg: "#dbeafe", fg: "#1e40af" },
+};
+
 export default function DevolucionesDashboard() {
   const navigate = useNavigate();
   const { email } = useHubAccess();
@@ -24,6 +30,7 @@ export default function DevolucionesDashboard() {
   const [rows, setRows] = useState<DevolucionesRow[]>([]);
   const [view, setView] = useState<"pending" | "completed">("pending");
   const [search, setSearch] = useState("");
+  const [uploadTag, setUploadTag] = useState<"devolucion" | "cambio" | "">("");
   const [uploadErr, setUploadErr] = useState("");
   const [uploadInfo, setUploadInfo] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -37,11 +44,13 @@ export default function DevolucionesDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const handleFile = async (file: File) => {
+    if (!uploadTag) { setUploadErr("Elige si este archivo es de Devolución/Reembolso o Cambio/Exchange antes de subirlo."); return; }
     setUploadErr("");
     setUploadInfo("");
     setUploading(true);
     let columns: string[] = [];
-    let json: Record<string, string>[] = [];
+    let newRows: { data: Record<string, string>; completed?: boolean }[] = [];
+    let replacedIds: number[] = [];
     let skippedCount = 0;
     try {
       const buf = await file.arrayBuffer();
@@ -58,26 +67,40 @@ export default function DevolucionesDashboard() {
       columns = WANTED_COLUMNS.filter((c) => trimmed.some((row) => c in row));
       if (columns.length === 0) { setUploadErr(`El archivo no tiene ninguna de las columnas esperadas: ${WANTED_COLUMNS.join(", ")}.`); setUploading(false); return; }
       const allRows = trimmed.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? ""])));
-      // Skip rows already in the table (by DEDUPE_KEY) and duplicate rows within the file itself.
-      const existingKeys = new Set(rows.map((r) => r.data[DEDUPE_KEY]).filter(Boolean));
+      // A row whose key already exists WITHOUT a tag (uploaded before tags existed) gets
+      // replaced by this new tagged row, carrying over its completed status. A row whose key
+      // already has a tag is a real duplicate and gets skipped, same as within this same file.
+      const existingByKey = new Map(rows.filter((r) => r.data[DEDUPE_KEY]).map((r) => [r.data[DEDUPE_KEY], r]));
       const seenInFile = new Set<string>();
-      json = allRows.filter((row) => {
+      newRows = [];
+      allRows.forEach((row) => {
         const key = row[DEDUPE_KEY];
-        if (!key) return true;
-        if (existingKeys.has(key) || seenInFile.has(key)) { skippedCount++; return false; }
+        if (!key) { newRows.push({ data: row }); return; }
+        if (seenInFile.has(key)) { skippedCount++; return; }
+        const existing = existingByKey.get(key);
+        if (existing) {
+          if (existing.tag) { skippedCount++; return; }
+          replacedIds.push(existing.id);
+          newRows.push({ data: row, completed: existing.completed });
+        } else {
+          newRows.push({ data: row });
+        }
         seenInFile.add(key);
-        return true;
       });
-      if (json.length === 0) { setUploadErr("Todas las filas de este archivo ya estaban cargadas (duplicados)."); setUploading(false); return; }
+      if (newRows.length === 0) { setUploadErr("Todas las filas de este archivo ya estaban cargadas (duplicados)."); setUploading(false); return; }
     } catch (err: any) {
       setUploadErr(`No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV válido. (${err?.message ?? "error desconocido"})`);
       setUploading(false);
       return;
     }
     try {
-      await createDevolucionesUpload(file.name, columns, json.map((data) => ({ data })));
+      if (replacedIds.length > 0) await deleteDevolucionesRows(replacedIds);
+      await createDevolucionesUpload(file.name, columns, newRows, uploadTag);
       await load();
-      if (skippedCount > 0) setUploadInfo(`Se agregaron ${json.length} filas nuevas. Se omitieron ${skippedCount} duplicadas.`);
+      const parts = [`Se agregaron ${newRows.length} filas nuevas con el tag "${TAG_LABELS[uploadTag]}".`];
+      if (replacedIds.length > 0) parts.push(`${replacedIds.length} reemplazaron filas antiguas sin tag.`);
+      if (skippedCount > 0) parts.push(`Se omitieron ${skippedCount} duplicadas.`);
+      setUploadInfo(parts.join(" "));
     } catch (err: any) {
       setUploadErr(`El archivo se leyó bien, pero no se pudo guardar en la base de datos: ${err?.message ?? "error desconocido"}`);
     } finally {
@@ -136,6 +159,14 @@ export default function DevolucionesDashboard() {
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
               Sube un Excel (.xlsx/.xls) o CSV. Las columnas se detectan automáticamente y se agregan a la tabla de abajo.
             </p>
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>Tipo de archivo</label>
+              <select className="form-control" style={{ maxWidth: 280 }} value={uploadTag} onChange={(e) => setUploadTag(e.target.value as any)}>
+                <option value="">Selecciona un tipo...</option>
+                <option value="devolucion">{TAG_LABELS.devolucion}</option>
+                <option value="cambio">{TAG_LABELS.cambio}</option>
+              </select>
+            </div>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -198,6 +229,7 @@ export default function DevolucionesDashboard() {
               <thead>
                 <tr>
                   <th></th>
+                  <th>Tipo</th>
                   {allColumns.map((c) => <th key={c}>{c}</th>)}
                 </tr>
               </thead>
@@ -212,11 +244,20 @@ export default function DevolucionesDashboard() {
                         title={view === "pending" ? "Marcar como completado" : "Devolver a pendientes"}
                       />
                     </td>
+                    <td>
+                      {r.tag ? (
+                        <span className="badge" style={{ background: TAG_COLORS[r.tag].bg, color: TAG_COLORS[r.tag].fg, border: "none", fontSize: "0.72rem" }}>
+                          {TAG_LABELS[r.tag]}
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>—</span>
+                      )}
+                    </td>
                     {allColumns.map((c) => <td key={c}>{r.data[c] ?? ""}</td>)}
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
-                  <tr><td colSpan={allColumns.length + 1} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
+                  <tr><td colSpan={allColumns.length + 2} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin resultados</td></tr>
                 )}
               </tbody>
             </table>

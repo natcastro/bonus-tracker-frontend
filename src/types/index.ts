@@ -375,6 +375,9 @@ export interface DevolucionesRow {
   uploadId: number;
   data: Record<string, string>;
   completed: boolean;
+  // null on rows uploaded before this field existed — a later tagged re-upload of the
+  // same return replaces an untagged row rather than being skipped as a duplicate.
+  tag: "devolucion" | "cambio" | null;
 }
 
 export interface SampleAnalysisRow {
