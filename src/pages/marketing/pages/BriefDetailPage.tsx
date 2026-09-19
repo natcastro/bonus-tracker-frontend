@@ -9,6 +9,7 @@ import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
 import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS } from "../types";
 import type { PublicationPlatform, StageKey } from "../types";
+import { uploadMarketingReviewImage } from "../../../services/api";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
 
@@ -29,6 +30,8 @@ export default function BriefDetailPage() {
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
   const [reviewLinkInput, setReviewLinkInput] = useState("");
+  const [uploadingReviewImage, setUploadingReviewImage] = useState(false);
+  const [reviewImageError, setReviewImageError] = useState("");
   const [publishAssignEmail, setPublishAssignEmail] = useState("");
   const [draftLinkInput, setDraftLinkInput] = useState(() => brief?.stages.find(s => s.key === "brief")?.link ?? "");
   const [savingDraftLink, setSavingDraftLink] = useState(false);
@@ -75,6 +78,19 @@ export default function BriefDetailPage() {
     setBusy(true); setDeleteError("");
     try { await deleteBrief(brief.id); navigate("/marketing/home"); }
     catch (err: any) { setDeleteError(err?.message ?? "No se pudo eliminar."); setBusy(false); }
+  };
+
+  const handleReviewImage = async (file: File) => {
+    setReviewImageError("");
+    setUploadingReviewImage(true);
+    try {
+      const url = await uploadMarketingReviewImage(brief.id, brief.currentStage, file);
+      setReviewLinkInput(url);
+    } catch (err: any) {
+      setReviewImageError(err?.message ?? "No se pudo subir la imagen.");
+    } finally {
+      setUploadingReviewImage(false);
+    }
   };
 
   const startEdit = (stageKey: StageKey, currentLink: string | null) => {
@@ -427,9 +443,23 @@ export default function BriefDetailPage() {
           {REVIEW_STAGES.has(brief.currentStage) && (
             <>
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
-                Enlace con comentarios de ajuste (opcional)
+                Enlace o imagen con comentarios de ajuste (opcional)
               </label>
-              <input style={{ ...fieldStyle, marginBottom: 12 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              <input style={{ ...fieldStyle, marginBottom: 8 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingReviewImage}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleReviewImage(f); e.target.value = ""; }}
+                  style={{ fontSize: 12 }}
+                />
+                {uploadingReviewImage && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
+              </div>
+              {reviewLinkInput && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(reviewLinkInput) && (
+                <img src={reviewLinkInput} alt="Comentario de ajuste" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
+              )}
+              {reviewImageError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{reviewImageError}</p>}
               {noteField}
               {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>

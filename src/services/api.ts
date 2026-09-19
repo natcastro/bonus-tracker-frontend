@@ -1588,6 +1588,15 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (error) throw error;
 }
 
+export async function uploadMarketingReviewImage(briefId: number, stageKey: string, file: File): Promise<string> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${briefId}/${stageKey}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("marketing-review-images").upload(path, file);
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("marketing-review-images").getPublicUrl(path);
+  return urlData.publicUrl;
+}
+
 export async function sendMarketingEmail(to: string, subject: string, html: string): Promise<void> {
   try {
     await fetch("/.netlify/functions/send-marketing-email", {
