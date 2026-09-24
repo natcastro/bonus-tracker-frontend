@@ -365,16 +365,24 @@ export default function OperationsDashboard() {
             {year === THOMAS_RECEIPT_YEAR && cycleId === THOMAS_RECEIPT_CYCLE_ID && (() => {
               const thomas = agentTotals.find((t) => t.agent.id === THOMAS_AGENT_ID);
               if (!thomas) return null;
-              const firstCorte = (THOMAS_RECEIPT_FIRST_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_FIRST_CORTE_DAYS;
-              const secondCorte = (THOMAS_RECEIPT_SECOND_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_SECOND_CORTE_DAYS;
-              const receiptTotal = firstCorte + secondCorte + THOMAS_RECEIPT_AMAZON_PERF + thomas.handling + thomas.tiktok;
+              const firstCorteBase = (THOMAS_RECEIPT_FIRST_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_FIRST_CORTE_DAYS;
+              const secondCorteBase = (THOMAS_RECEIPT_SECOND_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_SECOND_CORTE_DAYS;
+              const firstCorteAppeals = appeals
+                .filter((a) => a.agentId === THOMAS_AGENT_ID && a.status === "completed" && !a.invalidated && a.date >= THOMAS_BLUE_DOT_RANGE[0] && a.date <= THOMAS_BLUE_DOT_RANGE[1])
+                .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
+              const secondCorteAppeals = appeals
+                .filter((a) => a.agentId === THOMAS_AGENT_ID && a.status === "completed" && !a.invalidated && a.date >= THOMAS_YELLOW_DOT_RANGE[0] && a.date <= THOMAS_YELLOW_DOT_RANGE[1])
+                .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
+              const receiptTotal = firstCorteBase + secondCorteBase + firstCorteAppeals + secondCorteAppeals + THOMAS_RECEIPT_AMAZON_PERF + thomas.handling + thomas.tiktok;
               return (
                 <div className="card">
                   <h3>Desglose — Thomas (transición Ago 24 – Sep 23, 2026)</h3>
                   <table className="data-table">
                     <tbody>
-                      <tr><td>Bono primer corte (base ${THOMAS_RECEIPT_FIRST_CORTE_BASE}, {THOMAS_RECEIPT_FIRST_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${firstCorte.toFixed(2)}</td></tr>
-                      <tr><td>Bono segundo corte (base ${THOMAS_RECEIPT_SECOND_CORTE_BASE}, {THOMAS_RECEIPT_SECOND_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${secondCorte.toFixed(2)}</td></tr>
+                      <tr><td>Base primer corte (${THOMAS_RECEIPT_FIRST_CORTE_BASE}, {THOMAS_RECEIPT_FIRST_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${firstCorteBase.toFixed(2)}</td></tr>
+                      <tr><td>Base segundo corte (${THOMAS_RECEIPT_SECOND_CORTE_BASE}, {THOMAS_RECEIPT_SECOND_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${secondCorteBase.toFixed(2)}</td></tr>
+                      <tr><td>Bono Appeals — primer corte (Ago 24 – Sep 11)</td><td>${firstCorteAppeals.toFixed(2)}</td></tr>
+                      <tr><td>Bono Appeals — segundo corte (Sep 12 – Sep 23)</td><td>${secondCorteAppeals.toFixed(2)}</td></tr>
                       <tr><td>Amazon Performance</td><td>${THOMAS_RECEIPT_AMAZON_PERF.toFixed(2)}</td></tr>
                       <tr><td>Handling Time</td><td>${thomas.handling.toFixed(2)}</td></tr>
                       <tr><td>TikTok Score</td><td>${thomas.tiktok.toFixed(2)}</td></tr>
