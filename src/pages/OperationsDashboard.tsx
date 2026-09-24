@@ -29,6 +29,20 @@ const LINDA_LAST_CYCLE_START = "2026-09-12";
 const THOMAS_BLUE_DOT_RANGE: [string, string] = ["2026-08-24", "2026-09-11"];
 const THOMAS_YELLOW_DOT_RANGE: [string, string] = ["2026-09-12", "2026-09-23"];
 
+// One-off receipt breakdown for Thomas's Aug 24 – Sep 23, 2026 transition cycle only — his base
+// salary changed mid-cycle (old $800 base through Sep 11, new $1100 full-time base from Sep 12),
+// so both are prorated by calendar days over the standard 30-day reference month, same method
+// used for the one-off prorated Amazon Performance amount. Not a general formula — specific to
+// this one cycle, requested directly by Natalie.
+const THOMAS_RECEIPT_YEAR = "2026";
+const THOMAS_RECEIPT_CYCLE_ID = "8";
+const THOMAS_RECEIPT_REFERENCE_DAYS = 30;
+const THOMAS_RECEIPT_FIRST_CORTE_BASE = 800;
+const THOMAS_RECEIPT_FIRST_CORTE_DAYS = 19; // Aug 24 – Sep 11, inclusive
+const THOMAS_RECEIPT_SECOND_CORTE_BASE = 1100;
+const THOMAS_RECEIPT_SECOND_CORTE_DAYS = 12; // Sep 12 – Sep 23, inclusive
+const THOMAS_RECEIPT_AMAZON_PERF = 8.67; // prorated one-off, full-time Amazon Performance not yet active this cycle
+
 const OUTCOME_LABELS: Record<string, string> = {
   fullRefund: "Full Refund",
   partialRefund: "Partial Refund",
@@ -347,6 +361,29 @@ export default function OperationsDashboard() {
                 </tbody>
               </table>
             </div>
+
+            {year === THOMAS_RECEIPT_YEAR && cycleId === THOMAS_RECEIPT_CYCLE_ID && (() => {
+              const thomas = agentTotals.find((t) => t.agent.id === THOMAS_AGENT_ID);
+              if (!thomas) return null;
+              const firstCorte = (THOMAS_RECEIPT_FIRST_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_FIRST_CORTE_DAYS;
+              const secondCorte = (THOMAS_RECEIPT_SECOND_CORTE_BASE / THOMAS_RECEIPT_REFERENCE_DAYS) * THOMAS_RECEIPT_SECOND_CORTE_DAYS;
+              const receiptTotal = firstCorte + secondCorte + THOMAS_RECEIPT_AMAZON_PERF + thomas.handling + thomas.tiktok;
+              return (
+                <div className="card">
+                  <h3>Desglose — Thomas (transición Ago 24 – Sep 23, 2026)</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr><td>Bono primer corte (base ${THOMAS_RECEIPT_FIRST_CORTE_BASE}, {THOMAS_RECEIPT_FIRST_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${firstCorte.toFixed(2)}</td></tr>
+                      <tr><td>Bono segundo corte (base ${THOMAS_RECEIPT_SECOND_CORTE_BASE}, {THOMAS_RECEIPT_SECOND_CORTE_DAYS} de {THOMAS_RECEIPT_REFERENCE_DAYS} días)</td><td>${secondCorte.toFixed(2)}</td></tr>
+                      <tr><td>Amazon Performance</td><td>${THOMAS_RECEIPT_AMAZON_PERF.toFixed(2)}</td></tr>
+                      <tr><td>Handling Time</td><td>${thomas.handling.toFixed(2)}</td></tr>
+                      <tr><td>TikTok Score</td><td>${thomas.tiktok.toFixed(2)}</td></tr>
+                      <tr style={{ fontWeight: 700 }}><td>Total</td><td>${receiptTotal.toFixed(2)}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </section>
         )}
 
