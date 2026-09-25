@@ -77,6 +77,17 @@ export interface MarketingNotification {
   readCarol: boolean;
 }
 
+// A personal reminder/to-do — visible only to whoever created it, unlike a brief.
+export interface PrivateTask {
+  id: number;
+  ownerEmail: string;
+  title: string;
+  dueAt: string;
+  completed: boolean;
+  completedAt: string | null;
+  createdAt: string;
+}
+
 export interface MarketingUser {
   role: MarketingRole;
   name: string;

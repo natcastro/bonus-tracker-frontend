@@ -4,12 +4,13 @@ import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
   deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
-  getHubNicknames,
+  getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
+  togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
 } from "../../services/api";
 import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PublicationPlatform, StageKey } from "./types";
+import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey } from "./types";
 import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
@@ -61,6 +62,12 @@ interface MarketingCtx {
   deleteNotification: (id: number) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
 
+  // Personal reminders — visible only to whoever created them, for anyone in Marketing.
+  privateTasks: PrivateTask[];
+  createPrivateTask: (title: string, dueAt: string) => Promise<void>;
+  togglePrivateTaskCompleted: (id: number, completed: boolean) => Promise<void>;
+  deletePrivateTask: (id: number) => Promise<void>;
+
   notifyEmails: MarketingNotifyEmails;
   disenoEmailList: string[];
   updateNotifyEmail: (slot: MarketingNotifySlot, email: string) => Promise<void>;
@@ -81,6 +88,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const { getRole, email: myEmail } = useHubAccess();
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
+  const [privateTasks, setPrivateTasks] = useState<PrivateTask[]>([]);
   const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
   // Keyed by lowercased email — sourced from each person's Hub Access nickname, so a name never
   // has to be typed twice (once for login access, once for Marketing notifications).
@@ -108,9 +116,24 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   };
 
   const reload = useCallback(async () => {
-    const [b, n] = await Promise.all([getMarketingBriefs(), getMarketingNotifications()]);
-    setBriefs(b); setNotifications(n);
-  }, []);
+    const [b, n, t] = await Promise.all([getMarketingBriefs(), getMarketingNotifications(), getPrivateTasks(myEmail)]);
+    setBriefs(b); setNotifications(n); setPrivateTasks(t);
+  }, [myEmail]);
+
+  const createPrivateTask = async (title: string, dueAt: string) => {
+    await apiCreatePrivateTask(myEmail, title, dueAt);
+    await reload();
+  };
+
+  const togglePrivateTaskCompleted = async (id: number, completed: boolean) => {
+    await apiTogglePrivateTaskCompleted(id, completed);
+    await reload();
+  };
+
+  const deletePrivateTask = async (id: number) => {
+    await apiDeletePrivateTask(id);
+    await reload();
+  };
 
   const loadNicknames = useCallback(async (emails: MarketingNotifyEmails) => {
     try {
@@ -472,6 +495,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       authedUser, briefs, notifications, loading, reload,
       createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
+      privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
     }}>
       {children}

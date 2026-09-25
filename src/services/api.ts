@@ -11,7 +11,7 @@ import type {
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
   DevolucionesUpload, DevolucionesRow,
 } from "../types";
-import type { MarketingBrief, MarketingNotification } from "../pages/marketing/types";
+import type { MarketingBrief, MarketingNotification, PrivateTask } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1645,6 +1645,43 @@ export async function deleteMarketingNotification(id: number): Promise<void> {
 
 export async function deleteAllMarketingNotifications(): Promise<void> {
   const { error } = await supabase.from("marketing_notifications").delete().gte("id", 0);
+  if (error) throw error;
+}
+
+function mapPrivateTask(r: any): PrivateTask {
+  return { id: r.id, ownerEmail: r.owner_email, title: r.title, dueAt: r.due_at, completed: r.completed ?? false, completedAt: r.completed_at ?? null, createdAt: r.created_at };
+}
+
+export async function getPrivateTasks(ownerEmail: string): Promise<PrivateTask[]> {
+  const { data, error } = await supabase
+    .from("marketing_private_tasks")
+    .select("*")
+    .ilike("owner_email", ownerEmail)
+    .order("due_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapPrivateTask);
+}
+
+export async function createPrivateTask(ownerEmail: string, title: string, dueAt: string): Promise<PrivateTask> {
+  const { data, error } = await supabase
+    .from("marketing_private_tasks")
+    .insert({ owner_email: ownerEmail, title, due_at: dueAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapPrivateTask(data);
+}
+
+export async function togglePrivateTaskCompleted(id: number, completed: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("marketing_private_tasks")
+    .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePrivateTask(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_private_tasks").delete().eq("id", id);
   if (error) throw error;
 }
 
