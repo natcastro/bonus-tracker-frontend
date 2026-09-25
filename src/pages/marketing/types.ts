@@ -77,6 +77,17 @@ export interface MarketingNotification {
   readCarol: boolean;
 }
 
+// A personal reminder/to-do — visible only to whoever created it, unlike a brief.
+export interface PrivateTask {
+  id: number;
+  ownerEmail: string;
+  title: string;
+  dueAt: string;
+  completed: boolean;
+  completedAt: string | null;
+  createdAt: string;
+}
+
 export interface MarketingUser {
   role: MarketingRole;
   name: string;
@@ -129,6 +140,64 @@ export function daysBetweenIso(fromIso: string, toIso: string): number {
   const a = new Date(fromIso + "T00:00:00").getTime();
   const b = new Date(toIso + "T00:00:00").getTime();
   return Math.round((b - a) / 86_400_000);
+}
+
+// ── To Do tasks — Carol's own quick-turnaround requests, separate from Laura's briefs ──────
+// Shorter pipeline (3 business days a stage instead of the brief's 4/2/2/2/1/1) and no
+// Diseño-confirms-publish step — Carol's own final approval is the terminal state.
+
+export const TODO_TASK_TYPES = [
+  "Post redes sociales rectangular (1080 x 1350 px)",
+  "Post redes sociales cuadrado (1080 x 1080 px)",
+  "Portada de Facebook (851 x 315 px)",
+  "Banner página web",
+  "Fotos optimizadas web (1000 x 1200 px)",
+  "Comunicación para compartir x WhatsApp",
+  "Story Instagram (1080 x 1920 px)",
+  "Invitación digital",
+  "Otro",
+] as const;
+
+export type TodoStageKey = "proposal" | "review" | "adjustments" | "finalReview" | "finalAdjustments" | "approved";
+
+export interface TodoStage {
+  key: TodoStageKey;
+  label: string;
+  role: "diseno" | "carol";
+  gapDays: number;
+  deadline: string | null;
+  link: string | null;
+  completedAt: string | null;
+  status: "pending" | "done";
+  decision?: "approved" | "changes_requested";
+  late?: boolean;
+}
+
+export const TODO_STAGE_DEFS: { key: TodoStageKey; label: string; role: "diseno" | "carol"; gapDays: number }[] = [
+  { key: "proposal",         label: "Primera propuesta", role: "diseno", gapDays: 3 },
+  { key: "review",           label: "Revisión",          role: "carol",  gapDays: 3 },
+  { key: "adjustments",      label: "Ajuste 1",          role: "diseno", gapDays: 3 },
+  { key: "finalReview",      label: "Revisión final",    role: "carol",  gapDays: 3 },
+  { key: "finalAdjustments", label: "Últimos ajustes",   role: "diseno", gapDays: 3 },
+  { key: "approved",         label: "Aprobado",          role: "carol",  gapDays: 3 },
+];
+
+export function todoStageLabel(key: TodoStageKey | "completed"): string {
+  if (key === "completed") return "Completado";
+  return TODO_STAGE_DEFS.find(s => s.key === key)?.label ?? key;
+}
+
+export interface TodoTask {
+  id: number;
+  taskType: string;
+  title: string;
+  description: string;
+  assignedDisenoEmail: string;
+  currentStage: TodoStageKey | "completed";
+  status: "in_progress" | "completed";
+  stages: TodoStage[];
+  createdAt: string;
+  completedAt: string | null;
 }
 
 export function normalizeUrl(url: string): string {

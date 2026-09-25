@@ -151,7 +151,7 @@ export default function BriefDetailPage() {
               ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
             </div>
           )}
-          {myRole === "laura" && (
+          {(myRole === "laura" || myRole === "carol") && (
             <button onClick={handleDelete} disabled={busy} style={{
               fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
               background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",

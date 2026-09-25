@@ -11,7 +11,7 @@ import type {
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
   DevolucionesUpload, DevolucionesRow,
 } from "../types";
-import type { MarketingBrief, MarketingNotification } from "../pages/marketing/types";
+import type { MarketingBrief, MarketingNotification, PrivateTask, TodoTask } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1645,6 +1645,90 @@ export async function deleteMarketingNotification(id: number): Promise<void> {
 
 export async function deleteAllMarketingNotifications(): Promise<void> {
   const { error } = await supabase.from("marketing_notifications").delete().gte("id", 0);
+  if (error) throw error;
+}
+
+function mapPrivateTask(r: any): PrivateTask {
+  return { id: r.id, ownerEmail: r.owner_email, title: r.title, dueAt: r.due_at, completed: r.completed ?? false, completedAt: r.completed_at ?? null, createdAt: r.created_at };
+}
+
+export async function getPrivateTasks(ownerEmail: string): Promise<PrivateTask[]> {
+  const { data, error } = await supabase
+    .from("marketing_private_tasks")
+    .select("*")
+    .ilike("owner_email", ownerEmail)
+    .order("due_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapPrivateTask);
+}
+
+export async function createPrivateTask(ownerEmail: string, title: string, dueAt: string): Promise<PrivateTask> {
+  const { data, error } = await supabase
+    .from("marketing_private_tasks")
+    .insert({ owner_email: ownerEmail, title, due_at: dueAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapPrivateTask(data);
+}
+
+export async function togglePrivateTaskCompleted(id: number, completed: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("marketing_private_tasks")
+    .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePrivateTask(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_private_tasks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+function mapTodoTask(r: any): TodoTask {
+  return {
+    id: r.id, taskType: r.task_type, title: r.title, description: r.description ?? "", assignedDisenoEmail: r.assigned_diseno_email,
+    currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
+    createdAt: r.created_at, completedAt: r.completed_at,
+  };
+}
+
+export async function getTodoTasks(): Promise<TodoTask[]> {
+  const { data, error } = await supabase.from("marketing_todo_tasks").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapTodoTask);
+}
+
+export async function createTodoTask(b: Omit<TodoTask, "id" | "createdAt">): Promise<TodoTask> {
+  const { data, error } = await supabase.from("marketing_todo_tasks").insert({
+    task_type: b.taskType, title: b.title, description: b.description, assigned_diseno_email: b.assignedDisenoEmail,
+    current_stage: b.currentStage, status: b.status, stages: b.stages, completed_at: b.completedAt,
+  }).select().single();
+  if (error) throw error;
+  return mapTodoTask(data);
+}
+
+export async function uploadTodoTaskFile(taskId: number, stageKey: string, file: File): Promise<string> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${taskId}/${stageKey}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("marketing-todo-files").upload(path, file);
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("marketing-todo-files").getPublicUrl(path);
+  return urlData.publicUrl;
+}
+
+export async function updateTodoTask(id: number, patch: Partial<Omit<TodoTask, "id" | "createdAt">>): Promise<void> {
+  const dbPatch: any = {};
+  if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.stages !== undefined) dbPatch.stages = patch.stages;
+  if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
+  const { error } = await supabase.from("marketing_todo_tasks").update(dbPatch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTodoTask(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_todo_tasks").delete().eq("id", id);
   if (error) throw error;
 }
 

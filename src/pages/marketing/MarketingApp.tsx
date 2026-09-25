@@ -5,7 +5,10 @@ import Navbar from "./components/Navbar";
 import TabBar from "./components/TabBar";
 import MyTasksPage from "./pages/MyTasksPage";
 import DashboardPage from "./pages/DashboardPage";
+import TodoPage from "./pages/TodoPage";
+import TeamDashboardPage from "./pages/TeamDashboardPage";
 import BriefDetailPage from "./pages/BriefDetailPage";
+import TodoTaskDetailPage from "./pages/TodoTaskDetailPage";
 
 function Shell() {
   const { authedUser, loading } = useMarketing();
@@ -47,9 +50,11 @@ function Shell() {
         <Routes>
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MyTasksPage />} />
+          <Route path="todo" element={<TodoPage />} />
           <Route path="home" element={<DashboardPage />} />
-          <Route path="dashboard" element={<Navigate to="/marketing/home" replace />} />
+          <Route path="dashboard" element={<TeamDashboardPage />} />
           <Route path="brief/:id" element={<BriefDetailPage />} />
+          <Route path="todo/:id" element={<TodoTaskDetailPage />} />
           <Route path="*" element={<Navigate to="tasks" replace />} />
         </Routes>
       </div>

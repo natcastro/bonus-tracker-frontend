@@ -112,7 +112,7 @@ export default function DashboardPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Vista general</h1>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Briefs</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
         </div>
         <img src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />

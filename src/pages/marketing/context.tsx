@@ -4,13 +4,15 @@ import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
   deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
-  getHubNicknames,
+  getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
+  togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
+  getTodoTasks, createTodoTask as apiCreateTodoTask, updateTodoTask, deleteTodoTask as apiDeleteTodoTask,
 } from "../../services/api";
 import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PublicationPlatform, StageKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline } from "./types";
+import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -61,6 +63,18 @@ interface MarketingCtx {
   deleteNotification: (id: number) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
 
+  // Personal reminders — visible only to whoever created them, for anyone in Marketing.
+  privateTasks: PrivateTask[];
+  createPrivateTask: (title: string, dueAt: string) => Promise<void>;
+  togglePrivateTaskCompleted: (id: number, completed: boolean) => Promise<void>;
+  deletePrivateTask: (id: number) => Promise<void>;
+
+  // Carol's quick-turnaround To Do tasks — separate, shorter pipeline than Laura's briefs.
+  todoTasks: TodoTask[];
+  createTodoTask: (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => Promise<void>;
+  advanceTodoTask: (id: number, link: string | undefined, note?: string) => Promise<void>;
+  deleteTodoTask: (id: number) => Promise<void>;
+
   notifyEmails: MarketingNotifyEmails;
   disenoEmailList: string[];
   updateNotifyEmail: (slot: MarketingNotifySlot, email: string) => Promise<void>;
@@ -81,6 +95,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const { getRole, email: myEmail } = useHubAccess();
   const [briefs, setBriefs] = useState<MarketingBrief[]>([]);
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
+  const [privateTasks, setPrivateTasks] = useState<PrivateTask[]>([]);
+  const [todoTasks, setTodoTasks] = useState<TodoTask[]>([]);
   const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
   // Keyed by lowercased email — sourced from each person's Hub Access nickname, so a name never
   // has to be typed twice (once for login access, once for Marketing notifications).
@@ -108,9 +124,93 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   };
 
   const reload = useCallback(async () => {
-    const [b, n] = await Promise.all([getMarketingBriefs(), getMarketingNotifications()]);
-    setBriefs(b); setNotifications(n);
-  }, []);
+    const [b, n, t, tt] = await Promise.all([getMarketingBriefs(), getMarketingNotifications(), getPrivateTasks(myEmail), getTodoTasks()]);
+    setBriefs(b); setNotifications(n); setPrivateTasks(t); setTodoTasks(tt);
+  }, [myEmail]);
+
+  const createPrivateTask = async (title: string, dueAt: string) => {
+    await apiCreatePrivateTask(myEmail, title, dueAt);
+    await reload();
+  };
+
+  const togglePrivateTaskCompleted = async (id: number, completed: boolean) => {
+    await apiTogglePrivateTaskCompleted(id, completed);
+    await reload();
+  };
+
+  const deletePrivateTask = async (id: number) => {
+    await apiDeletePrivateTask(id);
+    await reload();
+  };
+
+  const buildTodoStages = (startDate: string) => TODO_STAGE_DEFS.map((def, i) => ({
+    ...def, deadline: i === 0 ? addWorkDaysIso(startDate, def.gapDays) : null,
+    link: null, completedAt: null, status: "pending" as const,
+  }));
+
+  const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => {
+    const today = todayIso();
+    const stages = buildTodoStages(today);
+    await apiCreateTodoTask({
+      taskType, title, description, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
+    });
+    await notify(null, `Karol asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
+    const emailBody = [description && `Descripción: ${description}`, emailNote && `Nota de Karol: ${emailNote}`].filter(Boolean).join(" — ") || undefined;
+    await sendMarketingEmail(
+      assignedDisenoEmail,
+      `Nueva tarea (To Do) — ${title}`,
+      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody }),
+    );
+    await reload();
+  };
+
+  // Every stage in the To Do pipeline is strictly sequential — whoever's turn it is submits
+  // (a link for Diseño, an optional link/note for Carol) and it always moves to the next stage,
+  // no approve/reject branching like briefs. The last stage (Carol's final approval) closes it out.
+  const advanceTodoTask = async (id: number, link: string | undefined, note?: string) => {
+    const task = todoTasks.find(t => t.id === id);
+    if (!task || task.status === "completed") return;
+    const stageIdx = task.stages.findIndex(s => s.key === task.currentStage);
+    if (stageIdx === -1) return;
+    const stage = task.stages[stageIdx];
+    const today = todayIso();
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+    const nextStage = task.stages[stageIdx + 1];
+    const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
+    const newStages = task.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, link: link ?? s.link, completedAt: today, status: "done" as const, late: isLate };
+      if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+      return s;
+    });
+    await updateTodoTask(id, {
+      stages: newStages,
+      currentStage: nextStage ? nextStage.key : "completed",
+      status: nextStage ? "in_progress" : "completed",
+      completedAt: nextStage ? null : today,
+    });
+    if (nextStage) {
+      const recipient = nextStage.role === "diseno" ? task.assignedDisenoEmail : notifyEmails.carol;
+      if (recipient) {
+        await sendMarketingEmail(
+          recipient,
+          `Tu turno — ${task.title}`,
+          emailHtml({
+            intro: `Se avanzó la tarea "${task.title}". Te toca continuar.`,
+            reference: task.title, nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline, note,
+          }),
+        );
+      }
+      await notify(null, `Avanzó la tarea to do "${task.title}" a ${todoStageLabel(nextStage.key)}.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
+    } else {
+      await notify(null, `Tarea to do completada: ${task.title}.${isLate ? " (tarde)" : ""}`);
+    }
+    await reload();
+  };
+
+  const deleteTodoTask = async (id: number) => {
+    await apiDeleteTodoTask(id);
+    await reload();
+  };
 
   const loadNicknames = useCallback(async (emails: MarketingNotifyEmails) => {
     try {
@@ -472,6 +572,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       authedUser, briefs, notifications, loading, reload,
       createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
+      privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
+      todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,
       notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
     }}>
       {children}
