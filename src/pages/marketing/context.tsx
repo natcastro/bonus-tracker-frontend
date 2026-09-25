@@ -249,7 +249,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       designDelayCount: brief.designDelayCount + (isLate ? 1 : 0),
     });
     const label = stage.key === "proposal" ? "la primera propuesta" : "los ajustes de diseño";
-    await notify(briefId, `Diseño subió ${label} de ${brief.reference}.`);
+    await notify(briefId, `Diseño subió ${label} de ${brief.reference}.${isLate ? ` (tarde — vencía ${stage.deadline})` : ""}${note ? ` Nota: ${note}` : ""}`);
     if (nextStage) {
       await sendMarketingEmail(
         notifyEmails.laura,
@@ -277,15 +277,16 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (action === "approve") {
       // Approving at any review stage skips straight to the publish step — Diseño still
       // has to confirm it went live, regardless of how early Laura approved.
+      const isLateApprove = !!stage.deadline && isPastDeadline(stage.deadline);
       const publishStage = brief.stages.find(s => s.key === "publish")!;
       const publishDeadline = addWorkDaysIso(today, publishStage.gapDays);
       const newStages = brief.stages.map(s => {
-        if (s.key === stage.key) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const };
+        if (s.key === stage.key) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLateApprove };
         if (s.key === "publish") return { ...s, deadline: publishDeadline };
         return s;
       });
-      await updateMarketingBrief(briefId, { stages: newStages, currentStage: "publish" });
-      await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — falta que Diseño confirme la publicación.`);
+      await updateMarketingBrief(briefId, { stages: newStages, currentStage: "publish", lauraDelayDays: brief.lauraDelayDays + (isLateApprove ? 1 : 0) });
+      await notify(briefId, `Laura aprobó ${brief.reference} sin cambios — falta que Diseño confirme la publicación.${isLateApprove ? ` (tarde — vencía ${stage.deadline})` : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
       for (const email of disenoRecipients(brief)) {
         await sendMarketingEmail(
           email,
@@ -305,15 +306,16 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
     // request_changes: mark this review stage done. The next stage's deadline is always
     // `today + gapDays`, counted from Laura's actual completion — so a fast or slow review
-    // never shrinks or balloons Diseño's next deadline, and Laura's own timing is never
-    // counted as a Diseño delay.
+    // never shrinks or balloons Diseño's next deadline. Laura's own lateness is still recorded
+    // on the stage itself (for the delay history), it just never counts against Diseño's stats.
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
     const nextStage = brief.stages[stageIdx + 1];
     const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = brief.stages.map((s, i) => {
       if (i === stageIdx) {
         return {
           ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const,
-          link: opts?.link ? opts.link : s.link,
+          link: opts?.link ? opts.link : s.link, late: isLate,
         };
       }
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
@@ -322,8 +324,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await updateMarketingBrief(briefId, {
       stages: newStages,
       currentStage: nextStage ? nextStage.key : brief.currentStage,
+      lauraDelayDays: brief.lauraDelayDays + (isLate ? 1 : 0),
     });
-    await notify(briefId, `Laura solicitó ajustes en ${brief.reference}.`);
+    await notify(briefId, `Laura solicitó ajustes en ${brief.reference}.${isLate ? ` (tarde — vencía ${stage.deadline})` : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
     if (nextStage) {
       for (const email of disenoRecipients(brief)) {
         await sendMarketingEmail(
@@ -361,7 +364,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       stages: newStages, currentStage: "adjustments2",
       extraRevisionRounds: brief.extraRevisionRounds + 1,
     });
-    await notify(briefId, `Laura solicitó una revisión adicional en ${brief.reference}.`);
+    await notify(briefId, `Laura solicitó una revisión adicional en ${brief.reference}.${note ? ` Nota: ${note}` : ""}`);
     for (const email of disenoRecipients(brief)) {
       await sendMarketingEmail(
         email,
@@ -386,7 +389,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await updateMarketingBrief(briefId, {
       stages: newStages, currentStage: "completed", status: "completed", completedAt: today,
     });
-    await notify(briefId, `Diseño confirmó la publicación de ${brief.reference} — brief completado.`);
+    await notify(briefId, `Diseño confirmó la publicación de ${brief.reference} — brief completado.${note ? ` Nota: ${note}` : ""}`);
     await sendMarketingEmail(
       notifyEmails.laura,
       `Publicado — ${brief.reference}`,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MT, formatDateHuman, ROLE_CFG } from "../theme";
+import { MT, formatDateHuman, formatRelative, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
 import Timeline from "../components/Timeline";
 import DeadlineBadge from "../components/DeadlineBadge";
@@ -25,7 +25,7 @@ const UPLOAD_LABELS: Record<string, string> = {
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
+  const { authedUser, briefs, notifications, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -275,6 +275,12 @@ export default function BriefDetailPage() {
                   color={s.status === "done" ? MT.primary : isCurrent ? MT.moss : MT.text3}
                   label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
                 />
+                {s.status === "done" && s.late && (
+                  <span title="Se completó después de su fecha límite" style={{
+                    fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`,
+                    borderRadius: 999, padding: "2px 7px", flexShrink: 0,
+                  }}>⚠ tarde</span>
+                )}
                 {isEditing ? (
                   <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center" }}>
                     <input
@@ -313,6 +319,23 @@ export default function BriefDetailPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Activity history — every action taken on this brief, including delay/late markers and notes */}
+      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
+        <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Historial de actividad</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {notifications.filter(n => n.briefId === brief.id).length === 0 ? (
+            <p style={{ fontSize: 12.5, color: MT.text3 }}>Sin actividad registrada todavía.</p>
+          ) : (
+            [...notifications].filter(n => n.briefId === brief.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(n => (
+              <div key={n.id} style={{ fontSize: 12.5, color: MT.text1, lineHeight: 1.5, borderBottom: `1px solid ${MT.border}`, paddingBottom: "0.5rem" }}>
+                <div>{n.message}</div>
+                <div style={{ fontSize: 11, color: MT.text3, marginTop: 2 }}>{formatRelative(n.createdAt)} — {formatDateHuman(n.createdAt.slice(0, 10))}</div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
