@@ -6,8 +6,8 @@ import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
-import { SearchIcon } from "../../../components/icons";
-import { stageLabel, todayIso, isPastDeadline } from "../types";
+import { SearchIcon, PaletteIcon } from "../../../components/icons";
+import { stageLabel, todoStageLabel, todayIso, isPastDeadline } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
 import ConstructionBanner from "../components/ConstructionBanner";
@@ -33,7 +33,12 @@ function groupOf(b: MarketingBrief): GroupKey {
 }
 
 export default function TodoPage() {
-  const { briefs: allBriefs, disenoDisplayName } = useMarketing();
+  const { briefs: allBriefs, todoTasks, disenoDisplayName } = useMarketing();
+  const pendingTodoTasks = useMemo(() => todoTasks.filter(t => t.status === "in_progress").sort((a, b) => {
+    const sa = a.stages.find(s => s.key === a.currentStage)?.deadline ?? "";
+    const sb = b.stages.find(s => s.key === b.currentStage)?.deadline ?? "";
+    return sa.localeCompare(sb);
+  }), [todoTasks]);
   // Private/pending tasks live only in "Mis tareas" — this tab only shows published briefs.
   const briefs = useMemo(() => allBriefs.filter(b => b.status !== "draft"), [allBriefs]);
   const navigate = useNavigate();
@@ -121,6 +126,38 @@ export default function TodoPage() {
         </div>
         <img src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
       </div>
+
+      {/* Carol's To Do tasks — separate, shorter pipeline than briefs */}
+      {pendingTodoTasks.length > 0 && (
+        <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, marginBottom: "1.25rem", boxShadow: MT.shadow, overflow: "hidden" }}>
+          <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", padding: "0.9rem 1.1rem 0" }}>
+            Tareas To Do (Karol)
+          </p>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {pendingTodoTasks.map(t => {
+              const stage = t.stages.find(s => s.key === t.currentStage)!;
+              const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => navigate(`/marketing/todo/${t.id}`)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.75rem 1.1rem", borderTop: `1px solid ${MT.border}`, cursor: "pointer" }}
+                >
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: `${MT.clay}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <PaletteIcon size={15} color={MT.clay} />
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{t.title}</span>
+                  <span style={{ fontSize: 11.5, color: MT.text3 }}>{disenoDisplayName(t.assignedDisenoEmail)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.04em" }}>{todoStageLabel(stage.key)}</span>
+                  {stage.deadline && (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: overdue ? MT.danger : MT.text2 }}>{formatDateHuman(stage.deadline)}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* KPI strip */}
       <div style={{

@@ -11,7 +11,7 @@ import type {
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
   DevolucionesUpload, DevolucionesRow,
 } from "../types";
-import type { MarketingBrief, MarketingNotification, PrivateTask } from "../pages/marketing/types";
+import type { MarketingBrief, MarketingNotification, PrivateTask, TodoTask } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1682,6 +1682,44 @@ export async function togglePrivateTaskCompleted(id: number, completed: boolean)
 
 export async function deletePrivateTask(id: number): Promise<void> {
   const { error } = await supabase.from("marketing_private_tasks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+function mapTodoTask(r: any): TodoTask {
+  return {
+    id: r.id, taskType: r.task_type, title: r.title, assignedDisenoEmail: r.assigned_diseno_email,
+    currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
+    createdAt: r.created_at, completedAt: r.completed_at,
+  };
+}
+
+export async function getTodoTasks(): Promise<TodoTask[]> {
+  const { data, error } = await supabase.from("marketing_todo_tasks").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapTodoTask);
+}
+
+export async function createTodoTask(b: Omit<TodoTask, "id" | "createdAt">): Promise<TodoTask> {
+  const { data, error } = await supabase.from("marketing_todo_tasks").insert({
+    task_type: b.taskType, title: b.title, assigned_diseno_email: b.assignedDisenoEmail,
+    current_stage: b.currentStage, status: b.status, stages: b.stages, completed_at: b.completedAt,
+  }).select().single();
+  if (error) throw error;
+  return mapTodoTask(data);
+}
+
+export async function updateTodoTask(id: number, patch: Partial<Omit<TodoTask, "id" | "createdAt">>): Promise<void> {
+  const dbPatch: any = {};
+  if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.stages !== undefined) dbPatch.stages = patch.stages;
+  if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
+  const { error } = await supabase.from("marketing_todo_tasks").update(dbPatch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTodoTask(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_todo_tasks").delete().eq("id", id);
   if (error) throw error;
 }
 
