@@ -10,6 +10,7 @@ import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
+import ConstructionBanner from "../components/ConstructionBanner";
 
 const MONTHLY_GOAL = 8;
 
@@ -31,14 +32,16 @@ function groupOf(b: MarketingBrief): GroupKey {
   return isOverdue(b) ? "overdue" : "active";
 }
 
-export default function DashboardPage() {
+export default function TodoPage() {
   const { briefs: allBriefs, disenoDisplayName } = useMarketing();
-  // Private/pending tasks live only in "Mis tareas" — Vista general only shows published briefs.
+  // Private/pending tasks live only in "Mis tareas" — this tab only shows published briefs.
   const briefs = useMemo(() => allBriefs.filter(b => b.status !== "draft"), [allBriefs]);
   const navigate = useNavigate();
   const tableRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all"|"in_progress"|"completed">("all");
+  // Defaults to just what's pending — this tab is meant as a pure to-do list, unlike Briefs
+  // which shows the full history including completed ones.
+  const [statusFilter, setStatusFilter] = useState<"all"|"in_progress"|"completed">("in_progress");
   const [responsibleFilter, setResponsibleFilter] = useState<"all"|"laura"|"diseno">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -110,10 +113,11 @@ export default function DashboardPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+      <ConstructionBanner label="To Do" />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Briefs</h1>
-          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
+          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Pendientes generales del equipo — copiado de Briefs como punto de partida</p>
         </div>
         <img src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
       </div>

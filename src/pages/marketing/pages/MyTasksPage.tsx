@@ -118,7 +118,9 @@ export default function MyTasksPage() {
       </div>
 
       {/* Private tasks — a personal to-do only the owner can see, like what people currently
-          track in MS Planner. Available to every Marketing role. */}
+          track in MS Planner. Laura already has "+ Nuevo" for her own drafts, so this is only
+          for Diseño and Carol. */}
+      {myRole !== "laura" && (
       <div style={{
         background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg,
         padding: "1.25rem", marginBottom: "1.75rem", boxShadow: MT.shadow,
@@ -205,6 +207,7 @@ export default function MyTasksPage() {
           </details>
         )}
       </div>
+      )}
 
       {myDrafts.length > 0 && (
         <div style={{ marginBottom: "1.75rem" }}>

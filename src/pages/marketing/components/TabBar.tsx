@@ -3,7 +3,8 @@ import { MT } from "../theme";
 
 const TABS = [
   { to: "/marketing/tasks", label: "Mis tareas" },
-  { to: "/marketing/home", label: "Vista general" },
+  { to: "/marketing/todo", label: "To Do" },
+  { to: "/marketing/home", label: "Briefs" },
   { to: "/marketing/dashboard", label: "Dashboard" },
 ];
 
