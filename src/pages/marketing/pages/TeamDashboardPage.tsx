@@ -1,9 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
 import ConstructionBanner from "../components/ConstructionBanner";
-import { stageLabel } from "../types";
+import { stageLabel, daysBetweenIso } from "../types";
 import type { StageKey } from "../types";
+
+interface DisenoStats {
+  email: string;
+  name: string;
+  entries: { completedAt: string; late: boolean; turnaroundDays: number }[];
+  avgDays: number | null;
+  onTimePct: number;
+  completedCount: number;
+}
 
 // Monday of the week containing this date, as yyyy-mm-dd.
 function isoWeekStart(iso: string): string {
@@ -15,9 +24,66 @@ function isoWeekStart(iso: string): string {
 }
 
 export default function TeamDashboardPage() {
-  const { briefs } = useMarketing();
+  const { briefs, todoTasks, disenoEmailList, disenoDisplayName } = useMarketing();
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
 
   const published = useMemo(() => briefs.filter(b => b.status !== "draft"), [briefs]);
+
+  // Average Handling Time per Diseño person — turnaround from when a stage became theirs
+  // (the previous stage's actual completion) to when they finished it, across briefs and
+  // To Do tasks alike. Ranked shortest-first.
+  const disenoStats: DisenoStats[] = useMemo(() => {
+    return disenoEmailList.map(email => {
+      const entries: { completedAt: string; late: boolean; turnaroundDays: number }[] = [];
+      for (const b of published) {
+        if (!b.assignedDisenoEmail || b.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
+        b.stages.forEach((s, i) => {
+          if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
+          const start = (i > 0 ? b.stages[i - 1].completedAt : b.startDate) ?? b.startDate;
+          entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
+        });
+      }
+      for (const t of todoTasks) {
+        if (t.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
+        t.stages.forEach((s, i) => {
+          if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
+          const start = (i > 0 ? t.stages[i - 1].completedAt : t.createdAt.slice(0, 10)) ?? t.createdAt.slice(0, 10);
+          entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
+        });
+      }
+      const completedCount = entries.length;
+      const onTime = entries.filter(e => !e.late).length;
+      const avgDays = completedCount > 0 ? entries.reduce((s, e) => s + e.turnaroundDays, 0) / completedCount : null;
+      return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount };
+    }).sort((a, b) => {
+      if (a.avgDays === null) return 1;
+      if (b.avgDays === null) return -1;
+      return a.avgDays - b.avgDays;
+    });
+  }, [published, todoTasks, disenoEmailList, disenoDisplayName]);
+
+  const selected = disenoStats.find(d => d.email === selectedEmail) ?? null;
+  const selectedWeeks = useMemo(() => {
+    if (!selected) return [];
+    const map = new Map<string, { total: number; onTime: number }>();
+    selected.entries.forEach(e => {
+      const wk = isoWeekStart(e.completedAt);
+      const cur = map.get(wk) ?? { total: 0, onTime: 0 };
+      cur.total++;
+      if (!e.late) cur.onTime++;
+      map.set(wk, cur);
+    });
+    const out: { label: string; total: number; onTime: number }[] = [];
+    const today = new Date();
+    for (let w = 7; w >= 0; w--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - w * 7);
+      const wk = isoWeekStart(d.toISOString().slice(0, 10));
+      const v = map.get(wk) ?? { total: 0, onTime: 0 };
+      out.push({ label: wk.slice(5), total: v.total, onTime: v.onTime });
+    }
+    return out;
+  }, [selected]);
 
   // Every completed stage across every brief — the raw material for every chart below.
   const doneStages = useMemo(() => {
@@ -96,8 +162,72 @@ export default function TeamDashboardPage() {
       <ConstructionBanner label="Dashboard" />
       <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Dashboard</h1>
       <p style={{ margin: "0.15rem 0 1.25rem", fontSize: 12.5, color: MT.text2 }}>
-        Estadísticas del equipo completo — sin desglosar por persona (borrador, cifras ajustables)
+        Estadísticas del equipo completo, más un ranking de AHT de Diseño (borrador, cifras ajustables)
       </p>
+
+      {/* Diseño AHT ranking — click a card for that person's stats */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+          Diseño — tiempo promedio de entrega (AHT)
+        </p>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {disenoStats.map((d, i) => (
+            <button
+              key={d.email}
+              onClick={() => setSelectedEmail(selectedEmail === d.email ? null : d.email)}
+              style={{
+                display: "flex", flexDirection: "column", gap: 4, padding: "0.9rem 1.1rem", minWidth: 170,
+                borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: MT.font, position: "relative",
+                border: `1.5px solid ${selectedEmail === d.email ? MT.clay : MT.border}`,
+                background: selectedEmail === d.email ? MT.claySoft : MT.surface,
+              }}
+            >
+              <span style={{
+                position: "absolute", top: -8, left: -8, width: 22, height: 22, borderRadius: "50%",
+                background: i === 0 ? MT.moss : MT.border, color: i === 0 ? "#fff" : MT.text2,
+                fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{i + 1}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: MT.text1 }}>{d.name}</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : `${d.avgDays.toFixed(1)}d`}</span>
+              <span style={{ fontSize: 11, color: MT.text3 }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
+            </button>
+          ))}
+        </div>
+
+        {selected && (
+          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.25rem", marginTop: "1rem", boxShadow: MT.shadow }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: MT.text1 }}>{selected.name}</h2>
+              <div style={{ display: "flex", gap: "1.25rem" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{selected.avgDays === null ? "—" : `${selected.avgDays.toFixed(1)}d`}</div>
+                  <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>AHT</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.text1 }}>{selected.completedCount}</div>
+                  <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>Entregas</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: selected.onTimePct >= 80 ? MT.primary : MT.warn }}>{selected.onTimePct}%</div>
+                  <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>A tiempo</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 110, borderBottom: `1px solid ${MT.border}`, paddingBottom: 4 }}>
+              {selectedWeeks.map(w => {
+                const h = Math.min(80, w.total * 18);
+                return (
+                  <div key={w.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: MT.text2 }}>{w.total}</span>
+                    <div style={{ width: "60%", height: Math.max(2, h), background: MT.clay, borderRadius: "4px 4px 0 0" }} />
+                    <span style={{ fontSize: 9, color: MT.text3 }}>{w.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* KPI strip */}
       <div style={{
