@@ -8,6 +8,7 @@ import StatusPill from "../components/StatusPill";
 import ConstructionBanner from "../components/ConstructionBanner";
 import { TrashIcon } from "../../../components/icons";
 import { todoStageLabel, normalizeUrl } from "../types";
+import { uploadTodoTaskFile } from "../../../services/api";
 
 export default function TodoTaskDetailPage() {
   const { id } = useParams();
@@ -18,6 +19,8 @@ export default function TodoTaskDetailPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   if (!task) {
     return (
@@ -45,6 +48,19 @@ export default function TodoTaskDetailPage() {
     navigate("/marketing/todo");
   };
 
+  const handleFile = async (file: File) => {
+    setUploadError("");
+    setUploading(true);
+    try {
+      const url = await uploadTodoTaskFile(task.id, task.currentStage, file);
+      setLink(url);
+    } catch (err: any) {
+      setUploadError(err?.message ?? "No se pudo subir el archivo.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>
       <ConstructionBanner label="To Do — detalle" />
@@ -64,6 +80,12 @@ export default function TodoTaskDetailPage() {
           <TrashIcon size={18} />
         </button>
       </div>
+
+      {task.description && (
+        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.9rem 1.1rem", marginBottom: "1rem", fontSize: 13, color: MT.text1, lineHeight: 1.5 }}>
+          {task.description}
+        </div>
+      )}
 
       {/* Stage list */}
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
@@ -111,16 +133,27 @@ export default function TodoTaskDetailPage() {
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Tu turno — {todoStageLabel(task.currentStage)}</p>
           {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
 
-          {needsLink && (
-            <>
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Link con el arte / entrega</label>
-              <input
-                style={{ width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", marginBottom: 12 }}
-                value={link} onChange={e => setLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..."
-              />
-            </>
+          <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
+            Link con el arte / entrega{needsLink ? "" : " (opcional)"}
+          </label>
+          <input
+            style={{ width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", marginBottom: 8 }}
+            value={link} onChange={e => setLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..."
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <input
+              type="file"
+              disabled={uploading}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+              style={{ fontSize: 12 }}
+            />
+            {uploading && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
+          </div>
+          {link && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(link) && (
+            <img src={link} alt="Entrega" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginBottom: 8, display: "block" }} />
           )}
-          <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Nota (opcional)</label>
+          {uploadError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 8 }}>{uploadError}</p>}
+          <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6, marginTop: 4 }}>Nota (opcional)</label>
           <textarea
             style={{ width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", minHeight: 60 }}
             value={note} onChange={e => setNote(e.target.value)}

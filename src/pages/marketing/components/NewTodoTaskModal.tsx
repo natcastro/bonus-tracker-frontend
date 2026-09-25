@@ -9,6 +9,8 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
   const [taskType, setTaskType] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [emailNote, setEmailNote] = useState("");
   const [assignedEmail, setAssignedEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -30,7 +32,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
     setSaving(true);
     setError("");
     try {
-      await createTodoTask(taskType, title, assignedEmail);
+      await createTodoTask(taskType, title, description.trim(), assignedEmail, emailNote.trim() || undefined);
       onClose();
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear la tarea.");
@@ -94,6 +96,24 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
               <input style={inputStyle} value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Describe la tarea..." required />
             </div>
           )}
+
+          <div>
+            <label style={labelStyle}>Descripción de la tarea</label>
+            <textarea
+              style={{ ...inputStyle, resize: "vertical", minHeight: 64 }}
+              value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="Detalles de lo que necesitas..."
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Mensaje adicional para el correo (opcional)</label>
+            <textarea
+              style={{ ...inputStyle, resize: "vertical", minHeight: 50 }}
+              value={emailNote} onChange={e => setEmailNote(e.target.value)}
+              placeholder="Algo que quieras que la persona vea en el correo..."
+            />
+          </div>
 
           <div>
             <label style={labelStyle}>Asignar a</label>

@@ -1687,7 +1687,7 @@ export async function deletePrivateTask(id: number): Promise<void> {
 
 function mapTodoTask(r: any): TodoTask {
   return {
-    id: r.id, taskType: r.task_type, title: r.title, assignedDisenoEmail: r.assigned_diseno_email,
+    id: r.id, taskType: r.task_type, title: r.title, description: r.description ?? "", assignedDisenoEmail: r.assigned_diseno_email,
     currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
     createdAt: r.created_at, completedAt: r.completed_at,
   };
@@ -1701,11 +1701,20 @@ export async function getTodoTasks(): Promise<TodoTask[]> {
 
 export async function createTodoTask(b: Omit<TodoTask, "id" | "createdAt">): Promise<TodoTask> {
   const { data, error } = await supabase.from("marketing_todo_tasks").insert({
-    task_type: b.taskType, title: b.title, assigned_diseno_email: b.assignedDisenoEmail,
+    task_type: b.taskType, title: b.title, description: b.description, assigned_diseno_email: b.assignedDisenoEmail,
     current_stage: b.currentStage, status: b.status, stages: b.stages, completed_at: b.completedAt,
   }).select().single();
   if (error) throw error;
   return mapTodoTask(data);
+}
+
+export async function uploadTodoTaskFile(taskId: number, stageKey: string, file: File): Promise<string> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${taskId}/${stageKey}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("marketing-todo-files").upload(path, file);
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("marketing-todo-files").getPublicUrl(path);
+  return urlData.publicUrl;
 }
 
 export async function updateTodoTask(id: number, patch: Partial<Omit<TodoTask, "id" | "createdAt">>): Promise<void> {

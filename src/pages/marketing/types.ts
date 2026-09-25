@@ -191,6 +191,7 @@ export interface TodoTask {
   id: number;
   taskType: string;
   title: string;
+  description: string;
   assignedDisenoEmail: string;
   currentStage: TodoStageKey | "completed";
   status: "in_progress" | "completed";

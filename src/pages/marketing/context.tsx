@@ -71,7 +71,7 @@ interface MarketingCtx {
 
   // Carol's quick-turnaround To Do tasks — separate, shorter pipeline than Laura's briefs.
   todoTasks: TodoTask[];
-  createTodoTask: (taskType: string, title: string, assignedDisenoEmail: string) => Promise<void>;
+  createTodoTask: (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => Promise<void>;
   advanceTodoTask: (id: number, link: string | undefined, note?: string) => Promise<void>;
   deleteTodoTask: (id: number) => Promise<void>;
 
@@ -148,17 +148,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     link: null, completedAt: null, status: "pending" as const,
   }));
 
-  const createTodoTask = async (taskType: string, title: string, assignedDisenoEmail: string) => {
+  const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => {
     const today = todayIso();
     const stages = buildTodoStages(today);
     await apiCreateTodoTask({
-      taskType, title, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
+      taskType, title, description, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
     });
-    await notify(null, `Karol asignó una nueva tarea to do: ${title}.`);
+    await notify(null, `Karol asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
+    const emailBody = [description && `Descripción: ${description}`, emailNote && `Nota de Karol: ${emailNote}`].filter(Boolean).join(" — ") || undefined;
     await sendMarketingEmail(
       assignedDisenoEmail,
       `Nueva tarea (To Do) — ${title}`,
-      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline }),
+      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody }),
     );
     await reload();
   };
