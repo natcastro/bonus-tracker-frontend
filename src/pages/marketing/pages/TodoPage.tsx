@@ -4,7 +4,6 @@ import { MT } from "../theme";
 import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
-import ConstructionBanner from "../components/ConstructionBanner";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
 import { todoStageLabel, isPastDeadline } from "../types";
 import type { TodoTask } from "../types";
@@ -57,7 +56,6 @@ export default function TodoPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <ConstructionBanner label="To Do" />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>

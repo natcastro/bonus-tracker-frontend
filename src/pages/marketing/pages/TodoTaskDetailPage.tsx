@@ -5,7 +5,6 @@ import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
-import ConstructionBanner from "../components/ConstructionBanner";
 import { TrashIcon } from "../../../components/icons";
 import { todoStageLabel, normalizeUrl } from "../types";
 import { uploadTodoTaskFile } from "../../../services/api";
@@ -63,7 +62,6 @@ export default function TodoTaskDetailPage() {
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>
-      <ConstructionBanner label="To Do — detalle" />
       <button onClick={() => navigate("/marketing/todo")} style={{
         background: "none", border: "none", cursor: "pointer", color: MT.text2, fontSize: 13, fontWeight: 600,
         marginBottom: 14, padding: 0, display: "flex", alignItems: "center", gap: 6,

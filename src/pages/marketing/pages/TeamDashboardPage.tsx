@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import ConstructionBanner from "../components/ConstructionBanner";
 import { stageLabel, daysBetweenIso } from "../types";
 import type { StageKey } from "../types";
 
@@ -181,7 +180,6 @@ export default function TeamDashboardPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <ConstructionBanner label="Dashboard" />
       <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Dashboard</h1>
       <p style={{ margin: "0.15rem 0 1.25rem", fontSize: 12.5, color: MT.text2 }}>
         Estadísticas del equipo completo, más un ranking de AHT de Diseño (borrador, cifras ajustables)

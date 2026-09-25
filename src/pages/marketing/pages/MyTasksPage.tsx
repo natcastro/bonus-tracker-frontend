@@ -5,7 +5,6 @@ import { useMarketing } from "../context";
 import NewBriefModal from "../components/NewBriefModal";
 import NewTodoTaskModal from "../components/NewTodoTaskModal";
 import DeadlineBadge from "../components/DeadlineBadge";
-import ConstructionBanner from "../components/ConstructionBanner";
 import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
 import { stageLabel, todoStageLabel, isPastDeadline, PUBLICATION_PLATFORMS } from "../types";
 
@@ -116,7 +115,6 @@ export default function MyTasksPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>
-      <ConstructionBanner label="Tareas privadas" />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem", gap: 10, flexWrap: "wrap" }}>
         <div>
