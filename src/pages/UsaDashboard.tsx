@@ -341,7 +341,7 @@ export default function UsaDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#1e40af" }}>USA</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#1e40af" }}>USA</span></div>
         <ul className="nav-links">
           {["summary", "appeals", "amazon", "cs-quality", "tiktok", "tiktok-lives", "settings"].map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>

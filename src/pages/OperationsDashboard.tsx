@@ -299,7 +299,7 @@ export default function OperationsDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#7c3aed" }}>Operations 🇺🇸</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#7c3aed" }}>Operations 🇺🇸</span></div>
         <ul className="nav-links">
           {TABS.map(([key, label]) => (
             <li key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}>{label}</li>

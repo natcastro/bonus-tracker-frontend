@@ -219,7 +219,7 @@ export default function AccountProtectionDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#0891b2" }}>Account Protection 🇺🇸</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#0891b2" }}>Account Protection 🇺🇸</span></div>
         <ul className="nav-links">
           {TABS.map(([key, label]) => (
             <li key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}>{label}</li>

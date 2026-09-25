@@ -148,7 +148,7 @@ export default function DevolucionesDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: COLOR }}>Devoluciones</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: COLOR }}>Devoluciones</span></div>
         <div />
         <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
       </nav>

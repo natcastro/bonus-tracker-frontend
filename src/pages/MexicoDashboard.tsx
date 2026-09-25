@@ -478,7 +478,7 @@ export default function MexicoDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#16a34a" }}>México</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#16a34a" }}>México</span></div>
         <ul className="nav-links">
           {["summary", "asistencia", "horarios", "meta", "ventas", ...(isAdmin ? ["settings"] : [])].map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>

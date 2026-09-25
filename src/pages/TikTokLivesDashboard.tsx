@@ -336,7 +336,7 @@ export default function TikTokLivesDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#e91e8c" }}>TikTok Lives USA</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#e91e8c" }}>TikTok Lives USA</span></div>
         <ul className="nav-links">
           {(["calendario", "contabilidad", "settings"] as const).map((tab) => (
             <li key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>

@@ -156,7 +156,7 @@ export default function CSQualityDashboard() {
     <div style={{ minHeight: "100vh" }}>
       {/* ── Nav ──────────────────────────────────────────────────────────────── */}
       <nav className="top-nav">
-        <div className="logo">Bonus Tracker — <span style={{ color: "#7c3aed" }}>CS Quality Dictionary</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#7c3aed" }}>CS Quality Dictionary</span></div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           {isAdmin && pending.length > 0 && (
             <button
