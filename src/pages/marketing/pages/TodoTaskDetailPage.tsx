@@ -76,9 +76,11 @@ export default function TodoTaskDetailPage() {
             Asignada a {disenoDisplayName(task.assignedDisenoEmail)} · {task.status === "completed" ? "Completada" : todoStageLabel(task.currentStage)}
           </p>
         </div>
-        <button onClick={handleDelete} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: MT.text3, display: "flex" }}>
-          <TrashIcon size={18} />
-        </button>
+        {(myRole === "laura" || myRole === "carol") && (
+          <button onClick={handleDelete} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: MT.text3, display: "flex" }}>
+            <TrashIcon size={18} />
+          </button>
+        )}
       </div>
 
       {task.description && (
