@@ -8,7 +8,7 @@ import ConstructionBanner from "../components/ConstructionBanner";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
 import { todoStageLabel, isPastDeadline } from "../types";
 import type { TodoTask } from "../types";
-import { moodBunny } from "../../../components/moodBunny";
+import { moodBird } from "../../../components/moodBird";
 
 function isOverdueTodo(t: TodoTask): boolean {
   if (t.status !== "in_progress") return false;
@@ -27,7 +27,7 @@ export default function TodoPage() {
   const late = pending.filter(t => isOverdueTodo(t));
   const completed = todoTasks.filter(t => t.status === "completed");
   const onTimePct = pending.length > 0 ? Math.round((100 * onTime.length) / pending.length) : 100;
-  const bunny = moodBunny(onTimePct);
+  const bird = moodBird(onTimePct);
 
   const filtered = useMemo(() => todoTasks
     .filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase()))
@@ -63,7 +63,7 @@ export default function TodoPage() {
           <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Tareas rápidas de Karol — separado de Briefs</p>
         </div>
-        <img src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
+        <img src={bird.src} alt={bird.label} title={`${onTimePct}% a tiempo — ${bird.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
       </div>
 
       {/* KPI strip */}
