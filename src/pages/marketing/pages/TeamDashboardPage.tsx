@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { stageLabel, daysBetweenIso } from "../types";
+import { stageLabel, daysBetweenIso, todayIsoBogota } from "../types";
 import type { StageKey } from "../types";
 
 interface DisenoStats {
@@ -27,13 +27,26 @@ function formatAht(days: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
-// Monday of the week containing this date, as yyyy-mm-dd.
+// Monday of the week containing this date, as yyyy-mm-dd. Pure calendar-date math via UTC
+// getters/setters — never touches the viewer's own machine timezone, so it can't drift a day
+// depending on where the browser happens to be (the previous version used toISOString() on a
+// locally-constructed Date, which reinterprets in UTC and can shift the date by up to a day).
 function isoWeekStart(iso: string): string {
-  const d = new Date(iso.slice(0, 10) + "T00:00:00");
-  const day = d.getDay();
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const day = date.getUTCDay();
   const diff = (day === 0 ? -6 : 1) - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+// Same pure-calendar approach as isoWeekStart — subtracts calendar days from a yyyy-mm-dd
+// string without ever touching the viewer's local timezone.
+function subtractDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
 }
 
 export default function TeamDashboardPage() {
@@ -95,11 +108,9 @@ export default function TeamDashboardPage() {
       map.set(wk, cur);
     });
     const out: { label: string; total: number; onTime: number }[] = [];
-    const today = new Date();
+    const todayBogota = todayIsoBogota();
     for (let w = 7; w >= 0; w--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - w * 7);
-      const wk = isoWeekStart(d.toISOString().slice(0, 10));
+      const wk = isoWeekStart(subtractDaysIso(todayBogota, w * 7));
       const v = map.get(wk) ?? { total: 0, onTime: 0 };
       out.push({ label: wk.slice(5), total: v.total, onTime: v.onTime });
     }
@@ -159,11 +170,9 @@ export default function TeamDashboardPage() {
       map.set(wk, cur);
     });
     const out: { label: string; total: number; onTime: number }[] = [];
-    const today = new Date();
+    const todayBogota = todayIsoBogota();
     for (let w = 7; w >= 0; w--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - w * 7);
-      const wk = isoWeekStart(d.toISOString().slice(0, 10));
+      const wk = isoWeekStart(subtractDaysIso(todayBogota, w * 7));
       const v = map.get(wk) ?? { total: 0, onTime: 0 };
       out.push({ label: wk.slice(5), total: v.total, onTime: v.onTime });
     }
