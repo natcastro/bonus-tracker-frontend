@@ -14,6 +14,20 @@ interface DisenoStats {
   completedCount: number;
 }
 
+// Converts a fractional day count (e.g. 2.35) into a human "2d 8h" / "3h 24m" label —
+// legitimate since it's a real average across entries, not fake sub-day precision.
+function formatAht(days: number): string {
+  if (days >= 1) {
+    const wholeDays = Math.floor(days);
+    const hours = Math.round((days - wholeDays) * 24);
+    return hours > 0 ? `${wholeDays}d ${hours}h` : `${wholeDays}d`;
+  }
+  const totalMinutes = Math.round(days * 24 * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
 // Monday of the week containing this date, as yyyy-mm-dd.
 function isoWeekStart(iso: string): string {
   const d = new Date(iso.slice(0, 10) + "T00:00:00");
@@ -56,9 +70,17 @@ export default function TeamDashboardPage() {
       const avgDays = completedCount > 0 ? entries.reduce((s, e) => s + e.turnaroundDays, 0) / completedCount : null;
       return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount };
     }).sort((a, b) => {
+      if (a.avgDays === null && b.avgDays === null) return 0;
       if (a.avgDays === null) return 1;
       if (b.avgDays === null) return -1;
-      return a.avgDays - b.avgDays;
+      const diff = a.avgDays - b.avgDays;
+      // Within ~6 hours of each other counts as "similar" AHT — break the tie by whoever is
+      // more consistently on time, then by whoever has delivered more.
+      if (Math.abs(diff) < 0.25) {
+        if (b.onTimePct !== a.onTimePct) return b.onTimePct - a.onTimePct;
+        if (b.completedCount !== a.completedCount) return b.completedCount - a.completedCount;
+      }
+      return diff;
     });
   }, [published, todoTasks, disenoEmailList, disenoDisplayName]);
 
@@ -170,26 +192,28 @@ export default function TeamDashboardPage() {
         <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
           Diseño — tiempo promedio de entrega (AHT)
         </p>
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           {disenoStats.map((d, i) => (
             <button
               key={d.email}
               onClick={() => setSelectedEmail(selectedEmail === d.email ? null : d.email)}
               style={{
-                display: "flex", flexDirection: "column", gap: 4, padding: "0.9rem 1.1rem", minWidth: 170,
-                borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: MT.font, position: "relative",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "1.25rem 1rem",
+                borderRadius: 12, cursor: "pointer", textAlign: "center", fontFamily: MT.font, position: "relative",
                 border: `1.5px solid ${selectedEmail === d.email ? MT.clay : MT.border}`,
                 background: selectedEmail === d.email ? MT.claySoft : MT.surface,
+                boxShadow: MT.shadow,
               }}
             >
               <span style={{
-                position: "absolute", top: -8, left: -8, width: 22, height: 22, borderRadius: "50%",
+                position: "absolute", top: 10, left: 10, width: 22, height: 22, borderRadius: "50%",
                 background: i === 0 ? MT.moss : MT.border, color: i === 0 ? "#fff" : MT.text2,
                 fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
               }}>{i + 1}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: MT.text1 }}>{d.name}</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : `${d.avgDays.toFixed(1)}d`}</span>
-              <span style={{ fontSize: 11, color: MT.text3 }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, marginTop: 6 }}>{d.name}</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>AHT promedio</span>
+              <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4 }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
             </button>
           ))}
         </div>
@@ -200,7 +224,7 @@ export default function TeamDashboardPage() {
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: MT.text1 }}>{selected.name}</h2>
               <div style={{ display: "flex", gap: "1.25rem" }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{selected.avgDays === null ? "—" : `${selected.avgDays.toFixed(1)}d`}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{selected.avgDays === null ? "—" : formatAht(selected.avgDays)}</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>AHT</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
