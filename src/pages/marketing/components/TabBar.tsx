@@ -4,6 +4,7 @@ import { MT } from "../theme";
 const TABS = [
   { to: "/marketing/tasks", label: "Mis tareas" },
   { to: "/marketing/home", label: "Vista general" },
+  { to: "/marketing/dashboard", label: "Dashboard" },
 ];
 
 export default function TabBar() {
