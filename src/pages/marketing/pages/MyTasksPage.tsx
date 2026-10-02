@@ -6,7 +6,7 @@ import NewBriefModal from "../components/NewBriefModal";
 import NewTodoTaskModal from "../components/NewTodoTaskModal";
 import DeadlineBadge from "../components/DeadlineBadge";
 import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
-import { stageLabel, todoStageLabel, isPastDeadline, PUBLICATION_PLATFORMS } from "../types";
+import { stageLabel, todoStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
 
 function formatDueIn(dueAt: string): { label: string; overdue: boolean } {
   const diffMs = new Date(dueAt).getTime() - Date.now();
@@ -82,8 +82,9 @@ export default function MyTasksPage() {
     return briefs
       .filter(b => b.status === "in_progress")
       .filter(b => {
-        const stage = b.stages.find(s => s.key === b.currentStage);
-        if (stage?.role !== myRole) return false;
+        // A variant-mode brief qualifies if ANY applicable variant is currently at my role —
+        // different variants can be at different stages/roles at once.
+        if (!currentActiveStages(b).some(s => s.role === myRole)) return false;
         // Each Diseño person only sees briefs assigned specifically to them, never a colleague's.
         if (myRole === "diseno") {
           return !!b.assignedDisenoEmail && b.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
@@ -91,9 +92,8 @@ export default function MyTasksPage() {
         return true;
       })
       .sort((a, b) => {
-        const sa = a.stages.find(s => s.key === a.currentStage)!;
-        const sb = b.stages.find(s => s.key === b.currentStage)!;
-        return (sa.deadline ?? "").localeCompare(sb.deadline ?? "");
+        const earliest = (brief: typeof a) => currentActiveStages(brief).filter(s => s.role === myRole).map(s => s.deadline ?? "").sort()[0] ?? "";
+        return earliest(a).localeCompare(earliest(b));
       });
   }, [briefs, myRole, authedUser?.email]);
 
@@ -343,7 +343,14 @@ export default function MyTasksPage() {
       ) : (
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
           {myPending.map(b => {
-            const stage = b.stages.find(s => s.key === b.currentStage)!;
+            // For a variant-mode brief, several variants could match my role at once — show
+            // whichever has the earliest deadline (same ordering the list itself is sorted by).
+            const matching = currentActiveStages(b).filter(s => s.role === myRole);
+            const stage = [...matching].sort((x, y) => (x.deadline ?? "").localeCompare(y.deadline ?? ""))[0] ?? b.stages.find(s => s.key === b.currentStage)!;
+            // Which variant this stage belongs to, if any — and how many other variants on this
+            // same brief are also waiting on me right now, so nothing stays hidden behind one card.
+            const matchingVariant = b.variants?.find(v => v.stages.includes(stage));
+            const otherPendingCount = matching.length - 1;
             const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
             const color = overdue ? MT.danger : myRole === "laura" ? MT.primary : myRole === "carol" ? MT.info : MT.clay;
             const Icon = PackageIcon; // Briefs — distinct from To Do tasks' palette icon
@@ -374,6 +381,11 @@ export default function MyTasksPage() {
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                  {matchingVariant && (
+                    <div style={{ fontSize: 12, color: MT.text2, marginTop: 2 }}>
+                      {variantLabel(matchingVariant.key)}{otherPendingCount > 0 && ` · +${otherPendingCount} más`}
+                    </div>
+                  )}
                 </div>
                 <DeadlineBadge deadline={stage.deadline!} />
               </button>

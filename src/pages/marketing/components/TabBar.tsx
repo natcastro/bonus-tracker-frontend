@@ -1,14 +1,22 @@
 import { NavLink } from "react-router-dom";
 import { MT } from "../theme";
+import { useMarketing } from "../context";
 
-const TABS = [
+const BASE_TABS = [
   { to: "/marketing/tasks", label: "Mis tareas" },
   { to: "/marketing/todo", label: "To Do" },
   { to: "/marketing/home", label: "Briefs" },
   { to: "/marketing/dashboard", label: "Dashboard" },
 ];
 
+// Solicitudes is Laura/Karol's view of every incoming request (assign, track, copy the public
+// link) — Diseño sees their own assigned ones folded into To Do instead, not a separate tab.
+const REQUESTS_TAB = { to: "/marketing/requests", label: "Solicitudes" };
+
 export default function TabBar() {
+  const { authedUser } = useMarketing();
+  const showRequestsTab = authedUser?.role === "laura" || authedUser?.role === "carol";
+  const TABS = showRequestsTab ? [...BASE_TABS, REQUESTS_TAB] : BASE_TABS;
   return (
     <div style={{
       display: "flex", gap: "1.25rem", padding: "0 1.5rem", background: MT.surface,

@@ -32,6 +32,7 @@ export default function NotificationBell() {
     if (isUnread(n)) markNotificationRead(n.id);
     setOpen(false);
     if (n.briefId) navigate(`/marketing/brief/${n.briefId}`);
+    else if (n.requestId) navigate(`/marketing/request/${n.requestId}`);
   };
 
   const handleDelete = (e: React.MouseEvent, id: number) => {

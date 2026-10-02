@@ -5,9 +5,10 @@ import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
-import { todoStageLabel, isPastDeadline } from "../types";
+import { todoStageLabel, requestStageLabel, isPastDeadline } from "../types";
 import type { TodoTask } from "../types";
 import { moodBird } from "../../../components/moodBird";
+import { LinkIcon } from "../../../components/icons";
 
 // Only a late Diseño stage counts as "overdue" — a task waiting on Carol's review never shows
 // as late, since that delay isn't Diseño's to answer for.
@@ -19,10 +20,23 @@ function isOverdueTodo(t: TodoTask): boolean {
 }
 
 export default function TodoPage() {
-  const { todoTasks, disenoDisplayName } = useMarketing();
+  const { todoTasks, disenoDisplayName, authedUser, requests } = useMarketing();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_progress" | "completed">("all");
+
+  // Solicitudes don't get their own tab for Diseño (that's Laura/Karol's view) — their own
+  // assigned ones show up here instead, alongside To Do tasks.
+  const myRequests = useMemo(() => {
+    if (authedUser?.role !== "diseno") return [];
+    return requests
+      .filter(r => r.status === "in_progress" && r.assignedDisenoEmail?.toLowerCase() === authedUser.email.toLowerCase())
+      .sort((a, b) => {
+        const da = a.stages.find(s => s.key === a.currentStage)?.deadline ?? "";
+        const db = b.stages.find(s => s.key === b.currentStage)?.deadline ?? "";
+        return da.localeCompare(db);
+      });
+  }, [requests, authedUser]);
 
   const pending = todoTasks.filter(t => t.status === "in_progress");
   const onTime = pending.filter(t => !isOverdueTodo(t));
@@ -135,6 +149,41 @@ export default function TodoPage() {
           </div>
         )}
       </div>
+
+      {myRequests.length > 0 && (
+        <div style={{ marginTop: "1.5rem" }}>
+          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
+            Solicitudes asignadas a ti
+          </p>
+          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden", boxShadow: MT.shadow }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {myRequests.map((r, i) => {
+                const stage = r.stages.find(s => s.key === r.currentStage);
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => navigate(`/marketing/request/${r.id}`)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "0.75rem 1.1rem", cursor: "pointer",
+                      borderTop: i === 0 ? "none" : `1px solid ${MT.border}`,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <span style={{ width: 32, height: 32, borderRadius: 8, background: `${MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <LinkIcon size={16} color={MT.violet} />
+                    </span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{r.title}</span>
+                    <span style={{ fontSize: 11.5, color: MT.text3 }}>{r.requesterEmail}</span>
+                    <StatusPill solid color={MT.violet} label={requestStageLabel(r.currentStage)} />
+                    {stage?.deadline && <DeadlineBadge deadline={stage.deadline} compact />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

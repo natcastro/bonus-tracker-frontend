@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { PRODUCT_LINES, todayIso } from "../types";
+import { PRODUCT_LINES, todayIso, VARIANT_DEFS } from "../types";
+import type { VariantKey } from "../types";
 
 export default function NewBriefModal({ onClose }: { onClose: () => void }) {
   const { createBrief, createDraftBrief, disenoEmailList, disenoDisplayName } = useMarketing();
@@ -11,8 +12,13 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
   const [startDate, setStartDate] = useState(todayIso());
   const [briefLink, setBriefLink] = useState("");
   const [assignedDisenoEmail, setAssignedDisenoEmail] = useState("");
+  const [variantKeys, setVariantKeys] = useState<VariantKey[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const toggleVariant = (key: VariantKey) => {
+    setVariantKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +29,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
       if (mode === "draft") {
         await createDraftBrief(reference.trim(), productLine, startDate, briefLink.trim());
       } else {
-        await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined);
+        await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined, variantKeys);
       }
       onClose();
     } catch (err: any) {
@@ -82,13 +88,31 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             <input style={inputStyle} value={briefLink} onChange={e => setBriefLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
           </div>
           {mode === "public" ? (
-            <div>
-              <label style={labelStyle}>Asignar a Diseño (opcional)</label>
-              <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
-                <option value="">Sin asignar — avisar a Karol</option>
-                {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
-              </select>
-            </div>
+            <>
+              <div>
+                <label style={labelStyle}>Asignar a Diseño (opcional)</label>
+                <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
+                  <option value="">Sin asignar — avisar a Karol</option>
+                  {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Variantes (opcional — déjalo vacío si este producto no tiene variantes)</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+                  {VARIANT_DEFS.map(v => (
+                    <label key={v.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: MT.text1, cursor: "pointer" }}>
+                      <input type="checkbox" checked={variantKeys.includes(v.key)} onChange={() => toggleVariant(v.key)} />
+                      {v.label}
+                    </label>
+                  ))}
+                </div>
+                {variantKeys.length > 0 && (
+                  <p style={{ fontSize: 11.5, color: MT.text3, margin: "6px 0 0" }}>
+                    Cada variante seleccionada tendrá su propia propuesta, revisión y aprobación — las demás quedan como "No aplica".
+                  </p>
+                )}
+              </div>
+            </>
           ) : (
             <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>
               Nadie es notificado todavía. La podrás publicar cuando quieras desde el detalle del brief.

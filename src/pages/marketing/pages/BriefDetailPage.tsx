@@ -7,8 +7,8 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS } from "../types";
-import type { PublicationPlatform, StageKey } from "../types";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
+import type { PublicationPlatform, StageKey, VariantKey, BriefVariant } from "../types";
 import { uploadMarketingReviewImage } from "../../../services/api";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
@@ -22,10 +22,25 @@ const UPLOAD_LABELS: Record<string, string> = {
   adjustments2: "de los ajustes (ronda 2)",
 };
 
+// Pending/in-review/done dot — per her "debe indicar visualmente cuáles están completas, en
+// revisión o pendientes."
+function variantDotColor(v: BriefVariant): string {
+  if (!v.applicable) return MT.border;
+  if (v.status === "completed") return MT.primary;
+  const label = variantStatusLabel(v);
+  if (label === "Pendiente") return MT.text3;
+  if (label === "Cambios solicitados") return MT.danger;
+  return MT.moss;
+}
+
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, briefs, notifications, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief } = useMarketing();
+  const {
+    authedUser, briefs, notifications, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish,
+    submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
+    updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief,
+  } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -44,6 +59,10 @@ export default function BriefDetailPage() {
   const [linkDrafts, setLinkDrafts] = useState<Partial<Record<PublicationPlatform, string>>>({});
   const [savingLink, setSavingLink] = useState<PublicationPlatform | null>(null);
   const [approvingLinks, setApprovingLinks] = useState(false);
+  const [selectedVariantKey, setSelectedVariantKey] = useState<VariantKey | null>(null);
+  // null = "untouched, use the default (just the currently selected variant)" — kept distinct
+  // from an explicit empty array (every checkbox unchecked), which must block submission.
+  const [coSubmitKeys, setCoSubmitKeys] = useState<VariantKey[] | null>(null);
 
   if (!brief) {
     return (
@@ -53,24 +72,70 @@ export default function BriefDetailPage() {
     );
   }
 
-  const currentStage = brief.stages.find(s => s.key === brief.currentStage);
+  const isVariantMode = !!brief.variants;
+  const applicableVariants = brief.variants?.filter(v => v.applicable) ?? [];
+  const activeVariantKey = selectedVariantKey ?? applicableVariants[0]?.key ?? null;
+  const activeVariant = isVariantMode ? brief.variants!.find(v => v.key === activeVariantKey) ?? null : null;
+
+  // In variant mode, everything below reads from the selected variant's own pipeline instead of
+  // the brief's — in plain mode these are simply the brief's own fields, unchanged behavior.
+  const activeStages = isVariantMode ? (activeVariant?.stages ?? []) : brief.stages;
+  const activeCurrentStage = isVariantMode ? (activeVariant?.currentStage ?? "completed") : brief.currentStage;
+  const activeCompletedAt = isVariantMode ? (activeVariant?.completedAt ?? null) : brief.completedAt;
+  const activeInProgress = isVariantMode ? activeVariant?.status === "in_progress" : brief.status === "in_progress";
+  const currentStage = activeStages.find(s => s.key === activeCurrentStage);
   const myRole = authedUser?.role;
   // A Diseño person can only act on briefs assigned specifically to them, never a colleague's.
   const isMyDisenoAssignment = myRole !== "diseno" || !brief.assignedDisenoEmail
     || brief.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
-  const canAct = brief.status === "in_progress" && currentStage?.role === myRole && isMyDisenoAssignment;
-  const isFinal = brief.currentStage === "final";
-  const isPublish = brief.currentStage === "publish";
+  const canAct = activeInProgress && currentStage?.role === myRole && isMyDisenoAssignment;
+  const isFinal = activeCurrentStage === "final";
+  const isPublish = activeCurrentStage === "publish";
   // Only Laura or Carol can assign — Diseño no longer picks itself. Independent of canAct/turn,
   // since assignment needs to happen as soon as possible, not just when it's Diseño's turn.
   const canAssign = myRole === "laura" || myRole === "carol";
   const showAssignPanel = brief.status === "in_progress" && canAssign;
 
+  // Other applicable variants currently at this exact same stage — Diseño can cover several at
+  // once with one delivery, per her spec ("la persona... debe poder seleccionar una o varias variantes").
+  const coDeliverableVariants = isVariantMode && activeVariant
+    ? applicableVariants.filter(v => v.status === "in_progress" && v.currentStage === activeVariant.currentStage)
+    : [];
+  // What this delivery will actually be applied to — defaults to just the selected variant until
+  // the person explicitly changes the checklist (including emptying it, which must block submit).
+  const effectiveCoSubmitKeys: VariantKey[] = isVariantMode
+    ? (coSubmitKeys ?? (activeVariantKey ? [activeVariantKey] : []))
+    : [];
+
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
-    try { await fn(); setLinkInput(""); setNoteInput(""); setReviewLinkInput(""); }
+    try { await fn(); setLinkInput(""); setNoteInput(""); setReviewLinkInput(""); setCoSubmitKeys([]); }
     catch (err: any) { setError(err?.message ?? "Ocurrió un error."); }
     finally { setBusy(false); }
+  };
+
+  const doSubmitDesign = (link: string, note?: string) => isVariantMode
+    ? submitVariantProposal(brief.id, effectiveCoSubmitKeys, link, note)
+    : submitDesignStage(brief.id, link, note);
+
+  const doLauraReview = (action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => isVariantMode
+    ? variantLauraReview(brief.id, activeVariantKey!, action, opts)
+    : lauraReview(brief.id, action, opts);
+
+  const doExtraRevision = (note?: string) => isVariantMode
+    ? variantRequestExtraRevision(brief.id, activeVariantKey!, note)
+    : requestExtraRevision(brief.id, note);
+
+  const doConfirmPublish = (note?: string) => isVariantMode
+    ? variantConfirmPublish(brief.id, activeVariantKey!, note)
+    : confirmPublish(brief.id, note);
+
+  const handleMarkNotApplicable = async (key: VariantKey) => {
+    const reason = prompt(`¿Por qué "${variantLabel(key)}" no aplica para este brief?`);
+    if (reason === null) return;
+    if (!reason.trim()) { alert("Necesitas escribir una justificación."); return; }
+    try { await markVariantNotApplicable(brief.id, key, reason.trim()); }
+    catch (err: any) { alert(err?.message ?? "No se pudo actualizar."); }
   };
 
   const handleDelete = async () => {
@@ -84,7 +149,7 @@ export default function BriefDetailPage() {
     setReviewImageError("");
     setUploadingReviewImage(true);
     try {
-      const url = await uploadMarketingReviewImage(brief.id, brief.currentStage, file);
+      const url = await uploadMarketingReviewImage(brief.id, activeCurrentStage, file);
       setReviewLinkInput(url);
     } catch (err: any) {
       setReviewImageError(err?.message ?? "No se pudo subir la imagen.");
@@ -123,91 +188,52 @@ export default function BriefDetailPage() {
     </div>
   );
 
-  return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <button onClick={() => navigate(-1)} style={{
-        background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
-      }}>← Volver</button>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: "0.5rem" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
-            <StatusPill
-              solid
-              color={brief.status === "completed" ? MT.primary : brief.status === "draft" ? MT.text3 : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
-              label={brief.status === "completed" ? "✓ Completado" : brief.status === "draft" ? "Pendiente (privada)" : stageLabel(brief.currentStage)}
-            />
-          </div>
-          <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>
-            {brief.productLine && <>{brief.productLine} · </>}
-            {brief.status === "draft" ? <>Inicio estimado: {formatDateHuman(brief.estimatedStartDate)}</> : <>Inicio: {formatDateHuman(brief.startDate)}</>}
-            {brief.status === "in_progress" && brief.assignedDisenoEmail && <> · Asignado a {disenoDisplayName(brief.assignedDisenoEmail)}</>}
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {brief.shiftDays > 0 && (
-            <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
-              ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
-            </div>
-          )}
-          {(myRole === "laura" || myRole === "carol") && (
-            <button onClick={handleDelete} disabled={busy} style={{
-              fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-              background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",
-              display: "flex", alignItems: "center", gap: 5,
-            }}><TrashIcon size={14} color={MT.danger} /> Eliminar</button>
-          )}
-        </div>
+  // The variant sidebar — fixed while navigating between variants, per her "menú lateral fijo".
+  const variantSidebar = isVariantMode && (
+    <div style={{ width: 200, flexShrink: 0 }}>
+      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "0.6rem", position: "sticky", top: 60 }}>
+        <p style={{ fontSize: 10.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", padding: "0.3rem 0.4rem" }}>Variantes</p>
+        {VARIANT_DEFS.map(def => {
+          const v = brief.variants!.find(x => x.key === def.key)!;
+          const isSelected = activeVariantKey === def.key;
+          return (
+            <button key={def.key} onClick={() => { setSelectedVariantKey(def.key); setCoSubmitKeys(null); }} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
+              fontFamily: MT.font, fontSize: 12.5, fontWeight: isSelected ? 800 : 600, cursor: "pointer",
+              padding: "0.55rem 0.5rem", borderRadius: 8, border: "none",
+              background: isSelected ? MT.primarySoft : "transparent",
+              color: v.applicable ? (isSelected ? MT.primary : MT.text1) : MT.text3,
+              marginBottom: 2,
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: variantDotColor(v), flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{def.label}</span>
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
 
-      {deleteError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{deleteError}</p>}
+  const variantStatusHeader = isVariantMode && activeVariant && (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: "0.75rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: MT.text1 }}>{variantLabel(activeVariant.key)}</h2>
+        <StatusPill solid color={activeVariant.status === "completed" ? MT.primary : MT.moss} label={variantStatusLabel(activeVariant)} />
+      </div>
+      {activeVariant.applicable && activeVariant.status === "in_progress" && (myRole === "laura" || myRole === "carol") && (
+        <button onClick={() => handleMarkNotApplicable(activeVariant.key)} style={{
+          fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+          background: "none", border: "none", color: MT.text3, padding: 0,
+        }}>Marcar como no aplica</button>
+      )}
+      {!activeVariant.applicable && activeVariant.naReason && (
+        <span style={{ fontSize: 11.5, color: MT.text3 }}>No aplica — {activeVariant.naReason}</span>
+      )}
+    </div>
+  );
 
-      {brief.status === "draft" ? (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
-          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
-            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
-          </p>
-          {myRole === "laura" ? (
-            <>
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Link de SharePoint del brief (opcional)</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <input
-                  style={fieldStyle} value={draftLinkInput} onChange={e => setDraftLinkInput(e.target.value)}
-                  placeholder="https://formatucuerpo.sharepoint.com/..."
-                />
-                <button disabled={savingDraftLink} onClick={async () => {
-                  setSavingDraftLink(true);
-                  try { await updateStageLink(brief.id, "brief", draftLinkInput.trim()); }
-                  finally { setSavingDraftLink(false); }
-                }} style={{
-                  fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: savingDraftLink ? "not-allowed" : "pointer",
-                  background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "0 16px", whiteSpace: "nowrap",
-                }}>{savingDraftLink ? "..." : "Guardar enlace"}</button>
-              </div>
-
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
-              <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
-                <option value="">Sin asignar — avisar a Karol</option>
-                {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
-              </select>
-              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-              <button disabled={busy} onClick={() => run(async () => {
-                const currentLink = brief.stages.find(s => s.key === "brief")?.link ?? "";
-                if (draftLinkInput.trim() !== currentLink) await updateStageLink(brief.id, "brief", draftLinkInput.trim());
-                await publishBrief(brief.id, publishAssignEmail || undefined);
-              })} style={{
-                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-              }}>{busy ? "Publicando..." : "Publicar ahora"}</button>
-            </>
-          ) : (
-            <p style={{ fontSize: 12.5, color: MT.text3 }}>Solo Laura puede publicar esta tarea.</p>
-          )}
-        </div>
-      ) : (
-      <>
+  const content = (
+    <>
       {showAssignPanel && (
         brief.assignedDisenoEmail && !showReassign ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.6rem 1rem", marginBottom: "1rem" }}>
@@ -250,17 +276,25 @@ export default function BriefDetailPage() {
         )
       )}
 
+      {variantStatusHeader}
+
+      {isVariantMode && !activeVariant?.applicable ? (
+        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.5rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
+          Esta variante no aplica para este brief.
+        </div>
+      ) : (
+      <>
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
-        <Timeline brief={brief} />
+        <Timeline brief={{ stages: activeStages, currentStage: activeCurrentStage, status: activeInProgress ? "in_progress" : "completed" }} />
       </div>
 
       {/* Stage links history */}
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
         <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Enlaces por etapa</p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          {brief.stages.map(s => {
-            const isCurrent = brief.status === "in_progress" && s.key === brief.currentStage;
-            const canEdit = LINK_STAGES.has(s.key) && s.role === myRole && isMyDisenoAssignment;
+          {activeStages.map(s => {
+            const isCurrent = activeInProgress && s.key === activeCurrentStage;
+            const canEdit = !isVariantMode && LINK_STAGES.has(s.key) && s.role === myRole && isMyDisenoAssignment;
             const isEditing = editingStage === s.key;
             return (
               <div key={s.key} style={{
@@ -339,9 +373,245 @@ export default function BriefDetailPage() {
         </div>
       </div>
 
-      {/* Action panel */}
-      {brief.status === "completed" ? (
-        <>
+      {/* Action panel — in plain (non-variant) mode, the overall "brief completado" state is
+          shown once at the bottom alongside publication links, not duplicated here. */}
+      {!activeInProgress && isVariantMode ? (
+        <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
+          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Variante completada</p>
+          <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(activeCompletedAt)}</p>
+        </div>
+      ) : !activeInProgress ? null : !canAct ? (
+        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            {currentStage && <Avatar role={currentStage.role} size={18} />}
+            <span>
+              {currentStage?.role === "diseno" && myRole === "diseno" && !isMyDisenoAssignment
+                ? <>Asignado a {disenoDisplayName(brief.assignedDisenoEmail)} — no es tu tarea</>
+                : <>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(activeCurrentStage)}</strong></>}
+            </span>
+          </div>
+          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+        </div>
+      ) : isPublish ? (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
+            Tu turno — Confirmar publicación
+          </p>
+          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {noteField}
+          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+          <button disabled={busy} onClick={() => run(() => doConfirmPublish(noteInput.trim() || undefined))} style={{
+            fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+          }}>✓ Confirmar que ya se publicó</button>
+          <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
+            Laura ya aprobó — esto cierra {isVariantMode ? "esta variante" : "el brief"} como completad{isVariantMode ? "a" : "o"}.
+          </p>
+        </div>
+      ) : (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
+            Tu turno — {stageLabel(activeCurrentStage)}
+          </p>
+          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+
+          {DESIGN_STAGES.has(activeCurrentStage) && (
+            <>
+              {isVariantMode && coDeliverableVariants.length > 1 && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
+                    ¿A qué variantes aplica esta entrega? (obligatorio)
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {coDeliverableVariants.map(v => {
+                      const checked = effectiveCoSubmitKeys.includes(v.key);
+                      return (
+                        <label key={v.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: MT.text1, cursor: "pointer" }}>
+                          <input type="checkbox" checked={checked} onChange={() => {
+                            setCoSubmitKeys(checked ? effectiveCoSubmitKeys.filter(k => k !== v.key) : [...effectiveCoSubmitKeys, v.key]);
+                          }} />
+                          {variantLabel(v.key)}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {effectiveCoSubmitKeys.length === 0 && (
+                    <p style={{ fontSize: 11.5, color: MT.danger, margin: "6px 0 0" }}>Selecciona al menos una variante.</p>
+                  )}
+                </div>
+              )}
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
+                Link de SharePoint {UPLOAD_LABELS[activeCurrentStage] ?? ""}
+              </label>
+              <input style={{ ...fieldStyle, marginBottom: 12 }} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              {noteField}
+              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginTop: 8 }}>{error}</p>}
+              <button
+                disabled={busy || !linkInput.trim() || (isVariantMode && effectiveCoSubmitKeys.length === 0)}
+                onClick={() => run(() => doSubmitDesign(linkInput.trim(), noteInput.trim() || undefined))}
+                style={{
+                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                  background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                }}>{busy ? "Enviando..." : "Subir y continuar"}</button>
+            </>
+          )}
+
+          {REVIEW_STAGES.has(activeCurrentStage) && (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
+                Enlace o imagen con comentarios de ajuste (opcional)
+              </label>
+              <input style={{ ...fieldStyle, marginBottom: 8 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingReviewImage}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleReviewImage(f); e.target.value = ""; }}
+                  style={{ fontSize: 12 }}
+                />
+                {uploadingReviewImage && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
+              </div>
+              {reviewLinkInput && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(reviewLinkInput) && (
+                <img src={reviewLinkInput} alt="Comentario de ajuste" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
+              )}
+              {reviewImageError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{reviewImageError}</p>}
+              {noteField}
+              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {!isFinal && (
+                  <button disabled={busy} onClick={() => run(() => doLauraReview("request_changes", { link: reviewLinkInput.trim() || undefined, note: noteInput.trim() || undefined }))} style={{
+                    fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                  }}>Solicitar ajustes / continuar</button>
+                )}
+
+                {isFinal && (
+                  <button disabled={busy} onClick={() => run(() => doExtraRevision(noteInput.trim() || undefined))} style={{
+                    fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                  }}>Solicitar revisión adicional</button>
+                )}
+
+                <button disabled={busy} onClick={() => run(() => doLauraReview("approve", { note: noteInput.trim() || undefined }))} style={{
+                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
+                }}>✓ Aprobar sin cambios</button>
+              </div>
+              <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
+                {isFinal
+                  ? "Aprobar envía a Diseño para confirmar la publicación. Solicitar revisión adicional reabre otra ronda de ajustes."
+                  : "Aprobar sin cambios envía directo a Diseño para confirmar la publicación. Solicitar ajustes lo envía de vuelta a Diseño."}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeInProgress && currentStage?.deadline && isPastDeadline(currentStage.deadline) && (
+        <p style={{ marginTop: 12, fontSize: 12, color: MT.danger, fontWeight: 600 }}>
+          ⚠ Esta etapa está atrasada — venció el {formatDateHuman(currentStage.deadline)}.
+        </p>
+      )}
+      </>
+      )}
+    </>
+  );
+
+  return (
+    <div style={{ maxWidth: isVariantMode ? 1180 : 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+      <button onClick={() => navigate(-1)} style={{
+        background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
+      }}>← Volver</button>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: "0.5rem" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
+            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
+            <StatusPill
+              solid
+              color={brief.status === "completed" ? MT.primary : brief.status === "draft" ? MT.text3 : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
+              label={brief.status === "completed" ? "✓ Completado" : brief.status === "draft" ? "Pendiente (privada)" : isVariantMode ? "Con variantes" : stageLabel(brief.currentStage)}
+            />
+          </div>
+          <p style={{ margin: 0, fontSize: 12.5, color: MT.text2 }}>
+            {brief.productLine && <>{brief.productLine} · </>}
+            {brief.status === "draft" ? <>Inicio estimado: {formatDateHuman(brief.estimatedStartDate)}</> : <>Inicio: {formatDateHuman(brief.startDate)}</>}
+            {brief.status === "in_progress" && brief.assignedDisenoEmail && <> · Asignado a {disenoDisplayName(brief.assignedDisenoEmail)}</>}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {brief.shiftDays > 0 && (
+            <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
+              ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
+            </div>
+          )}
+          {(myRole === "laura" || myRole === "carol") && (
+            <button onClick={handleDelete} disabled={busy} style={{
+              fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+              background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",
+              display: "flex", alignItems: "center", gap: 5,
+            }}><TrashIcon size={14} color={MT.danger} /> Eliminar</button>
+          )}
+        </div>
+      </div>
+
+      {deleteError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{deleteError}</p>}
+
+      {brief.status === "draft" ? (
+        <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
+          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
+            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
+          </p>
+          {myRole === "laura" ? (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Link de SharePoint del brief (opcional)</label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  style={fieldStyle} value={draftLinkInput} onChange={e => setDraftLinkInput(e.target.value)}
+                  placeholder="https://formatucuerpo.sharepoint.com/..."
+                />
+                <button disabled={savingDraftLink} onClick={async () => {
+                  setSavingDraftLink(true);
+                  try { await updateStageLink(brief.id, "brief", draftLinkInput.trim()); }
+                  finally { setSavingDraftLink(false); }
+                }} style={{
+                  fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: savingDraftLink ? "not-allowed" : "pointer",
+                  background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "0 16px", whiteSpace: "nowrap",
+                }}>{savingDraftLink ? "..." : "Guardar enlace"}</button>
+              </div>
+
+              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Asignar a Diseño (opcional)</label>
+              <select style={{ ...fieldStyle, marginBottom: 12 }} value={publishAssignEmail} onChange={e => setPublishAssignEmail(e.target.value)}>
+                <option value="">Sin asignar — avisar a Karol</option>
+                {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
+              </select>
+              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+              <button disabled={busy} onClick={() => run(async () => {
+                const currentLink = brief.stages.find(s => s.key === "brief")?.link ?? "";
+                if (draftLinkInput.trim() !== currentLink) await updateStageLink(brief.id, "brief", draftLinkInput.trim());
+                await publishBrief(brief.id, publishAssignEmail || undefined);
+              })} style={{
+                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+              }}>{busy ? "Publicando..." : "Publicar ahora"}</button>
+            </>
+          ) : (
+            <p style={{ fontSize: 12.5, color: MT.text3 }}>Solo Laura puede publicar esta tarea.</p>
+          )}
+        </div>
+      ) : isVariantMode ? (
+        <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start" }}>
+          {variantSidebar}
+          <div style={{ flex: 1, minWidth: 0 }}>{content}</div>
+        </div>
+      ) : (
+        content
+      )}
+
+      {brief.status === "completed" && (
+        <div style={{ marginTop: "1.25rem" }}>
           <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", marginBottom: "1rem" }}>
             <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
             <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
@@ -412,115 +682,7 @@ export default function BriefDetailPage() {
               </div>
             );
           })()}
-        </>
-      ) : !canAct ? (
-        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-            {currentStage && <Avatar role={currentStage.role} size={18} />}
-            <span>
-              {currentStage?.role === "diseno" && myRole === "diseno" && !isMyDisenoAssignment
-                ? <>Asignado a {disenoDisplayName(brief.assignedDisenoEmail)} — no es tu tarea</>
-                : <>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(brief.currentStage)}</strong></>}
-            </span>
-          </div>
-          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
         </div>
-      ) : isPublish ? (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
-            Tu turno — Confirmar publicación
-          </p>
-          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
-          {noteField}
-          {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <button disabled={busy} onClick={() => run(() => confirmPublish(brief.id, noteInput.trim() || undefined))} style={{
-            fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-          }}>✓ Confirmar que ya se publicó</button>
-          <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
-            Laura ya aprobó — esto cierra el brief como completado.
-          </p>
-        </div>
-      ) : (
-        <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
-            Tu turno — {stageLabel(brief.currentStage)}
-          </p>
-          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
-
-          {DESIGN_STAGES.has(brief.currentStage) && (
-            <>
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
-                Link de SharePoint {UPLOAD_LABELS[brief.currentStage] ?? ""}
-              </label>
-              <input style={{ ...fieldStyle, marginBottom: 12 }} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
-              {noteField}
-              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginTop: 8 }}>{error}</p>}
-              <button disabled={busy || !linkInput.trim()} onClick={() => run(() => submitDesignStage(brief.id, linkInput.trim(), noteInput.trim() || undefined))} style={{
-                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-              }}>{busy ? "Enviando..." : "Subir y continuar"}</button>
-            </>
-          )}
-
-          {REVIEW_STAGES.has(brief.currentStage) && (
-            <>
-              <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
-                Enlace o imagen con comentarios de ajuste (opcional)
-              </label>
-              <input style={{ ...fieldStyle, marginBottom: 8 }} value={reviewLinkInput} onChange={e => setReviewLinkInput(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={uploadingReviewImage}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleReviewImage(f); e.target.value = ""; }}
-                  style={{ fontSize: 12 }}
-                />
-                {uploadingReviewImage && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
-              </div>
-              {reviewLinkInput && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(reviewLinkInput) && (
-                <img src={reviewLinkInput} alt="Comentario de ajuste" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
-              )}
-              {reviewImageError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{reviewImageError}</p>}
-              {noteField}
-              {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                {!isFinal && (
-                  <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "request_changes", { link: reviewLinkInput.trim() || undefined, note: noteInput.trim() || undefined }))} style={{
-                    fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-                  }}>Solicitar ajustes / continuar</button>
-                )}
-
-                {isFinal && (
-                  <button disabled={busy} onClick={() => run(() => requestExtraRevision(brief.id, noteInput.trim() || undefined))} style={{
-                    fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-                  }}>Solicitar revisión adicional</button>
-                )}
-
-                <button disabled={busy} onClick={() => run(() => lauraReview(brief.id, "approve", { note: noteInput.trim() || undefined }))} style={{
-                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
-                }}>✓ Aprobar sin cambios</button>
-              </div>
-              <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
-                {isFinal
-                  ? "Aprobar envía a Diseño para confirmar la publicación. Solicitar revisión adicional reabre otra ronda de ajustes."
-                  : "Aprobar sin cambios envía directo a Diseño para confirmar la publicación. Solicitar ajustes lo envía de vuelta a Diseño."}
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {brief.status === "in_progress" && currentStage?.deadline && isPastDeadline(currentStage.deadline) && (
-        <p style={{ marginTop: 12, fontSize: 12, color: MT.danger, fontWeight: 600 }}>
-          ⚠ Esta etapa está atrasada — venció el {formatDateHuman(currentStage.deadline)}.
-        </p>
-      )}
-      </>
       )}
     </div>
   );
