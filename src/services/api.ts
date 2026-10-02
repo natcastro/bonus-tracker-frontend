@@ -1544,6 +1544,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
     carolNotifiedAt: r.carol_notified_at ?? null,
     publicationLinks: r.publication_links ?? {},
     linksApprovedByKarol: r.links_approved ?? false,
+    variants: Array.isArray(r.variants) ? r.variants : null,
   };
 }
 
@@ -1569,6 +1570,7 @@ export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "creat
     extra_revision_rounds: b.extraRevisionRounds, completed_at: b.completedAt,
     assigned_diseno_email: b.assignedDisenoEmail, carol_notified_at: b.carolNotifiedAt,
     publication_links: b.publicationLinks, links_approved: b.linksApprovedByKarol,
+    variants: b.variants,
   }).select().single();
   if (error) throw error;
   return mapMarketingBrief(data);
@@ -1590,6 +1592,7 @@ export async function updateMarketingBrief(id: number, patch: Partial<Omit<Marke
   if (patch.carolNotifiedAt !== undefined) dbPatch.carol_notified_at = patch.carolNotifiedAt;
   if (patch.publicationLinks !== undefined) dbPatch.publication_links = patch.publicationLinks;
   if (patch.linksApprovedByKarol !== undefined) dbPatch.links_approved = patch.linksApprovedByKarol;
+  if (patch.variants !== undefined) dbPatch.variants = patch.variants;
   const { error } = await supabase.from("marketing_briefs").update(dbPatch).eq("id", id);
   if (error) throw error;
 }

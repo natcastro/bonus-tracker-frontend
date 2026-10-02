@@ -11,8 +11,8 @@ import {
 import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel } from "./types";
+import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -45,7 +45,7 @@ interface MarketingCtx {
   loading: boolean;
   reload: () => Promise<void>;
 
-  createBrief: (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => Promise<void>;
+  createBrief: (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => Promise<void>;
   createDraftBrief: (reference: string, productLine: string, estimatedStartDate: string, briefLink: string) => Promise<void>;
   publishBrief: (briefId: number, assignedDisenoEmail?: string) => Promise<void>;
   submitDesignStage: (briefId: number, link: string, note?: string) => Promise<void>;
@@ -57,6 +57,14 @@ interface MarketingCtx {
   approvePublicationLinks: (briefId: number) => Promise<void>;
   assignBrief: (briefId: number, email: string) => Promise<void>;
   deleteBrief: (briefId: number) => Promise<void>;
+
+  // Variants — up to 4 independent proposal/review pipelines inside one brief, only present
+  // when that brief was created with at least one variant selected.
+  submitVariantProposal: (briefId: number, variantKeys: VariantKey[], link: string, note?: string) => Promise<void>;
+  variantLauraReview: (briefId: number, variantKey: VariantKey, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => Promise<void>;
+  variantRequestExtraRevision: (briefId: number, variantKey: VariantKey, note?: string) => Promise<void>;
+  variantConfirmPublish: (briefId: number, variantKey: VariantKey, note?: string) => Promise<void>;
+  markVariantNotApplicable: (briefId: number, variantKey: VariantKey, reason: string) => Promise<void>;
 
   unreadCount: number;
   markNotificationRead: (id: number) => Promise<void>;
@@ -291,14 +299,24 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return { ...def, deadline: null, link: null, completedAt: null, status: "pending" as const };
   });
 
-  const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string) => {
+  // One independent stage pipeline per selected variant — unselected ones are "No aplica" from
+  // the start, no justification needed since they were never meant to apply.
+  const buildVariants = (startDate: string, variantKeys: VariantKey[]): BriefVariant[] | null => {
+    if (variantKeys.length === 0) return null;
+    return VARIANT_DEFS.map(def => variantKeys.includes(def.key)
+      ? { key: def.key, applicable: true, naReason: null, currentStage: "proposal" as StageKey, status: "in_progress" as const, stages: buildStages(startDate, ""), lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null }
+      : { key: def.key, applicable: false, naReason: null, currentStage: "completed" as const, status: "completed" as const, stages: [], lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null });
+  };
+
+  const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => {
     const stages = buildStages(startDate, briefLink);
     const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
     const assignment = await notifyBriefLive(reference, assignedDisenoEmail, nextDeadline);
     await createMarketingBrief({
       reference, productLine, startDate, estimatedStartDate: null, currentStage: "proposal", status: "in_progress",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
-      completedAt: null, publicationLinks: {}, linksApprovedByKarol: false, ...assignment,
+      completedAt: null, publicationLinks: {}, linksApprovedByKarol: false,
+      variants: buildVariants(startDate, variantKeys ?? []), ...assignment,
     });
     await notify(null, `Laura creó un nuevo brief: ${reference}.`);
     await reload();
@@ -312,7 +330,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       reference, productLine, startDate: estimatedStartDate, estimatedStartDate, currentStage: "brief", status: "draft",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
       completedAt: null, assignedDisenoEmail: null, carolNotifiedAt: null,
-      publicationLinks: {}, linksApprovedByKarol: false,
+      publicationLinks: {}, linksApprovedByKarol: false, variants: null,
     });
     await reload();
   };
@@ -535,6 +553,166 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  // ── Variants — same stage-advance math as submitDesignStage/lauraReview/etc. above, just
+  // scoped to one entry of brief.variants instead of the brief's own top-level stages. ──────────
+
+  const recomputeBriefCompletion = (variants: BriefVariant[], today: string) => {
+    const allDone = variants.every(v => !v.applicable || v.status === "completed");
+    return allDone ? { status: "completed" as const, completedAt: today } : {};
+  };
+
+  const submitVariantProposal = async (briefId: number, variantKeys: VariantKey[], link: string, note?: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || !brief.variants || variantKeys.length === 0) return;
+    const today = todayIso();
+    let anyLate = false;
+    let anyNextDeadline: string | null = null;
+    const newVariants = brief.variants.map(v => {
+      if (!variantKeys.includes(v.key) || !v.applicable || v.status === "completed") return v;
+      const stageIdx = v.stages.findIndex(s => s.key === v.currentStage);
+      const stage = v.stages[stageIdx];
+      const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+      if (isLate) anyLate = true;
+      const nextStage = v.stages[stageIdx + 1];
+      const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
+      anyNextDeadline = nextDeadline;
+      const newStages = v.stages.map((s, i) => {
+        if (i === stageIdx) return { ...s, link, completedAt: today, status: "done" as const, late: isLate };
+        if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+        return s;
+      });
+      return { ...v, stages: newStages, currentStage: nextStage ? nextStage.key : v.currentStage, designDelayCount: v.designDelayCount + (isLate ? 1 : 0) };
+    });
+    await updateMarketingBrief(briefId, { variants: newVariants, ...recomputeBriefCompletion(newVariants, today) });
+    const labels = variantLabels(variantKeys);
+    await notify(briefId, `Diseño subió una propuesta para ${labels} de ${brief.reference}.${anyLate ? " (una o más tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
+    await sendMarketingEmail(
+      notifyEmails.laura,
+      `Tienes una revisión pendiente — ${brief.reference} (${labels})`,
+      emailHtml({ intro: `Diseño subió una propuesta para ${labels}. Te toca revisar.`, reference: brief.reference, deadline: anyNextDeadline, note }),
+    );
+    await reload();
+  };
+
+  const variantLauraReview = async (briefId: number, variantKey: VariantKey, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || !brief.variants) return;
+    const variant = brief.variants.find(v => v.key === variantKey);
+    if (!variant || variant.status === "completed") return;
+    const today = todayIso();
+    const label = variantLabel(variantKey);
+
+    if (action === "approve") {
+      const stage = variant.stages.find(s => s.key === variant.currentStage)!;
+      const isLateApprove = !!stage.deadline && isPastDeadline(stage.deadline);
+      const publishStage = variant.stages.find(s => s.key === "publish")!;
+      const publishDeadline = addWorkDaysIso(today, publishStage.gapDays);
+      const newStages = variant.stages.map(s => {
+        if (s.key === stage.key) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLateApprove };
+        if (s.key === "publish") return { ...s, deadline: publishDeadline };
+        return s;
+      });
+      const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: "publish" as StageKey, lauraDelayDays: v.lauraDelayDays + (isLateApprove ? 1 : 0) } : v);
+      await updateMarketingBrief(briefId, { variants: newVariants });
+      await notify(briefId, `Laura aprobó ${label} de ${brief.reference} — falta que Diseño confirme la publicación.${isLateApprove ? " (tarde)" : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
+      for (const email of disenoRecipients(brief)) {
+        await sendMarketingEmail(
+          email,
+          `Aprobado — confirma publicación de ${label} (${brief.reference})`,
+          emailHtml({ intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("publish"), deadline: publishDeadline, note: opts?.note }),
+        );
+      }
+      await reload();
+      return;
+    }
+
+    const stageIdx = variant.stages.findIndex(s => s.key === variant.currentStage);
+    const stage = variant.stages[stageIdx];
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+    const nextStage = variant.stages[stageIdx + 1];
+    const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
+    const newStages = variant.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const, link: opts?.link ? opts.link : s.link, late: isLate };
+      if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+      return s;
+    });
+    const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: nextStage ? nextStage.key : v.currentStage, lauraDelayDays: v.lauraDelayDays + (isLate ? 1 : 0) } : v);
+    await updateMarketingBrief(briefId, { variants: newVariants });
+    await notify(briefId, `Laura solicitó ajustes en ${label} de ${brief.reference}.${isLate ? " (tarde)" : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
+    if (nextStage) {
+      for (const email of disenoRecipients(brief)) {
+        await sendMarketingEmail(
+          email,
+          `Ajustes solicitados — ${label} (${brief.reference})`,
+          emailHtml({ intro: "Laura solicitó ajustes en la última entrega.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel(nextStage.key), deadline: nextDeadline, note: opts?.note }),
+        );
+      }
+    }
+    await reload();
+  };
+
+  const variantRequestExtraRevision = async (briefId: number, variantKey: VariantKey, note?: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || !brief.variants) return;
+    const variant = brief.variants.find(v => v.key === variantKey);
+    if (!variant || variant.status === "completed") return;
+    const today = todayIso();
+    const label = variantLabel(variantKey);
+    const adjustments2Gap = variant.stages.find(s => s.key === "adjustments2")!.gapDays;
+    const adjustments2Deadline = addWorkDaysIso(today, adjustments2Gap);
+    const newStages = variant.stages.map(s => {
+      if (s.key === "adjustments2") return { ...s, status: "pending" as const, completedAt: null, link: null, decision: undefined, deadline: adjustments2Deadline };
+      if (s.key === "final") return { ...s, status: "pending" as const, completedAt: null, decision: undefined, deadline: null };
+      return s;
+    });
+    const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: "adjustments2" as StageKey, extraRevisionRounds: v.extraRevisionRounds + 1 } : v);
+    await updateMarketingBrief(briefId, { variants: newVariants });
+    await notify(briefId, `Laura solicitó una revisión adicional en ${label} de ${brief.reference}.${note ? ` Nota: ${note}` : ""}`);
+    for (const email of disenoRecipients(brief)) {
+      await sendMarketingEmail(
+        email,
+        `Revisión adicional — ${label} (${brief.reference})`,
+        emailHtml({ intro: "Laura solicitó una revisión adicional sobre el cierre final.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("adjustments2"), deadline: adjustments2Deadline, note }),
+      );
+    }
+    await reload();
+  };
+
+  const variantConfirmPublish = async (briefId: number, variantKey: VariantKey, note?: string) => {
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || !brief.variants) return;
+    const variant = brief.variants.find(v => v.key === variantKey);
+    if (!variant || variant.status === "completed" || variant.currentStage !== "publish") return;
+    const today = todayIso();
+    const label = variantLabel(variantKey);
+    const newStages = variant.stages.map(s => s.key === "publish" ? { ...s, completedAt: today, status: "done" as const } : s);
+    const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: "completed" as const, status: "completed" as const, completedAt: today } : v);
+    const completion = recomputeBriefCompletion(newVariants, today);
+    await updateMarketingBrief(briefId, { variants: newVariants, ...completion });
+    const allDone = "status" in completion;
+    await notify(briefId, `Diseño confirmó la publicación de ${label} (${brief.reference}).${note ? ` Nota: ${note}` : ""}${allDone ? " — Brief completado." : ""}`);
+    await sendMarketingEmail(
+      notifyEmails.laura,
+      allDone ? `Brief completado — ${brief.reference}` : `Publicado — ${label} (${brief.reference})`,
+      emailHtml({
+        intro: allDone ? "Todas las variantes fueron aprobadas y publicadas. El brief quedó completado." : "Diseño confirmó que esta variante ya se publicó.",
+        reference: allDone ? brief.reference : `${brief.reference} — ${label}`, note,
+      }),
+    );
+    await reload();
+  };
+
+  const markVariantNotApplicable = async (briefId: number, variantKey: VariantKey, reason: string) => {
+    if (!reason.trim()) throw new Error("Debes indicar una justificación.");
+    const brief = briefs.find(b => b.id === briefId);
+    if (!brief || !brief.variants) return;
+    const today = todayIso();
+    const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, applicable: false, naReason: reason.trim(), status: "completed" as const, currentStage: "completed" as const } : v);
+    await updateMarketingBrief(briefId, { variants: newVariants, ...recomputeBriefCompletion(newVariants, today) });
+    await notify(briefId, `${variantLabel(variantKey)} marcada como no aplica en ${brief.reference}. Motivo: ${reason.trim()}`);
+    await reload();
+  };
+
   const deleteBrief = async (briefId: number) => {
     if (authedUser?.role !== "laura") throw new Error("Solo Laura puede eliminar briefs.");
     await deleteMarketingBrief(briefId);
@@ -574,6 +752,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
       createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
+      submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,

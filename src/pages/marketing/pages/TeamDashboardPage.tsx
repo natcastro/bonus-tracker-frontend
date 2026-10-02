@@ -63,11 +63,14 @@ export default function TeamDashboardPage() {
       const entries: { completedAt: string; late: boolean; turnaroundDays: number }[] = [];
       for (const b of published) {
         if (!b.assignedDisenoEmail || b.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
-        b.stages.forEach((s, i) => {
-          if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
-          const start = (i > 0 ? b.stages[i - 1].completedAt : b.startDate) ?? b.startDate;
-          entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
-        });
+        const briefStageSets = b.variants ? b.variants.filter(v => v.applicable).map(v => v.stages) : [b.stages];
+        for (const stages of briefStageSets) {
+          stages.forEach((s, i) => {
+            if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
+            const start = (i > 0 ? stages[i - 1].completedAt : b.startDate) ?? b.startDate;
+            entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
+          });
+        }
       }
       for (const t of todoTasks) {
         if (t.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
@@ -117,11 +120,14 @@ export default function TeamDashboardPage() {
     return out;
   }, [selected]);
 
-  // Every completed stage across every brief — the raw material for every chart below.
+  // Every completed stage across every brief — the raw material for every chart below. For a
+  // variant-mode brief, each applicable variant's own completed stages flatten in alongside
+  // everyone else's, so the on-time charts/delay counts don't need a separate code path.
   const doneStages = useMemo(() => {
     const list: { completedAt: string; late: boolean; role: "laura" | "diseno"; stageKey: StageKey }[] = [];
     for (const b of published) {
-      for (const s of b.stages) {
+      const allStages = b.variants ? b.variants.filter(v => v.applicable).flatMap(v => v.stages) : b.stages;
+      for (const s of allStages) {
         if (s.status !== "done" || !s.completedAt || s.role === "carol") continue;
         list.push({ completedAt: s.completedAt, late: !!s.late, role: s.role, stageKey: s.key });
       }

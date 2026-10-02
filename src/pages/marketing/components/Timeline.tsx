@@ -1,7 +1,15 @@
 import { MT, formatDateHuman } from "../theme";
-import type { MarketingBrief } from "../types";
+import type { MarketingStage } from "../types";
 
-export default function Timeline({ brief }: { brief: MarketingBrief }) {
+// Takes the bare pipeline shape instead of a whole MarketingBrief, so it also works for a single
+// variant's stages (BriefDetailPage), not just a plain brief.
+interface TimelinePipeline {
+  stages: MarketingStage[];
+  currentStage: string;
+  status: "draft" | "in_progress" | "completed";
+}
+
+export default function Timeline({ brief }: { brief: TimelinePipeline }) {
   const currentIdx = brief.status === "completed" ? brief.stages.length : brief.stages.findIndex(s => s.key === brief.currentStage);
 
   return (

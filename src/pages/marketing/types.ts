@@ -42,6 +42,57 @@ export const PUBLICATION_PLATFORMS = [
 export type PublicationPlatform = typeof PUBLICATION_PLATFORMS[number]["key"];
 export type PublicationLinks = Partial<Record<PublicationPlatform, string>>;
 
+// ── Variants — some products come in up to 4 physical variants, each needing its own proposal,
+// review and approval cycle instead of sharing one. Laura picks which apply when she creates the
+// brief; unselected ones are "No aplica" from the start, no justification needed.
+
+export type VariantKey = "es_beige" | "es_negro" | "en_beige" | "en_negro";
+
+export const VARIANT_DEFS: { key: VariantKey; label: string }[] = [
+  { key: "es_beige", label: "Español – Beige" },
+  { key: "es_negro", label: "Español – Negro" },
+  { key: "en_beige", label: "Inglés – Beige" },
+  { key: "en_negro", label: "Inglés – Negro" },
+];
+
+export function variantLabel(key: VariantKey): string {
+  return VARIANT_DEFS.find(v => v.key === key)?.label ?? key;
+}
+
+export function variantLabels(keys: VariantKey[]): string {
+  return keys.map(variantLabel).join(" y ");
+}
+
+export interface BriefVariant {
+  key: VariantKey;
+  // false = "No aplica" — either never selected at creation, or marked so later with a reason.
+  applicable: boolean;
+  naReason: string | null;
+  currentStage: StageKey | "completed";
+  status: "in_progress" | "completed";
+  stages: MarketingStage[];
+  lauraDelayDays: number;
+  designDelayCount: number;
+  extraRevisionRounds: number;
+  completedAt: string | null;
+}
+
+// Maps the underlying stage pipeline onto her 7 flat statuses — an approximation, since the real
+// pipeline has 2 review rounds and this list doesn't, but it covers every state a variant passes through.
+export function variantStatusLabel(v: BriefVariant): string {
+  if (!v.applicable) return "No aplica";
+  if (v.status === "completed") return "Aprobada";
+  const stage = v.stages.find(s => s.key === v.currentStage);
+  if (!stage) return "Pendiente";
+  const startedAny = v.stages.some(s => s.status === "done");
+  if (stage.key === "publish") return "Entregada";
+  if (stage.role === "laura") return "En revisión";
+  // role === "diseno": either nothing's been delivered yet, or Laura just asked for changes.
+  const lastDoneWasChangesRequested = [...v.stages].reverse().find(s => s.status === "done")?.decision === "changes_requested";
+  if (!startedAny) return "Pendiente";
+  return lastDoneWasChangesRequested ? "Cambios solicitados" : "Pendiente";
+}
+
 export interface MarketingBrief {
   id: number;
   reference: string;
@@ -70,6 +121,9 @@ export interface MarketingBrief {
   // Karol reviews the count and signs off once all of them are filled in.
   publicationLinks: PublicationLinks;
   linksApprovedByKarol: boolean;
+  // Non-null means this brief tracks up to 4 variants independently instead of a single pipeline —
+  // when present, `stages`/`currentStage` above are unused and each variant has its own.
+  variants: BriefVariant[] | null;
 }
 
 export interface MarketingNotification {
@@ -122,6 +176,20 @@ export const STAGE_ORDER: StageKey[] = STAGE_DEFS.map(s => s.key);
 export function stageLabel(key: StageKey | "completed"): string {
   if (key === "completed") return "Completado";
   return STAGE_DEFS.find(s => s.key === key)?.label ?? key;
+}
+
+// A brief's currently-pending stage(s) — one for a plain brief, or one per applicable
+// in-progress variant for a variant-mode brief. Used anywhere "whose turn is it" or "what's the
+// deadline" needs to work the same way regardless of which mode the brief is in.
+export function currentActiveStages(brief: MarketingBrief): MarketingStage[] {
+  if (brief.variants) {
+    return brief.variants
+      .filter(v => v.applicable && v.status === "in_progress")
+      .map(v => v.stages.find(s => s.key === v.currentStage))
+      .filter((s): s is MarketingStage => !!s);
+  }
+  const stage = brief.stages.find(s => s.key === brief.currentStage);
+  return stage ? [stage] : [];
 }
 
 export function addDaysIso(iso: string, days: number): string {

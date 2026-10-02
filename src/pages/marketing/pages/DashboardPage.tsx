@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
-import { stageLabel, todayIso, isPastDeadline } from "../types";
+import { stageLabel, todayIso, isPastDeadline, currentActiveStages } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
 
@@ -21,12 +21,28 @@ const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
 ];
 
 // Only a late Diseño stage counts as "overdue" for alerts/health — a brief waiting on Laura
-// (review stages) never shows as late, since that delay isn't Diseño's to answer for.
+// (review stages) never shows as late, since that delay isn't Diseño's to answer for. For a
+// variant-mode brief, it counts as overdue if ANY applicable variant's current Diseño stage is.
 function isOverdue(brief: MarketingBrief): boolean {
   if (brief.status !== "in_progress") return false;
-  const stage = brief.stages.find(s => s.key === brief.currentStage);
-  if (!stage || stage.role !== "diseno") return false;
-  return !!stage.deadline && isPastDeadline(stage.deadline);
+  return currentActiveStages(brief).some(s => s.role === "diseno" && !!s.deadline && isPastDeadline(s.deadline));
+}
+
+// Design delays, summed across variants for a variant-mode brief (the brief's own
+// designDelayCount stays 0 in that case since delays are tracked per variant instead).
+function totalDesignDelayCount(brief: MarketingBrief): number {
+  if (brief.variants) return brief.variants.reduce((s, v) => s + v.designDelayCount, 0);
+  return brief.designDelayCount;
+}
+
+// For list/table views, a variant-mode brief shows whichever in-progress variant is most urgent
+// (overdue first, else the nearest deadline) as its one-line summary.
+function representativeStage(brief: MarketingBrief) {
+  const candidates = currentActiveStages(brief);
+  if (candidates.length === 0) return null;
+  const overdue = candidates.find(s => !!s.deadline && isPastDeadline(s.deadline));
+  if (overdue) return overdue;
+  return [...candidates].sort((a, b) => (a.deadline ?? "9999-99-99").localeCompare(b.deadline ?? "9999-99-99"))[0];
 }
 
 function groupOf(b: MarketingBrief): GroupKey {
@@ -57,16 +73,16 @@ export default function DashboardPage() {
   // current deadline — not just past delays on briefs that have already been completed.
   const onTimeCohort = [...completedThisMonth, ...inProgressBriefs];
   const onTimePct = onTimeCohort.length > 0
-    ? Math.round(100 * onTimeCohort.filter(b => b.designDelayCount === 0 && !isOverdue(b)).length / onTimeCohort.length)
+    ? Math.round(100 * onTimeCohort.filter(b => totalDesignDelayCount(b) === 0 && !isOverdue(b)).length / onTimeCohort.length)
     : 100;
-  const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + b.designDelayCount, 0);
+  const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + totalDesignDelayCount(b), 0);
   const bunny = moodBunny(onTimePct);
 
   const filtered = briefs.filter(b => {
     if (search && !b.reference.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== "all" && b.status !== statusFilter) return false;
     if (responsibleFilter !== "all") {
-      const stage = b.stages.find(s => s.key === b.currentStage);
+      const stage = representativeStage(b);
       if (b.status !== "in_progress" || !stage || stage.role !== responsibleFilter) return false;
     }
     if (dateFrom && b.startDate < dateFrom) return false;
@@ -196,7 +212,7 @@ export default function DashboardPage() {
                       </td>
                     </tr>
                     {!isCollapsed && g.rows.map(b => {
-                      const stage = b.stages.find(s => s.key === b.currentStage);
+                      const stage = representativeStage(b);
                       const overdue = isOverdue(b);
                       const role: MarketingRole | undefined = stage?.role;
                       const statusColor = b.status === "completed" ? MT.primary : role ? ROLE_CFG[role].color : MT.text2;
@@ -211,7 +227,7 @@ export default function DashboardPage() {
                           <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{b.productLine || "—"}</td>
                           <td style={{ padding: "0.55rem 0.9rem", fontSize: 12, color: MT.text2 }}>{formatDateHuman(b.startDate)}</td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
-                            <StatusPill solid color={statusColor} label={b.status === "completed" ? "✓ Completado" : stageLabel(b.currentStage)} />
+                            <StatusPill solid color={statusColor} label={b.status === "completed" ? "✓ Completado" : b.variants ? (stage?.label ? `${stage.label} (variante)` : "Con variantes") : stageLabel(b.currentStage)} />
                           </td>
                           <td style={{ padding: "0.55rem 0.9rem" }}>
                             {role ? (
