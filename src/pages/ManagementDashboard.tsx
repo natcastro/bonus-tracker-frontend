@@ -169,7 +169,7 @@ export default function ManagementDashboard() {
           <>
             <div className="summary-cards">
               {usaTotals.map((t) => (
-                <div key={t.agent.id} className="stat-card" style={{ borderLeftColor: color }}>
+                <div key={t.agent.id} className="stat-card" style={{ borderTopColor: color }}>
                   <h3>{t.agent.name}</h3>
                   <div className="amount" style={{ color }}>${t.total.toFixed(2)}</div>
                 </div>
@@ -212,7 +212,7 @@ export default function ManagementDashboard() {
           <>
             <div className="summary-cards">
               {opsTotals.map((t) => (
-                <div key={t.agent.id} className="stat-card" style={{ borderLeftColor: color }}>
+                <div key={t.agent.id} className="stat-card" style={{ borderTopColor: color }}>
                   <h3>{t.agent.name}</h3>
                   <div className="amount" style={{ color }}>${t.total.toFixed(2)}</div>
                 </div>
@@ -258,7 +258,7 @@ export default function ManagementDashboard() {
             </div>
             <div className="summary-cards">
               {mexTotals.map((t) => (
-                <div key={t.agent.id} className="stat-card" style={{ borderLeftColor: color }}>
+                <div key={t.agent.id} className="stat-card" style={{ borderTopColor: color }}>
                   <h3>{t.agent.name}</h3>
                   <div className="amount" style={{ color }}>${t.total.toFixed(0)}</div>
                 </div>
