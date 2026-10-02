@@ -9,10 +9,13 @@ import { todoStageLabel, isPastDeadline } from "../types";
 import type { TodoTask } from "../types";
 import { moodBird } from "../../../components/moodBird";
 
+// Only a late Diseño stage counts as "overdue" — a task waiting on Carol's review never shows
+// as late, since that delay isn't Diseño's to answer for.
 function isOverdueTodo(t: TodoTask): boolean {
   if (t.status !== "in_progress") return false;
   const stage = t.stages.find(s => s.key === t.currentStage);
-  return !!stage?.deadline && isPastDeadline(stage.deadline);
+  if (!stage || stage.role !== "diseno") return false;
+  return !!stage.deadline && isPastDeadline(stage.deadline);
 }
 
 export default function TodoPage() {

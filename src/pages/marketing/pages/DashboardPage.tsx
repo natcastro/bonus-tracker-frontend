@@ -20,10 +20,13 @@ const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
   { key: "completed", label: "Completados", color: MT.primary },
 ];
 
+// Only a late Diseño stage counts as "overdue" for alerts/health — a brief waiting on Laura
+// (review stages) never shows as late, since that delay isn't Diseño's to answer for.
 function isOverdue(brief: MarketingBrief): boolean {
   if (brief.status !== "in_progress") return false;
   const stage = brief.stages.find(s => s.key === brief.currentStage);
-  return !!stage?.deadline && isPastDeadline(stage.deadline);
+  if (!stage || stage.role !== "diseno") return false;
+  return !!stage.deadline && isPastDeadline(stage.deadline);
 }
 
 function groupOf(b: MarketingBrief): GroupKey {
