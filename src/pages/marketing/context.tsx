@@ -150,12 +150,20 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const myRoleForLoad = getRole("MARKETING");
   const reload = useCallback(async () => {
     const hasInternalRole = !!myRoleForLoad;
+    // Each query is isolated — if one of the newer tables/columns (requests, notification
+    // actor/target tracking) isn't migrated in yet, that must never block Briefs/To Do/everything
+    // else from loading. A single Promise.all here previously meant one failing query blanked
+    // out the entire page.
+    const safe = async <T,>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+      try { return await fn(); }
+      catch (err) { console.error(`Failed to load ${label}:`, err); return fallback; }
+    };
     const [n, rq, b, t, tt] = await Promise.all([
-      getMarketingNotifications(hasInternalRole ? undefined : myEmail),
-      getMarketingRequests(),
-      hasInternalRole ? getMarketingBriefs() : Promise.resolve([]),
-      hasInternalRole ? getPrivateTasks(myEmail) : Promise.resolve([]),
-      hasInternalRole ? getTodoTasks() : Promise.resolve([]),
+      safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
+      safe("requests", () => getMarketingRequests(), []),
+      hasInternalRole ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
+      hasInternalRole ? safe("private tasks", () => getPrivateTasks(myEmail), []) : Promise.resolve([]),
+      hasInternalRole ? safe("todo tasks", () => getTodoTasks(), []) : Promise.resolve([]),
     ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
