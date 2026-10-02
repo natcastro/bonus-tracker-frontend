@@ -30,7 +30,7 @@ function emailHtml(opts: { intro: string; reference: string; nextTask?: string; 
       <p>${intro}</p>
       <p><strong>Referencia:</strong> ${reference}</p>
       ${nextTask ? `<p><strong>Próxima tarea:</strong> ${nextTask}</p>` : ""}
-      ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 5:30 PM hora de Colombia</p>` : ""}
+      ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 6:30 PM hora de Colombia</p>` : ""}
       ${note ? `<p><strong>Nota:</strong> ${note}</p>` : ""}
       <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
     </div>
