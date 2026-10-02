@@ -9,6 +9,8 @@ import TodoPage from "./pages/TodoPage";
 import TeamDashboardPage from "./pages/TeamDashboardPage";
 import BriefDetailPage from "./pages/BriefDetailPage";
 import TodoTaskDetailPage from "./pages/TodoTaskDetailPage";
+import RequestsPage from "./pages/RequestsPage";
+import RequestDetailPage from "./pages/RequestDetailPage";
 
 function Shell() {
   const { authedUser, loading } = useMarketing();
@@ -18,7 +20,7 @@ function Shell() {
       <div style={{ minHeight: "100vh", background: MT.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center", fontFamily: MT.font }}>
         <h1 style={{ fontSize: "1.3rem", fontWeight: 800, color: MT.text1, marginBottom: "0.5rem" }}>Sin rol asignado en Marketing</h1>
         <p style={{ color: MT.text2, maxWidth: 380 }}>
-          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura o Diseño) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
+          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura, Diseño, Karol o Usuario enlace) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
         </p>
       </div>
     );
@@ -47,16 +49,29 @@ function Shell() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <Navbar />
         <TabBar />
-        <Routes>
-          <Route index element={<Navigate to="tasks" replace />} />
-          <Route path="tasks" element={<MyTasksPage />} />
-          <Route path="todo" element={<TodoPage />} />
-          <Route path="home" element={<DashboardPage />} />
-          <Route path="dashboard" element={<TeamDashboardPage />} />
-          <Route path="brief/:id" element={<BriefDetailPage />} />
-          <Route path="todo/:id" element={<TodoTaskDetailPage />} />
-          <Route path="*" element={<Navigate to="tasks" replace />} />
-        </Routes>
+        {/* An "enlace" user only ever gets these two routes registered — there is no URL that
+            can reach Briefs/To Do/Dashboard data for this role, not just a hidden UI for it. */}
+        {authedUser.role === "enlace" ? (
+          <Routes>
+            <Route index element={<Navigate to="requests" replace />} />
+            <Route path="requests" element={<RequestsPage />} />
+            <Route path="request/:id" element={<RequestDetailPage />} />
+            <Route path="*" element={<Navigate to="requests" replace />} />
+          </Routes>
+        ) : (
+          <Routes>
+            <Route index element={<Navigate to="tasks" replace />} />
+            <Route path="tasks" element={<MyTasksPage />} />
+            <Route path="todo" element={<TodoPage />} />
+            <Route path="home" element={<DashboardPage />} />
+            <Route path="dashboard" element={<TeamDashboardPage />} />
+            <Route path="brief/:id" element={<BriefDetailPage />} />
+            <Route path="todo/:id" element={<TodoTaskDetailPage />} />
+            <Route path="requests" element={<RequestsPage />} />
+            <Route path="request/:id" element={<RequestDetailPage />} />
+            <Route path="*" element={<Navigate to="tasks" replace />} />
+          </Routes>
+        )}
       </div>
     </div>
   );

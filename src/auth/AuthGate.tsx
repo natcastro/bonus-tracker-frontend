@@ -11,7 +11,10 @@ const TEAM_LABELS: Record<string, string> = {
 
 function viewAsLabel(team: string, role: string): string {
   const teamLabel = TEAM_LABELS[team] ?? team;
-  if (team === "MARKETING") return `${teamLabel} — ${role === "admin" ? "Laura" : "Diseño"}`;
+  if (team === "MARKETING") {
+    const label = role === "admin" ? "Laura" : role === "carol" ? "Karol" : role === "enlace" ? "Usuario enlace" : "Diseño";
+    return `${teamLabel} — ${label}`;
+  }
   return `${teamLabel} — ${role === "admin" ? "Administrador" : "Staff"}`;
 }
 

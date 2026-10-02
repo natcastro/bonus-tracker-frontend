@@ -122,7 +122,7 @@ export default function TeamDashboardPage() {
     const list: { completedAt: string; late: boolean; role: "laura" | "diseno"; stageKey: StageKey }[] = [];
     for (const b of published) {
       for (const s of b.stages) {
-        if (s.status !== "done" || !s.completedAt || s.role === "carol") continue;
+        if (s.status !== "done" || !s.completedAt) continue;
         list.push({ completedAt: s.completedAt, late: !!s.late, role: s.role, stageKey: s.key });
       }
     }

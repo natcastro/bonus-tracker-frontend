@@ -23,6 +23,7 @@ export default function NotificationBell() {
 
   const isUnread = (n: MarketingNotification) => {
     if (!authedUser) return false;
+    if (authedUser.role === "enlace") return !n.readTarget;
     if (authedUser.role === "laura") return !n.readLaura;
     if (authedUser.role === "carol") return !n.readCarol;
     return !n.readDiseno;
@@ -32,6 +33,7 @@ export default function NotificationBell() {
     if (isUnread(n)) markNotificationRead(n.id);
     setOpen(false);
     if (n.briefId) navigate(`/marketing/brief/${n.briefId}`);
+    else if (n.requestId) navigate(`/marketing/request/${n.requestId}`);
   };
 
   const handleDelete = (e: React.MouseEvent, id: number) => {

@@ -29,6 +29,8 @@ export const MT = {
   successSoft: "#E4EEE2",
   info: "#4F6D8C",
   infoSoft: "#E6EDF3",
+  violet: "#6B5B95",
+  violetSoft: "#ECE9F3",
 
   shadow: "0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)",
   shadowLg: "0 4px 16px rgba(17,24,39,0.08), 0 24px 48px rgba(17,24,39,0.10)",
@@ -44,6 +46,7 @@ export const ROLE_CFG: Record<string, { label: string; color: string; soft: stri
   laura: { label: "Laura", color: MT.primary, soft: MT.primarySoft },
   diseno: { label: "Diseño", color: MT.clay, soft: MT.claySoft },
   carol: { label: "Karol", color: MT.info, soft: MT.infoSoft },
+  enlace: { label: "Usuario enlace", color: MT.violet, soft: MT.violetSoft },
 };
 
 export function formatDateHuman(iso: string | null): string {

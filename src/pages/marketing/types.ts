@@ -1,4 +1,6 @@
-export type MarketingRole = "laura" | "diseno" | "carol";
+// "enlace" is a restricted requester role — someone outside the Marketing team who can only
+// create and track their own requests, never see Briefs/To Do/Dashboard.
+export type MarketingRole = "laura" | "diseno" | "carol" | "enlace";
 
 export const PRODUCT_LINES = [
   "Línea Oro",
@@ -15,7 +17,7 @@ export type StageKey = "brief" | "proposal" | "review1" | "adjustments" | "revie
 export interface MarketingStage {
   key: StageKey;
   label: string;
-  role: MarketingRole;
+  role: "laura" | "diseno";
   gapDays: number; // days allotted for this stage, counted from the previous stage's actual completion
   deadline: string | null; // yyyy-mm-dd — null until the previous stage is done and this one becomes current
   link: string | null;
@@ -75,11 +77,16 @@ export interface MarketingBrief {
 export interface MarketingNotification {
   id: number;
   briefId: number | null;
+  // Set only for requester-specific pings (a usuario enlace's own request moved forward) —
+  // when present, this notification is scoped to that one email instead of a shared role inbox.
+  requestId: number | null;
+  targetEmail: string | null;
   message: string;
   createdAt: string;
   readLaura: boolean;
   readDiseno: boolean;
   readCarol: boolean;
+  readTarget: boolean;
 }
 
 // A personal reminder/to-do — visible only to whoever created it, unlike a brief.
@@ -103,7 +110,7 @@ export interface MarketingUser {
 
 // gapDays is always counted from the previous stage's actual completion date — never from the
 // brief's original start date — so a fast (or slow) turnaround never shrinks or balloons the next deadline.
-export const STAGE_DEFS: { key: StageKey; label: string; role: MarketingRole; gapDays: number }[] = [
+export const STAGE_DEFS: { key: StageKey; label: string; role: "laura" | "diseno"; gapDays: number }[] = [
   { key: "brief",       label: "Brief",        role: "laura",  gapDays: 0 },
   { key: "proposal",    label: "Propuesta inicial", role: "diseno", gapDays: 4 },
   { key: "review1",     label: "Revisión 1",   role: "laura",  gapDays: 2 },
@@ -207,6 +214,57 @@ export interface TodoTask {
   currentStage: TodoStageKey | "completed";
   status: "in_progress" | "completed";
   stages: TodoStage[];
+  createdAt: string;
+  completedAt: string | null;
+}
+
+// ── Requests — created by a restricted "usuario enlace" (someone outside the Marketing team),
+// always fulfilled by Diseño, with a review/approve-or-changes loop the requester controls. ─────
+
+export type RequestStageKey = "delivery" | "review";
+
+export interface RequestStage {
+  key: RequestStageKey;
+  label: string;
+  role: "diseno" | "enlace";
+  gapDays: number;
+  deadline: string | null;
+  link: string | null;
+  completedAt: string | null;
+  status: "pending" | "done";
+  decision?: "approved" | "changes_requested";
+  late?: boolean;
+  remind24hAt?: string;
+  remind12hAt?: string;
+  remind1hAt?: string;
+  overdueLastRemindAt?: string;
+}
+
+export const REQUEST_STAGE_DEFS: { key: RequestStageKey; label: string; role: "diseno" | "enlace"; gapDays: number }[] = [
+  { key: "delivery", label: "Entrega de Diseño",         role: "diseno", gapDays: 3 },
+  { key: "review",   label: "Revisión del solicitante",  role: "enlace", gapDays: 2 },
+];
+
+export function requestStageLabel(key: RequestStageKey | "completed"): string {
+  if (key === "completed") return "Completado";
+  return REQUEST_STAGE_DEFS.find(s => s.key === key)?.label ?? key;
+}
+
+export interface MarketingRequest {
+  id: number;
+  requesterEmail: string;
+  title: string;
+  description: string;
+  attachments: string[];
+  // Other "enlace" emails explicitly invited to view/track this request — read-only, they don't
+  // get approval rights (only the original requester does).
+  sharedWithEmails: string[];
+  assignedDisenoEmail: string | null;
+  carolNotifiedAt: string | null;
+  currentStage: RequestStageKey | "completed";
+  status: "in_progress" | "completed";
+  stages: RequestStage[];
+  revisionRounds: number;
   createdAt: string;
   completedAt: string | null;
 }
