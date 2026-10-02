@@ -31,8 +31,22 @@ function CopyLinkButton() {
 }
 
 export default function RequestsPage() {
-  const { requests, disenoDisplayName } = useMarketing();
+  const { requests, disenoDisplayName, authedUser } = useMarketing();
   const navigate = useNavigate();
+
+  // Diseño can hand out the public link too, but the full list — and assigning/reassigning
+  // requests from it — stays Laura/Karol's job.
+  if (authedUser?.role === "diseno") {
+    return (
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Solicitudes</h1>
+        <p style={{ margin: "0.4rem 0 1.25rem", fontSize: 12.5, color: MT.text2 }}>
+          Comparte este enlace con quien necesite pedirte algo — no necesita rol en Marketing, solo su correo corporativo. Tus propias solicitudes asignadas aparecen en To Do.
+        </p>
+        <CopyLinkButton />
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>

@@ -60,9 +60,10 @@ function InternalShell() {
           <Route path="dashboard" element={<TeamDashboardPage />} />
           <Route path="brief/:id" element={<BriefDetailPage />} />
           <Route path="todo/:id" element={<TodoTaskDetailPage />} />
-          {/* Solicitudes (the full list + the "copiar enlace" admin tool) is Laura/Karol's view —
-              Diseño sees their own assigned requests folded into To Do instead. */}
-          <Route path="requests" element={authedUser.role === "diseno" ? <Navigate to="todo" replace /> : <RequestsPage />} />
+          {/* Everyone reaches Solicitudes, but RequestsPage itself only shows the full
+              list/assign/reassign/delete tools to Laura/Karol — Diseño just gets the
+              "copiar enlace" box so they can hand it out too. */}
+          <Route path="requests" element={<RequestsPage />} />
           <Route path="*" element={<Navigate to="tasks" replace />} />
         </Routes>
       </div>
