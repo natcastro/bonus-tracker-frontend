@@ -83,9 +83,10 @@ interface MarketingCtx {
   // one, otherwise the raw email, otherwise "Diseño" when nobody is assigned.
   disenoDisplayName: (email: string | null) => string;
 
-  // Requests — created by a restricted "usuario enlace", always fulfilled by Diseño.
+  // Requests — created via a public link by anyone with a company Microsoft login (no Marketing
+  // role needed), always fulfilled by Diseño.
   requests: MarketingRequest[];
-  createRequest: (title: string, description: string, attachments: string[], sharedWithEmails: string[]) => Promise<void>;
+  createRequest: (title: string, description: string, attachments: string[], sharedWithEmails: string[]) => Promise<number>;
   assignRequest: (requestId: number, email: string) => Promise<void>;
   submitRequestDelivery: (requestId: number, link: string, note?: string) => Promise<void>;
   requesterReview: (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => Promise<void>;
@@ -119,7 +120,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (role === "admin") return { role: "laura", name: nicknames[myEmail.toLowerCase()] || "Laura", email: myEmail };
     if (role === "carol") return { role: "carol", name: nicknames[myEmail.toLowerCase()] || "Karol", email: myEmail };
     if (role === "staff") return { role: "diseno", name: nicknames[myEmail.toLowerCase()] || "Diseño", email: myEmail };
-    if (role === "enlace") return { role: "enlace", name: nicknames[myEmail.toLowerCase()] || "Usuario", email: myEmail };
     return null;
   }, [getRole, myEmail, nicknames]);
 
@@ -133,17 +133,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return nicknames[email.toLowerCase()] || email;
   };
 
-  // An "enlace" user never needs Briefs/To Do/private-task data — not fetching it at all (rather
-  // than just not rendering it) keeps that data out of their browser entirely.
+  // Someone with no Marketing role (just visiting the public request link) never needs
+  // Briefs/To Do/private-task data — not fetching it at all (rather than just not rendering it)
+  // keeps that data out of their browser entirely.
   const myRoleForLoad = getRole("MARKETING");
   const reload = useCallback(async () => {
-    const isEnlace = myRoleForLoad === "enlace";
+    const hasInternalRole = !!myRoleForLoad;
     const [n, rq, b, t, tt] = await Promise.all([
-      getMarketingNotifications(isEnlace ? myEmail : undefined),
+      getMarketingNotifications(hasInternalRole ? undefined : myEmail),
       getMarketingRequests(),
-      isEnlace ? Promise.resolve([]) : getMarketingBriefs(),
-      isEnlace ? Promise.resolve([]) : getPrivateTasks(myEmail),
-      isEnlace ? Promise.resolve([]) : getTodoTasks(),
+      hasInternalRole ? getMarketingBriefs() : Promise.resolve([]),
+      hasInternalRole ? getPrivateTasks(myEmail) : Promise.resolve([]),
+      hasInternalRole ? getTodoTasks() : Promise.resolve([]),
     ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
@@ -248,7 +249,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         notifyEmails.carol,
         `Nueva solicitud sin asignar — ${title}`,
         emailHtml({
-          intro: "Hay una nueva solicitud de un usuario enlace sin asignar. Entra a la plataforma y asígnala a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
+          intro: "Hay una nueva solicitud (enviada por el enlace público) sin asignar. Entra a la plataforma y asígnala a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
           reference: title, nextTask: requestStageLabel("delivery"), deadline,
         }),
       );
@@ -256,18 +257,22 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return new Date().toISOString();
   };
 
-  const createRequest = async (title: string, description: string, attachments: string[], sharedWithEmails: string[]) => {
-    if (!authedUser || authedUser.role !== "enlace") throw new Error("Solo un usuario enlace puede crear solicitudes.");
+  // No Marketing role is required to create a request — anyone who can log in with their
+  // company Microsoft account (the only auth this whole Hub uses) can reach the public link and
+  // submit one, identified by whatever email they're logged in as.
+  const createRequest = async (title: string, description: string, attachments: string[], sharedWithEmails: string[]): Promise<number> => {
+    if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
     const today = todayIso();
     const stages = buildRequestStages(today);
     const carolNotifiedAt = await notifyRequestLive(title, stages[0].deadline);
-    await apiCreateMarketingRequest({
-      requesterEmail: authedUser.email, title, description, attachments, sharedWithEmails,
+    const created = await apiCreateMarketingRequest({
+      requesterEmail: myEmail, title, description, attachments, sharedWithEmails,
       assignedDisenoEmail: null, carolNotifiedAt, currentStage: "delivery", status: "in_progress",
       stages, revisionRounds: 0, completedAt: null,
     });
-    await notify(null, `${authedUser.name} creó una nueva solicitud: ${title}.`);
+    await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${title}.`);
     await reload();
+    return created.id;
   };
 
   const assignRequest = async (requestId: number, email: string) => {
@@ -278,7 +283,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       await sendMarketingEmail(
         email,
         `Te asignaron una solicitud — ${req.title}`,
-        emailHtml({ intro: "Te asignaron esta solicitud de un usuario enlace.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
+        emailHtml({ intro: "Te asignaron esta solicitud.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
       );
     }
     await reload();
@@ -318,7 +323,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const requesterReview = async (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => {
     const req = requests.find(r => r.id === requestId);
     if (!req || req.status === "completed") return;
-    if (!authedUser || req.requesterEmail.toLowerCase() !== authedUser.email.toLowerCase()) {
+    if (!myEmail || req.requesterEmail.toLowerCase() !== myEmail.toLowerCase()) {
       throw new Error("Solo quien creó la solicitud puede aprobarla o pedir cambios.");
     }
     const stageIdx = req.stages.findIndex(s => s.key === req.currentStage);
@@ -696,19 +701,20 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   const readField = (role: "laura" | "diseno" | "carol") => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
 
+  // Someone with no Marketing role (tracking their own request via the public link) has their
+  // own personal notifications (target_email) instead of a shared laura/diseno/carol inbox.
   const unreadCount = useMemo(() => {
-    if (!authedUser) return 0;
-    if (authedUser.role === "enlace") return notifications.filter(n => !n.readTarget).length;
+    if (!authedUser) return notifications.filter(n => !n.readTarget).length;
     const field = readField(authedUser.role);
     return notifications.filter(n => !n[field]).length;
   }, [notifications, authedUser]);
 
   const markNotificationRead = async (id: number) => {
-    if (!authedUser) return;
-    if (authedUser.role === "enlace") {
+    if (!authedUser) {
+      if (!myEmail) return;
       const notif = notifications.find(n => n.id === id);
       if (!notif || notif.readTarget) return;
-      await markTargetNotificationRead(authedUser.email, id);
+      await markTargetNotificationRead(myEmail, id);
       await reload();
       return;
     }

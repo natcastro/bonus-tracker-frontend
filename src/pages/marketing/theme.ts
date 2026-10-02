@@ -46,7 +46,7 @@ export const ROLE_CFG: Record<string, { label: string; color: string; soft: stri
   laura: { label: "Laura", color: MT.primary, soft: MT.primarySoft },
   diseno: { label: "Diseño", color: MT.clay, soft: MT.claySoft },
   carol: { label: "Karol", color: MT.info, soft: MT.infoSoft },
-  enlace: { label: "Usuario enlace", color: MT.violet, soft: MT.violetSoft },
+  requester: { label: "Solicitante", color: MT.violet, soft: MT.violetSoft },
 };
 
 export function formatDateHuman(iso: string | null): string {

@@ -2,15 +2,20 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MT, formatDateHuman, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
+import { useHubAccess } from "../../../auth/HubAccessContext";
 import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
 import { requestStageLabel, normalizeUrl } from "../types";
 import { uploadMarketingRequestFile } from "../../../services/api";
 
+// Reachable two ways: internally (Laura/Diseño/Karol, from the Solicitudes tab) and via the
+// public request link (anyone with a company Microsoft login, no Marketing role needed) — so
+// identity here comes straight from the Hub login, not from a Marketing role that may not exist.
 export default function RequestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { authedUser, requests, disenoEmailList, disenoDisplayName, assignRequest, submitRequestDelivery, requesterReview } = useMarketing();
+  const { email: rawEmail } = useHubAccess();
   const request = requests.find(r => r.id === Number(id));
   const [linkInput, setLinkInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
@@ -20,23 +25,32 @@ export default function RequestDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const header = (
+    <div style={{ fontSize: 14, fontWeight: 800, color: MT.text1, letterSpacing: "-0.01em", marginBottom: "1.5rem" }}>
+      FTC Hub — <span style={{ color: MT.primary }}>Marketing</span>
+    </div>
+  );
+
   if (!request) {
     return (
-      <div style={{ maxWidth: 900, margin: "3rem auto", textAlign: "center", fontFamily: MT.font, color: MT.text2 }}>
-        Solicitud no encontrada. <button onClick={() => navigate("/marketing/requests")} style={{ color: MT.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>Volver</button>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+        {header}
+        <div style={{ textAlign: "center", color: MT.text2, marginTop: "2rem" }}>Solicitud no encontrada.</div>
       </div>
     );
   }
 
   const myRole = authedUser?.role;
-  const myEmail = authedUser?.email.toLowerCase() ?? "";
+  const myEmail = rawEmail.toLowerCase();
   const isRequester = request.requesterEmail.toLowerCase() === myEmail;
   const isSharedViewer = request.sharedWithEmails.some(e => e.toLowerCase() === myEmail);
-  const canView = myRole !== "enlace" || isRequester || isSharedViewer;
+  // Internal roles (Laura/Diseño/Karol) can see every request, like Briefs/To Do — someone with
+  // no Marketing role at all can only see requests they created or were explicitly shared.
+  const canView = !!myRole || isRequester || isSharedViewer;
   const currentStage = request.stages.find(s => s.key === request.currentStage);
   const isMyDisenoAssignment = myRole !== "diseno" || !request.assignedDisenoEmail || request.assignedDisenoEmail.toLowerCase() === myEmail;
   const canDeliver = request.status === "in_progress" && currentStage?.role === "diseno" && myRole === "diseno" && isMyDisenoAssignment;
-  const canReview = request.status === "in_progress" && currentStage?.role === "enlace" && isRequester;
+  const canReview = request.status === "in_progress" && currentStage?.role === "requester" && isRequester;
   const canAssign = myRole === "laura" || myRole === "carol";
 
   const fieldStyle: React.CSSProperties = {
@@ -60,17 +74,21 @@ export default function RequestDetailPage() {
 
   if (!canView) {
     return (
-      <div style={{ maxWidth: 900, margin: "3rem auto", textAlign: "center", fontFamily: MT.font, color: MT.text2 }}>
-        No tienes acceso a esta solicitud. <button onClick={() => navigate("/marketing/requests")} style={{ color: MT.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>Volver</button>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+        {header}
+        <div style={{ textAlign: "center", color: MT.text2, marginTop: "2rem" }}>No tienes acceso a esta solicitud.</div>
       </div>
     );
   }
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <button onClick={() => navigate(-1)} style={{
-        background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
-      }}>← Volver</button>
+      {header}
+      {myRole && (
+        <button onClick={() => navigate("/marketing/requests")} style={{
+          background: "none", border: "none", color: MT.text2, cursor: "pointer", fontSize: 12.5, marginBottom: 12, padding: 0,
+        }}>← Volver a Solicitudes</button>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
         <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{request.title}</h1>

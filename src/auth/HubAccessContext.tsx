@@ -4,7 +4,7 @@ import { useMsal } from "@azure/msal-react";
 import { getHubAccessForEmail } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
 
-export type TeamRole = "admin" | "staff" | "carol" | "enlace";
+export type TeamRole = "admin" | "staff" | "carol";
 // email is set when a role is shared by more than one person (e.g. Marketing's 3 Diseño people) —
 // it simulates being that specific person, not just the role, so per-person features work in preview.
 export interface ViewAs { team: string; role: TeamRole; email?: string }

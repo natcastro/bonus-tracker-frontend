@@ -1,8 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { MT } from "../theme";
-import { useMarketing } from "../context";
 
-const INTERNAL_TABS = [
+const TABS = [
   { to: "/marketing/tasks", label: "Mis tareas" },
   { to: "/marketing/todo", label: "To Do" },
   { to: "/marketing/home", label: "Briefs" },
@@ -10,15 +9,7 @@ const INTERNAL_TABS = [
   { to: "/marketing/requests", label: "Solicitudes" },
 ];
 
-// An "enlace" user only ever sees their own requests — no tab here should even hint at
-// Briefs/To Do/Dashboard existing, since those routes aren't registered for that role at all.
-const ENLACE_TABS = [
-  { to: "/marketing/requests", label: "Solicitudes" },
-];
-
 export default function TabBar() {
-  const { authedUser } = useMarketing();
-  const TABS = authedUser?.role === "enlace" ? ENLACE_TABS : INTERNAL_TABS;
   return (
     <div style={{
       display: "flex", gap: "1.25rem", padding: "0 1.5rem", background: MT.surface,

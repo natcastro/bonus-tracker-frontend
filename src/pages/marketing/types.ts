@@ -1,6 +1,4 @@
-// "enlace" is a restricted requester role — someone outside the Marketing team who can only
-// create and track their own requests, never see Briefs/To Do/Dashboard.
-export type MarketingRole = "laura" | "diseno" | "carol" | "enlace";
+export type MarketingRole = "laura" | "diseno" | "carol";
 
 export const PRODUCT_LINES = [
   "Línea Oro",
@@ -77,8 +75,8 @@ export interface MarketingBrief {
 export interface MarketingNotification {
   id: number;
   briefId: number | null;
-  // Set only for requester-specific pings (a usuario enlace's own request moved forward) —
-  // when present, this notification is scoped to that one email instead of a shared role inbox.
+  // Set only for requester-specific pings (a request's own creator, tracking it via its public
+  // link) — when present, this notification is scoped to that one email instead of a shared role inbox.
   requestId: number | null;
   targetEmail: string | null;
   // Whoever performed the action this notification is about — used to hide a notification from
@@ -222,15 +220,15 @@ export interface TodoTask {
   completedAt: string | null;
 }
 
-// ── Requests — created by a restricted "usuario enlace" (someone outside the Marketing team),
-// always fulfilled by Diseño, with a review/approve-or-changes loop the requester controls. ─────
+// ── Requests — created via a public link (no Marketing role needed, just a company Microsoft
+// login), always fulfilled by Diseño, with a review/approve-or-changes loop the requester controls.
 
 export type RequestStageKey = "delivery" | "review";
 
 export interface RequestStage {
   key: RequestStageKey;
   label: string;
-  role: "diseno" | "enlace";
+  role: "diseno" | "requester";
   gapDays: number;
   deadline: string | null;
   link: string | null;
@@ -244,9 +242,9 @@ export interface RequestStage {
   overdueLastRemindAt?: string;
 }
 
-export const REQUEST_STAGE_DEFS: { key: RequestStageKey; label: string; role: "diseno" | "enlace"; gapDays: number }[] = [
-  { key: "delivery", label: "Entrega de Diseño",         role: "diseno", gapDays: 3 },
-  { key: "review",   label: "Revisión del solicitante",  role: "enlace", gapDays: 2 },
+export const REQUEST_STAGE_DEFS: { key: RequestStageKey; label: string; role: "diseno" | "requester"; gapDays: number }[] = [
+  { key: "delivery", label: "Entrega de Diseño",         role: "diseno",     gapDays: 3 },
+  { key: "review",   label: "Revisión del solicitante",  role: "requester", gapDays: 2 },
 ];
 
 export function requestStageLabel(key: RequestStageKey | "completed"): string {
@@ -260,7 +258,7 @@ export interface MarketingRequest {
   title: string;
   description: string;
   attachments: string[];
-  // Other "enlace" emails explicitly invited to view/track this request — read-only, they don't
+  // Other company emails explicitly invited to view/track this request — read-only, they don't
   // get approval rights (only the original requester does).
   sharedWithEmails: string[];
   assignedDisenoEmail: string | null;

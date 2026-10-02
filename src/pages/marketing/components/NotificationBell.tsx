@@ -23,7 +23,6 @@ export default function NotificationBell() {
 
   const isUnread = (n: MarketingNotification) => {
     if (!authedUser) return false;
-    if (authedUser.role === "enlace") return !n.readTarget;
     if (authedUser.role === "laura") return !n.readLaura;
     if (authedUser.role === "carol") return !n.readCarol;
     return !n.readDiseno;

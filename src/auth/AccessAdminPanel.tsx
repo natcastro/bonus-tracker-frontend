@@ -18,17 +18,15 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
 const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];
 
 // Teams where access also needs a role — stored in hub_access as "TEAM:role" (e.g. "MEX:admin").
-// extraRoles lets a team offer extra role buttons beyond admin/staff (Marketing needs this for
-// Karol and for "usuario enlace" — a restricted requester who isn't part of the team itself).
+// extraRoles lets a team offer extra role buttons beyond admin/staff (only Marketing needs this, for Carol).
 const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: string; extraRoles?: { value: string; label: string }[] }[] = [
   { key: "MEX",       label: "FTC México", adminLabel: "Administrador", staffLabel: "Staff" },
   { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRoles: [
     { value: "carol", label: "Karol (coordinación)" },
-    { value: "enlace", label: "Usuario enlace" },
   ] },
 ];
 
-type RoleValue = "admin" | "staff" | "carol" | "enlace" | "";
+type RoleValue = "admin" | "staff" | "carol" | "";
 
 function parseTeams(teams: string[]) {
   const plain = teams.filter((t) => t !== "ALL" && !ROLE_TEAMS.some((rt) => t.startsWith(`${rt.key}:`)));

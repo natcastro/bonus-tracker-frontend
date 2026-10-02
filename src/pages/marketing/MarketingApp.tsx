@@ -11,8 +11,11 @@ import BriefDetailPage from "./pages/BriefDetailPage";
 import TodoTaskDetailPage from "./pages/TodoTaskDetailPage";
 import RequestsPage from "./pages/RequestsPage";
 import RequestDetailPage from "./pages/RequestDetailPage";
+import NewRequestPage from "./pages/NewRequestPage";
 
-function Shell() {
+// Everything under here needs an actual Marketing role (Laura/Diseño/Karol) — unlike
+// "nueva-solicitud" and "request/:id" below, which only need a company Microsoft login.
+function InternalShell() {
   const { authedUser, loading } = useMarketing();
 
   if (!authedUser) {
@@ -20,7 +23,7 @@ function Shell() {
       <div style={{ minHeight: "100vh", background: MT.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center", fontFamily: MT.font }}>
         <h1 style={{ fontSize: "1.3rem", fontWeight: 800, color: MT.text1, marginBottom: "0.5rem" }}>Sin rol asignado en Marketing</h1>
         <p style={{ color: MT.text2, maxWidth: 380 }}>
-          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura, Diseño, Karol o Usuario enlace) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
+          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura, Diseño o Karol) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
         </p>
       </div>
     );
@@ -49,29 +52,17 @@ function Shell() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <Navbar />
         <TabBar />
-        {/* An "enlace" user only ever gets these two routes registered — there is no URL that
-            can reach Briefs/To Do/Dashboard data for this role, not just a hidden UI for it. */}
-        {authedUser.role === "enlace" ? (
-          <Routes>
-            <Route index element={<Navigate to="requests" replace />} />
-            <Route path="requests" element={<RequestsPage />} />
-            <Route path="request/:id" element={<RequestDetailPage />} />
-            <Route path="*" element={<Navigate to="requests" replace />} />
-          </Routes>
-        ) : (
-          <Routes>
-            <Route index element={<Navigate to="tasks" replace />} />
-            <Route path="tasks" element={<MyTasksPage />} />
-            <Route path="todo" element={<TodoPage />} />
-            <Route path="home" element={<DashboardPage />} />
-            <Route path="dashboard" element={<TeamDashboardPage />} />
-            <Route path="brief/:id" element={<BriefDetailPage />} />
-            <Route path="todo/:id" element={<TodoTaskDetailPage />} />
-            <Route path="requests" element={<RequestsPage />} />
-            <Route path="request/:id" element={<RequestDetailPage />} />
-            <Route path="*" element={<Navigate to="tasks" replace />} />
-          </Routes>
-        )}
+        <Routes>
+          <Route index element={<Navigate to="tasks" replace />} />
+          <Route path="tasks" element={<MyTasksPage />} />
+          <Route path="todo" element={<TodoPage />} />
+          <Route path="home" element={<DashboardPage />} />
+          <Route path="dashboard" element={<TeamDashboardPage />} />
+          <Route path="brief/:id" element={<BriefDetailPage />} />
+          <Route path="todo/:id" element={<TodoTaskDetailPage />} />
+          <Route path="requests" element={<RequestsPage />} />
+          <Route path="*" element={<Navigate to="tasks" replace />} />
+        </Routes>
       </div>
     </div>
   );
@@ -80,7 +71,14 @@ function Shell() {
 export default function MarketingApp() {
   return (
     <MarketingProvider>
-      <Shell />
+      {/* "nueva-solicitud" and "request/:id" are reachable by anyone with a company Microsoft
+          login, no Marketing role needed — they're matched before the internal-only catch-all,
+          and render their own minimal layout (no Navbar/TabBar, which assume an internal role). */}
+      <Routes>
+        <Route path="nueva-solicitud" element={<NewRequestPage />} />
+        <Route path="request/:id" element={<RequestDetailPage />} />
+        <Route path="*" element={<InternalShell />} />
+      </Routes>
     </MarketingProvider>
   );
 }
