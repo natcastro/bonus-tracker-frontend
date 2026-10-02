@@ -81,6 +81,10 @@ export interface MarketingNotification {
   // when present, this notification is scoped to that one email instead of a shared role inbox.
   requestId: number | null;
   targetEmail: string | null;
+  // Whoever performed the action this notification is about — used to hide a notification from
+  // the very person who caused it (you don't need to be told about your own action), while still
+  // showing it to everyone else who shares that role/inbox.
+  actorEmail: string | null;
   message: string;
   createdAt: string;
   readLaura: boolean;

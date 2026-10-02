@@ -145,7 +145,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       isEnlace ? Promise.resolve([]) : getPrivateTasks(myEmail),
       isEnlace ? Promise.resolve([]) : getTodoTasks(),
     ]);
-    setNotifications(n); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt);
+    // Never show someone a notification about their own action — only about what others did.
+    const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
+    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt);
   }, [myEmail, myRoleForLoad]);
 
   const createPrivateTask = async (title: string, dueAt: string) => {
@@ -396,13 +398,15 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const disenoRecipients = (brief: MarketingBrief): string[] =>
     brief.assignedDisenoEmail ? [brief.assignedDisenoEmail] : disenoEmailList;
 
+  // Always stamped with whoever is doing the action right now — so it never shows back up as a
+  // notification "to" that same person (you don't need to be told about your own action).
   const notify = async (briefId: number | null, message: string) => {
-    await createMarketingNotification(briefId, message);
+    await createMarketingNotification(briefId, message, { actorEmail: myEmail });
   };
 
   // Pings one specific requester — never the shared laura/diseno/carol broadcast feed.
   const notifyRequester = async (requestId: number, requesterEmail: string, message: string) => {
-    await createMarketingNotification(null, message, { targetEmail: requesterEmail, requestId });
+    await createMarketingNotification(null, message, { targetEmail: requesterEmail, requestId, actorEmail: myEmail });
   };
 
   // A brief going live either has someone assigned already (Laura picked at creation/publish, or
