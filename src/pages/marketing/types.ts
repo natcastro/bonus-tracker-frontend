@@ -213,9 +213,9 @@ export function todayIso(): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10);
 }
 
-// All deadlines cut off at 5:00 PM Colombia time (fixed UTC-5, no DST).
+// All deadlines cut off at 5:30 PM Colombia time (fixed UTC-5, no DST).
 export function deadlineTimestamp(dateIso: string): number {
-  return new Date(`${dateIso}T17:00:00-05:00`).getTime();
+  return new Date(`${dateIso}T17:30:00-05:00`).getTime();
 }
 
 export function isPastDeadline(dateIso: string): boolean {
