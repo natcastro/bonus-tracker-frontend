@@ -75,6 +75,9 @@ export interface MarketingBrief {
 export interface MarketingNotification {
   id: number;
   briefId: number | null;
+  // Whoever performed the action this notification is about — used to hide a notification from
+  // the very person who caused it, while still showing it to everyone else who shares that inbox.
+  actorEmail: string | null;
   message: string;
   createdAt: string;
   readLaura: boolean;

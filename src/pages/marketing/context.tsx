@@ -125,7 +125,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     const [b, n, t, tt] = await Promise.all([getMarketingBriefs(), getMarketingNotifications(), getPrivateTasks(myEmail), getTodoTasks()]);
-    setBriefs(b); setNotifications(n); setPrivateTasks(t); setTodoTasks(tt);
+    // Never show someone a notification about their own action — only about what others did.
+    const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
+    setBriefs(b); setNotifications(others); setPrivateTasks(t); setTodoTasks(tt);
   }, [myEmail]);
 
   const createPrivateTask = async (title: string, dueAt: string) => {
@@ -249,8 +251,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const disenoRecipients = (brief: MarketingBrief): string[] =>
     brief.assignedDisenoEmail ? [brief.assignedDisenoEmail] : disenoEmailList;
 
+  // Stamped with whoever is doing this right now, so it's filtered out of their own feed in reload().
   const notify = async (briefId: number | null, message: string) => {
-    await createMarketingNotification(briefId, message);
+    await createMarketingNotification(briefId, message, myEmail);
   };
 
   // A brief going live either has someone assigned already (Laura picked at creation/publish, or

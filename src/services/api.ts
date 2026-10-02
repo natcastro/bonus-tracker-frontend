@@ -1549,7 +1549,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
 
 function mapMarketingNotification(r: any): MarketingNotification {
   return {
-    id: r.id, briefId: r.brief_id, message: r.message, createdAt: r.created_at,
+    id: r.id, briefId: r.brief_id, actorEmail: r.actor_email ?? null, message: r.message, createdAt: r.created_at,
     readLaura: r.read_laura ?? false, readDiseno: r.read_diseno ?? false, readCarol: r.read_carol ?? false,
   };
 }
@@ -1626,8 +1626,8 @@ export async function getMarketingNotifications(): Promise<MarketingNotification
   return (data ?? []).map(mapMarketingNotification);
 }
 
-export async function createMarketingNotification(briefId: number | null, message: string): Promise<void> {
-  const { error } = await supabase.from("marketing_notifications").insert({ brief_id: briefId, message });
+export async function createMarketingNotification(briefId: number | null, message: string, actorEmail?: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").insert({ brief_id: briefId, message, actor_email: actorEmail?.toLowerCase() ?? null });
   if (error) throw error;
 }
 
