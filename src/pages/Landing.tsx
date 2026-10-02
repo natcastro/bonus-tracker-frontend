@@ -35,47 +35,48 @@ function HubCard({
       style={{
         background: "#fff",
         border: `1px solid ${active ? color : "#EEEEEE"}`,
-        borderLeft: `3px solid ${color}`,
-        borderRadius: "10px",
-        padding: "1.75rem",
+        borderTop: `3px solid ${color}`,
+        borderRadius: "14px",
+        padding: "1.85rem",
         cursor: "pointer",
         textAlign: "left",
-        transition: "box-shadow 0.2s, transform 0.15s",
-        boxShadow: active ? `0 4px 16px ${color}1a` : "0 1px 2px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.25s, transform 0.25s, border-color 0.25s",
+        boxShadow: active ? `0 4px 16px ${color}22` : "0 1px 2px rgba(35,31,32,0.04), 0 6px 16px -4px rgba(35,31,32,0.06)",
         display: "flex",
         flexDirection: "column",
-        gap: "0.9rem",
+        gap: "1rem",
         minWidth: 260,
         maxWidth: 360,
         flex: "1 1 260px",
         position: "relative",
+        fontFamily: "var(--font-body)",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 24px ${color}22`;
-        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 12px 28px -6px ${color}33`;
+        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-3px)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.boxShadow = active
-          ? `0 4px 16px ${color}1a`
-          : "0 1px 2px rgba(0,0,0,0.04)";
+          ? `0 4px 16px ${color}22`
+          : "0 1px 2px rgba(35,31,32,0.04), 0 6px 16px -4px rgba(35,31,32,0.06)";
         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span style={{
-          width: 42, height: 42,
+          width: 44, height: 44,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: color + "12",
-          borderRadius: "8px",
+          background: color + "14",
+          borderRadius: "10px",
           flexShrink: 0,
         }}>{icon}</span>
         <span style={{
-          fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.08em",
+          fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.09em",
           textTransform: "uppercase", color: color,
         }}>{eyebrow}</span>
       </div>
       <div>
-        <div style={{ fontWeight: 700, fontSize: "1.15rem", color: "#111827", letterSpacing: "-0.01em" }}>{title}</div>
+        <div style={{ fontFamily: "var(--font-display)", fontWeight: 400, fontSize: "1.3rem", color: "var(--ftc-black)", letterSpacing: "-0.005em" }}>{title}</div>
         <div style={{ fontSize: "0.85rem", color: "#6B7280", marginTop: 6, lineHeight: 1.5 }}>{subtitle}</div>
       </div>
     </button>
