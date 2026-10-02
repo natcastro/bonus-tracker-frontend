@@ -323,6 +323,9 @@ export function requestStageLabel(key: RequestStageKey | "completed"): string {
 export interface MarketingRequest {
   id: number;
   requesterEmail: string;
+  // The dropdown category (reuses TODO_TASK_TYPES) — "title" is the display name: the category
+  // itself, or the custom text typed in when taskType is "Otro".
+  taskType: string;
   title: string;
   description: string;
   attachments: string[];

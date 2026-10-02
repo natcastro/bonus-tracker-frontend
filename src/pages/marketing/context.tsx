@@ -94,7 +94,10 @@ interface MarketingCtx {
   // Requests — created via a public link by anyone with a company Microsoft login (no Marketing
   // role needed), always fulfilled by Diseño.
   requests: MarketingRequest[];
-  createRequest: (title: string, description: string, attachments: string[], sharedWithEmails: string[]) => Promise<number>;
+  createRequest: (opts: {
+    taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
+    startDate: string; assignedDisenoEmail?: string;
+  }) => Promise<number>;
   assignRequest: (requestId: number, email: string) => Promise<void>;
   submitRequestDelivery: (requestId: number, link: string, note?: string) => Promise<void>;
   requesterReview: (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => Promise<void>;
@@ -248,10 +251,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     link: null, completedAt: null, status: "pending" as const,
   }));
 
-  // A brand-new request has nobody assigned yet — Carol gets notified and has 24h to assign it
-  // before the round-robin timeout job (extended to also sweep marketing_requests) picks someone
-  // automatically, the same pattern an unassigned brief already uses.
-  const notifyRequestLive = async (title: string, deadline: string | null) => {
+  // If the requester picked a specific Diseño person, they get assigned and notified directly —
+  // "No sé" leaves it unassigned, Carol gets notified and has 24h to assign it before the
+  // round-robin timeout job (extended to also sweep marketing_requests) picks someone automatically.
+  const notifyRequestLive = async (title: string, assignedDisenoEmail: string | undefined, deadline: string | null) => {
+    if (assignedDisenoEmail) {
+      await sendMarketingEmail(
+        assignedDisenoEmail,
+        `Nueva solicitud — ${title}`,
+        emailHtml({ intro: "Te asignaron una nueva solicitud.", reference: title, nextTask: requestStageLabel("delivery"), deadline }),
+      );
+      return { assignedDisenoEmail, carolNotifiedAt: null as string | null };
+    }
     if (notifyEmails.carol) {
       await sendMarketingEmail(
         notifyEmails.carol,
@@ -262,23 +273,26 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         }),
       );
     }
-    return new Date().toISOString();
+    return { assignedDisenoEmail: null as string | null, carolNotifiedAt: new Date().toISOString() };
   };
 
   // No Marketing role is required to create a request — anyone who can log in with their
   // company Microsoft account (the only auth this whole Hub uses) can reach the public link and
   // submit one, identified by whatever email they're logged in as.
-  const createRequest = async (title: string, description: string, attachments: string[], sharedWithEmails: string[]): Promise<number> => {
+  const createRequest = async (opts: {
+    taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
+    startDate: string; assignedDisenoEmail?: string;
+  }): Promise<number> => {
     if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
-    const today = todayIso();
-    const stages = buildRequestStages(today);
-    const carolNotifiedAt = await notifyRequestLive(title, stages[0].deadline);
+    const stages = buildRequestStages(opts.startDate);
+    const assignment = await notifyRequestLive(opts.title, opts.assignedDisenoEmail, stages[0].deadline);
     const created = await apiCreateMarketingRequest({
-      requesterEmail: myEmail, title, description, attachments, sharedWithEmails,
-      assignedDisenoEmail: null, carolNotifiedAt, currentStage: "delivery", status: "in_progress",
-      stages, revisionRounds: 0, completedAt: null,
+      requesterEmail: myEmail, taskType: opts.taskType, title: opts.title, description: opts.description,
+      attachments: opts.attachments, sharedWithEmails: opts.sharedWithEmails,
+      currentStage: "delivery", status: "in_progress",
+      stages, revisionRounds: 0, completedAt: null, ...assignment,
     });
-    await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${title}.`);
+    await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${opts.title}.`);
     await reload();
     return created.id;
   };
