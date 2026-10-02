@@ -1,6 +1,8 @@
 :root {
-  --primary: #3E8C54;
-  --primary-hover: #2D7444;
+  /* FORMA TU CUERPO brand tokens (Brand Guide 2026) — primary interactive color is brand
+     black, since the corporate olive green is too light for white-on-color text/buttons. */
+  --primary: #231F20;
+  --primary-hover: #3A3435;
   --background: #FFFFFF;
   --surface: #FFFFFF;
   --text-main: #111827;
@@ -10,12 +12,26 @@
   --success: #10B981;
   --radius: 12px;
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+
+  --ftc-black: #231F20;
+  --ftc-green: #CCDB95;
+  --ftc-green-soft: #E3EEBF;
+  --ftc-green-softer: #E9F1D7;
+  --ftc-cream: #FFF6D7;
+  --ftc-pink: #FBC7C1;
+  --ftc-peach: #F9D5C9;
+  --ftc-apricot: #FDD6BA;
+  --ftc-taupe: #D7C4B7;
+  --ftc-butter: #EFDBB2;
+
+  --font-body: 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Alata', 'Lato', -apple-system, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
   background-color: var(--background);
   color: var(--text-main);
   line-height: 1.5;
@@ -33,11 +49,11 @@ body::before, body::after {
 }
 body::before {
   top: -12%; left: -10%; width: 460px; height: 460px;
-  background: radial-gradient(circle, rgba(62,140,84,0.14) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(204,219,149,0.35) 0%, transparent 70%);
 }
 body::after {
   bottom: -14%; right: -10%; width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(212,160,39,0.14) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(253,214,186,0.35) 0%, transparent 70%);
 }
 
 #root { min-height: 100vh; position: relative; z-index: 1; }
@@ -58,7 +74,24 @@ body::after {
   column-gap: 1.5rem;
 }
 
-.logo { font-size: 1.1rem; font-weight: 700; color: var(--primary); letter-spacing: -0.01em; }
+.logo {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.logo::before {
+  content: "";
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: var(--ftc-black) url("/favicon.png") center / 70% no-repeat;
+}
 
 /* Force the tab list onto its own full-width row, separated from the logo/logout row */
 .nav-links {
@@ -263,4 +296,23 @@ body::after {
 @media (max-width: 768px) {
   .top-nav { padding: 1rem; }
   .nav-links { gap: 0.5rem; }
+}
+
+/* Idle "alive" loop for mascot illustrations (Marketing bunny/bird) — a gentle breathing
+   scale plus an occasional blink-like flicker, never distracting, always skippable. */
+@keyframes ftc-mascot-breathe {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.035) rotate(-1.2deg); }
+}
+@keyframes ftc-mascot-blink {
+  0%, 92%, 100% { opacity: 1; }
+  94% { opacity: 0.55; }
+  96% { opacity: 1; }
+}
+.ftc-mascot {
+  animation: ftc-mascot-breathe 3.6s ease-in-out infinite, ftc-mascot-blink 5s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ftc-mascot { animation: none; }
 }

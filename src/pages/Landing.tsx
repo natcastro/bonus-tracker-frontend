@@ -5,6 +5,7 @@ import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
 import { GlobeIcon, ToolsIcon, ChartIcon, PackageIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon, ReturnIcon } from "../components/icons";
+import fcSymbol from "../assets/brand/fc-symbol.png";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING" | "DEVOLUCIONES";
 type View = "hub" | "ftc-usa" | "ops-tools";
@@ -135,12 +136,12 @@ export default function Landing() {
         {/* Soft brand-colored accents — kept out of the content area, which stays white */}
         <div aria-hidden style={{
           position: "fixed", top: "-12%", left: "-10%", width: 480, height: 480, borderRadius: "50%",
-          background: "radial-gradient(circle, #3E8C5433 0%, transparent 70%)",
+          background: "radial-gradient(circle, #CCDB9555 0%, transparent 70%)",
           filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
         }} />
         <div aria-hidden style={{
           position: "fixed", bottom: "-15%", right: "-10%", width: 560, height: 560, borderRadius: "50%",
-          background: "radial-gradient(circle, #D4A02733 0%, transparent 70%)",
+          background: "radial-gradient(circle, #FDD6BA55 0%, transparent 70%)",
           filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
         }} />
 
@@ -161,19 +162,24 @@ export default function Landing() {
         {showAdminPanel && <AccessAdminPanel onClose={() => setShowAdminPanel(false)} />}
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem", position: "relative", zIndex: 1 }}>
+          <img src={fcSymbol} alt="" aria-hidden style={{ height: 56, marginBottom: "0.9rem" }} />
           <div style={{
             fontSize: "0.8rem",
             fontWeight: 700,
             letterSpacing: "0.15em",
-            color: "#3E8C54",
+            color: "var(--ftc-black)",
             textTransform: "uppercase",
             marginBottom: "0.5rem",
-          }}>Forma tu Cuerpo</div>
+          }}>
+            Forma tu Cuerpo
+            <span style={{ display: "inline-block", width: 24, height: 3, background: "var(--ftc-green)", borderRadius: 999, marginLeft: 8, verticalAlign: "middle" }} />
+          </div>
           <h1 style={{
+            fontFamily: "var(--font-display)",
             fontSize: "2.75rem",
-            fontWeight: 800,
-            color: "#0F172A",
-            letterSpacing: "-0.03em",
+            fontWeight: 400,
+            color: "var(--ftc-black)",
+            letterSpacing: "-0.01em",
             margin: 0,
           }}>FTC Hub</h1>
           <p style={{ color: "#6B7280", marginTop: "0.6rem", fontSize: "0.95rem" }}>
@@ -289,7 +295,7 @@ export default function Landing() {
 
         <div style={{ textAlign: "center", marginBottom: "2.5rem", width: "100%" }}>
           <div style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.15em", color: "#1e40af", textTransform: "uppercase", marginBottom: "0.4rem" }}>FTC USA</div>
-          <h2 style={{ fontSize: "2rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", margin: 0 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", fontWeight: 400, color: "var(--ftc-black)", letterSpacing: "-0.01em", margin: 0 }}>
             Selecciona tu área
           </h2>
         </div>
@@ -374,7 +380,7 @@ export default function Landing() {
 
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.15em", color: "#475569", textTransform: "uppercase", marginBottom: "0.4rem" }}>Operational Tools</div>
-        <h2 style={{ fontSize: "2rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", margin: 0 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", fontWeight: 400, color: "var(--ftc-black)", letterSpacing: "-0.01em", margin: 0 }}>
           Herramientas internas
         </h2>
       </div>

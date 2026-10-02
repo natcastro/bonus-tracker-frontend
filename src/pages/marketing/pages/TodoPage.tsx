@@ -61,7 +61,7 @@ export default function TodoPage() {
           <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Tareas rápidas de Karol — separado de Briefs</p>
         </div>
-        <img src={bird.src} alt={bird.label} title={`${onTimePct}% a tiempo — ${bird.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
+        <img className="ftc-mascot" src={bird.src} alt={bird.label} title={`${onTimePct}% a tiempo — ${bird.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
       </div>
 
       {/* KPI strip */}
