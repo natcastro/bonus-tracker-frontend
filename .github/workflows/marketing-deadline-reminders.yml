@@ -1,8 +1,8 @@
-name: Marketing 24h reminders
+name: Marketing deadline reminders
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -11,5 +11,5 @@ jobs:
     steps:
       - name: Trigger reminder check
         run: |
-          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-24h-reminders" \
+          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-deadline-reminders" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

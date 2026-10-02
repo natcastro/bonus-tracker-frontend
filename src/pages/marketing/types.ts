@@ -23,7 +23,12 @@ export interface MarketingStage {
   status: "pending" | "done";
   decision?: "approved" | "changes_requested" | "extra_revision";
   late?: boolean;
-  reminded24h?: boolean;
+  // Written by the check-deadline-reminders Netlify function — tracks which scheduled
+  // deadline-alert emails have already gone out for this stage, so it never double-sends.
+  remind24hAt?: string;
+  remind12hAt?: string;
+  remind1hAt?: string;
+  overdueLastRemindAt?: string;
 }
 
 export const PUBLICATION_PLATFORMS = [
@@ -171,6 +176,12 @@ export interface TodoStage {
   status: "pending" | "done";
   decision?: "approved" | "changes_requested";
   late?: boolean;
+  // Written by the check-deadline-reminders Netlify function — tracks which scheduled
+  // deadline-alert emails have already gone out for this stage, so it never double-sends.
+  remind24hAt?: string;
+  remind12hAt?: string;
+  remind1hAt?: string;
+  overdueLastRemindAt?: string;
 }
 
 export const TODO_STAGE_DEFS: { key: TodoStageKey; label: string; role: "diseno" | "carol"; gapDays: number }[] = [

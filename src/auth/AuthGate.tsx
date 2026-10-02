@@ -52,7 +52,10 @@ function LoginScreen() {
       </div>
       <h1 style={{ fontSize: "2.25rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.03em", margin: "0 0 1.75rem" }}>FTC Hub</h1>
       <button
-        onClick={() => instance.loginRedirect(loginRequest)}
+        onClick={() => {
+          const path = window.location.pathname + window.location.search;
+          instance.loginRedirect(path && path !== "/" ? { ...loginRequest, state: path } : loginRequest);
+        }}
         disabled={inProgress !== InteractionStatus.None}
         style={{
           display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.95rem", fontWeight: 700,
