@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { MT } from "./theme";
 import { MarketingProvider, useMarketing } from "./context";
 import Navbar from "./components/Navbar";
-import TabBar from "./components/TabBar";
 import MyTasksPage from "./pages/MyTasksPage";
 import DashboardPage from "./pages/DashboardPage";
 import TodoPage from "./pages/TodoPage";
@@ -51,7 +50,6 @@ function InternalShell() {
       }} />
       <div style={{ position: "relative", zIndex: 1 }}>
         <Navbar />
-        <TabBar />
         <Routes>
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MyTasksPage />} />

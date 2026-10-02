@@ -1,5 +1,4 @@
 import { NavLink } from "react-router-dom";
-import { MT } from "../theme";
 
 const TABS = [
   { to: "/marketing/tasks", label: "Mis tareas" },
@@ -9,21 +8,16 @@ const TABS = [
   { to: "/marketing/requests", label: "Solicitudes" },
 ];
 
+// Same .nav-links styling (and the same brand font/colors) every other module's top-nav already
+// uses — Marketing used to have its own separate look, now it matches.
 export default function TabBar() {
   return (
-    <div style={{
-      display: "flex", gap: "1.25rem", padding: "0 1.5rem", background: MT.surface,
-      borderBottom: `1px solid ${MT.border}`, position: "sticky", top: 49, zIndex: 40, fontFamily: MT.font,
-    }}>
+    <ul className="nav-links">
       {TABS.map(t => (
-        <NavLink key={t.to} to={t.to} style={({ isActive }) => ({
-          padding: "0.6rem 0.1rem", fontSize: 13, fontWeight: 700, textDecoration: "none",
-          color: isActive ? MT.primary : MT.text2,
-          borderBottom: `2px solid ${isActive ? MT.primary : "transparent"}`,
-        })}>
+        <NavLink key={t.to} to={t.to} className={({ isActive }) => (isActive ? "active" : "")}>
           {t.label}
         </NavLink>
       ))}
-    </div>
+    </ul>
   );
 }

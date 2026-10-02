@@ -35,7 +35,8 @@ export const MT = {
   shadow: "0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)",
   shadowLg: "0 4px 16px rgba(17,24,39,0.08), 0 24px 48px rgba(17,24,39,0.10)",
 
-  font: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`,
+  // Same brand font (Lato) every other module's shared index.css already uses.
+  font: `var(--font-body, 'Lato'), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
   mono: `"SF Mono", "Menlo", "Monaco", Consolas, monospace`,
 
   radius: 10,
