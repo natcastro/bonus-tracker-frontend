@@ -11,7 +11,7 @@ import type {
   UploadBatch, UploadRow, AffiliateContestEntry, SampleAnalysisPeriod, SampleAnalysisRow,
   DevolucionesUpload, DevolucionesRow,
 } from "../types";
-import type { MarketingBrief, MarketingNotification, PrivateTask, TodoTask } from "../pages/marketing/types";
+import type { MarketingBrief, MarketingNotification, MarketingRequest, PrivateTask, TodoTask } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1550,8 +1550,11 @@ function mapMarketingBrief(r: any): MarketingBrief {
 
 function mapMarketingNotification(r: any): MarketingNotification {
   return {
-    id: r.id, briefId: r.brief_id, actorEmail: r.actor_email ?? null, message: r.message, createdAt: r.created_at,
+    id: r.id, briefId: r.brief_id, requestId: r.request_id ?? null, targetEmail: r.target_email ?? null,
+    actorEmail: r.actor_email ?? null,
+    message: r.message, createdAt: r.created_at,
     readLaura: r.read_laura ?? false, readDiseno: r.read_diseno ?? false, readCarol: r.read_carol ?? false,
+    readTarget: r.read_target ?? false,
   };
 }
 
@@ -1623,14 +1626,23 @@ export async function deleteMarketingBrief(id: number): Promise<void> {
   if (error) throw error;
 }
 
-export async function getMarketingNotifications(): Promise<MarketingNotification[]> {
-  const { data, error } = await supabase.from("marketing_notifications").select("*").order("created_at", { ascending: false }).limit(100);
+// Internal roles (laura/diseno/carol) share one broadcast feed (target_email is null); a
+// requester's own notifications are scoped to just their email and never shown in that feed.
+export async function getMarketingNotifications(targetEmail?: string): Promise<MarketingNotification[]> {
+  let query = supabase.from("marketing_notifications").select("*").order("created_at", { ascending: false }).limit(100);
+  query = targetEmail ? query.eq("target_email", targetEmail.toLowerCase()) : query.is("target_email", null);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(mapMarketingNotification);
 }
 
-export async function createMarketingNotification(briefId: number | null, message: string, actorEmail?: string): Promise<void> {
-  const { error } = await supabase.from("marketing_notifications").insert({ brief_id: briefId, message, actor_email: actorEmail?.toLowerCase() ?? null });
+export async function createMarketingNotification(
+  briefId: number | null, message: string, opts?: { targetEmail?: string; requestId?: number; actorEmail?: string },
+): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").insert({
+    brief_id: briefId, message, target_email: opts?.targetEmail?.toLowerCase() ?? null, request_id: opts?.requestId ?? null,
+    actor_email: opts?.actorEmail?.toLowerCase() ?? null,
+  });
   if (error) throw error;
 }
 
@@ -1638,6 +1650,13 @@ export async function markMarketingNotificationsRead(role: "laura"|"diseno"|"car
   if (ids.length === 0) return;
   const field = role === "laura" ? "read_laura" : role === "carol" ? "read_carol" : "read_diseno";
   const { error } = await supabase.from("marketing_notifications").update({ [field]: true }).in("id", ids);
+  if (error) throw error;
+}
+
+// A requester only ever marks their own notifications read — filtering by target_email here is
+// a belt-and-suspenders check on top of the UI only ever calling this with the viewer's own id.
+export async function markTargetNotificationRead(email: string, id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_notifications").update({ read_target: true }).eq("id", id).eq("target_email", email.toLowerCase());
   if (error) throw error;
 }
 
@@ -1733,6 +1752,56 @@ export async function updateTodoTask(id: number, patch: Partial<Omit<TodoTask, "
 export async function deleteTodoTask(id: number): Promise<void> {
   const { error } = await supabase.from("marketing_todo_tasks").delete().eq("id", id);
   if (error) throw error;
+}
+
+function mapMarketingRequest(r: any): MarketingRequest {
+  return {
+    id: r.id, requesterEmail: r.requester_email, title: r.title, description: r.description ?? "",
+    attachments: Array.isArray(r.attachments) ? r.attachments : [],
+    sharedWithEmails: Array.isArray(r.shared_with_emails) ? r.shared_with_emails : [],
+    assignedDisenoEmail: r.assigned_diseno_email ?? null, carolNotifiedAt: r.carol_notified_at ?? null,
+    currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
+    revisionRounds: r.revision_rounds ?? 0, createdAt: r.created_at, completedAt: r.completed_at,
+  };
+}
+
+export async function getMarketingRequests(): Promise<MarketingRequest[]> {
+  const { data, error } = await supabase.from("marketing_requests").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapMarketingRequest);
+}
+
+export async function createMarketingRequest(r: Omit<MarketingRequest, "id" | "createdAt">): Promise<MarketingRequest> {
+  const { data, error } = await supabase.from("marketing_requests").insert({
+    requester_email: r.requesterEmail, title: r.title, description: r.description, attachments: r.attachments,
+    shared_with_emails: r.sharedWithEmails, assigned_diseno_email: r.assignedDisenoEmail, carol_notified_at: r.carolNotifiedAt,
+    current_stage: r.currentStage, status: r.status, stages: r.stages, revision_rounds: r.revisionRounds, completed_at: r.completedAt,
+  }).select().single();
+  if (error) throw error;
+  return mapMarketingRequest(data);
+}
+
+export async function updateMarketingRequest(id: number, patch: Partial<Omit<MarketingRequest, "id" | "createdAt">>): Promise<void> {
+  const dbPatch: any = {};
+  if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.stages !== undefined) dbPatch.stages = patch.stages;
+  if (patch.assignedDisenoEmail !== undefined) dbPatch.assigned_diseno_email = patch.assignedDisenoEmail;
+  if (patch.carolNotifiedAt !== undefined) dbPatch.carol_notified_at = patch.carolNotifiedAt;
+  if (patch.revisionRounds !== undefined) dbPatch.revision_rounds = patch.revisionRounds;
+  if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
+  if (patch.sharedWithEmails !== undefined) dbPatch.shared_with_emails = patch.sharedWithEmails;
+  const { error } = await supabase.from("marketing_requests").update(dbPatch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function uploadMarketingRequestFile(requesterEmail: string, file: File): Promise<string> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${requesterEmail.toLowerCase()}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("marketing-request-files").upload(path, file);
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("marketing-request-files").getPublicUrl(path);
+  return urlData.publicUrl;
 }
 
 export type MarketingNotifySlot = "laura" | "carol" | "diseno_1" | "diseno_2" | "diseno_3";

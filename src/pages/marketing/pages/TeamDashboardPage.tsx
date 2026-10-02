@@ -128,7 +128,7 @@ export default function TeamDashboardPage() {
     for (const b of published) {
       const allStages = b.variants ? b.variants.filter(v => v.applicable).flatMap(v => v.stages) : b.stages;
       for (const s of allStages) {
-        if (s.status !== "done" || !s.completedAt || s.role === "carol") continue;
+        if (s.status !== "done" || !s.completedAt) continue;
         list.push({ completedAt: s.completedAt, late: !!s.late, role: s.role, stageKey: s.key });
       }
     }

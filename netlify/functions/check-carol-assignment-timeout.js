@@ -10,8 +10,8 @@ async function sbFetch(path) {
   return resp.json();
 }
 
-async function updateBrief(id, patch) {
-  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_briefs?id=eq.${id}`;
+async function updateRow(table, id, patch) {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`;
   const resp = await fetch(url, {
     method: "PATCH",
     headers: { ...supabaseHeaders(), Prefer: "return=minimal" },
@@ -20,12 +20,12 @@ async function updateBrief(id, patch) {
   if (!resp.ok) throw new Error(`Supabase update failed: ${resp.status} ${await resp.text()}`);
 }
 
-async function insertNotification(briefId, message) {
+async function insertNotification(idField, id, message) {
   const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_notifications`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { ...supabaseHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify({ brief_id: briefId, message }),
+    body: JSON.stringify({ [idField]: id, message }),
   });
   if (!resp.ok) throw new Error(`Supabase insert failed: ${resp.status} ${await resp.text()}`);
 }
@@ -80,13 +80,41 @@ function emailHtml(intro, reference) {
   </div>`;
 }
 
-// Round-robin among the 3 configured Diseño emails: whoever has the fewest briefs ever
-// assigned to them (across the brief's whole history) gets the next unassigned one.
+// Round-robin among the 3 configured Diseño emails: whoever has the fewest briefs+requests ever
+// assigned to them (across their whole history) gets the next unassigned one.
 function pickNextDiseno(disenoEmails, allAssignedEmails) {
   const counts = disenoEmails.map(email => allAssignedEmails.filter(e => e === email).length);
   let minIdx = 0;
   for (let i = 1; i < counts.length; i++) if (counts[i] < counts[minIdx]) minIdx = i;
   return disenoEmails[minIdx];
+}
+
+// Sweeps one table's unassigned, Carol-notified-24h-ago rows and auto-assigns the next Diseño
+// person — same logic for marketing_briefs and marketing_requests, just different id fields.
+async function sweepTable({ table, idField, referenceField, rows, disenoEmails, assignedEmailHistory, now }) {
+  let assigned = 0;
+  for (const row of rows) {
+    const notifiedAt = new Date(row.carol_notified_at).getTime();
+    if (now - notifiedAt < 24 * 3600 * 1000) continue;
+
+    const email = pickNextDiseno(disenoEmails, assignedEmailHistory);
+    assignedEmailHistory.push(email); // so the next row in this same run doesn't pick the same person
+
+    const reference = row[referenceField];
+    try {
+      await updateRow(table, row.id, { assigned_diseno_email: email, carol_notified_at: null });
+      await insertNotification(idField, row.id, `Se asignó automáticamente "${reference}" a Diseño — Karol no lo asignó a tiempo.`);
+      await sendGraphMail(
+        email,
+        `Te asignaron ${idField === "brief_id" ? "un brief" : "una solicitud"} — ${reference}`,
+        emailHtml("Se te asignó esto automáticamente porque no fue asignado a tiempo.", reference),
+      );
+      assigned++;
+    } catch (err) {
+      console.error(`Failed to auto-assign ${table} ${row.id}:`, err.message);
+    }
+  }
+  return assigned;
 }
 
 export const handler = async (event) => {
@@ -95,12 +123,14 @@ export const handler = async (event) => {
     return { statusCode: 401, body: "Unauthorized" };
   }
 
-  let briefs, notifyEmailRows, history;
+  let briefs, requests, notifyEmailRows, briefHistory, requestHistory;
   try {
-    [briefs, notifyEmailRows, history] = await Promise.all([
+    [briefs, requests, notifyEmailRows, briefHistory, requestHistory] = await Promise.all([
       sbFetch("marketing_briefs?status=eq.in_progress&assigned_diseno_email=is.null&carol_notified_at=not.is.null&select=*"),
+      sbFetch("marketing_requests?status=eq.in_progress&assigned_diseno_email=is.null&carol_notified_at=not.is.null&select=*"),
       sbFetch("marketing_notify_emails?select=*"),
       sbFetch("marketing_briefs?assigned_diseno_email=not.is.null&select=assigned_diseno_email"),
+      sbFetch("marketing_requests?assigned_diseno_email=not.is.null&select=assigned_diseno_email"),
     ]);
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
@@ -110,33 +140,20 @@ export const handler = async (event) => {
   notifyEmailRows.forEach(r => { notifyMap[r.role] = r.email; });
   const disenoEmails = [notifyMap.diseno_1, notifyMap.diseno_2, notifyMap.diseno_3].filter(Boolean);
   if (disenoEmails.length === 0) {
-    return { statusCode: 200, body: JSON.stringify({ checked: briefs.length, assigned: 0, note: "No Diseño emails configured" }) };
+    return { statusCode: 200, body: JSON.stringify({ checked: briefs.length + requests.length, assigned: 0, note: "No Diseño emails configured" }) };
   }
 
   const now = Date.now();
-  const assignedEmailHistory = history.map(r => r.assigned_diseno_email);
-  let assigned = 0;
+  const assignedEmailHistory = [...briefHistory, ...requestHistory].map(r => r.assigned_diseno_email);
 
-  for (const brief of briefs) {
-    const notifiedAt = new Date(brief.carol_notified_at).getTime();
-    if (now - notifiedAt < 24 * 3600 * 1000) continue;
+  const assignedBriefs = await sweepTable({
+    table: "marketing_briefs", idField: "brief_id", referenceField: "reference",
+    rows: briefs, disenoEmails, assignedEmailHistory, now,
+  });
+  const assignedRequests = await sweepTable({
+    table: "marketing_requests", idField: "request_id", referenceField: "title",
+    rows: requests, disenoEmails, assignedEmailHistory, now,
+  });
 
-    const email = pickNextDiseno(disenoEmails, assignedEmailHistory);
-    assignedEmailHistory.push(email); // so the next brief in this same run doesn't pick the same person
-
-    try {
-      await updateBrief(brief.id, { assigned_diseno_email: email, carol_notified_at: null });
-      await insertNotification(brief.id, `Se asignó automáticamente ${brief.reference} a Diseño — Karol no lo asignó a tiempo.`);
-      await sendGraphMail(
-        email,
-        `Te asignaron un brief — ${brief.reference}`,
-        emailHtml("Se te asignó este brief automáticamente porque no fue asignado a tiempo.", brief.reference),
-      );
-      assigned++;
-    } catch (err) {
-      console.error(`Failed to auto-assign brief ${brief.id}:`, err.message);
-    }
-  }
-
-  return { statusCode: 200, body: JSON.stringify({ checked: briefs.length, assigned }) };
+  return { statusCode: 200, body: JSON.stringify({ checked: briefs.length + requests.length, assigned: assignedBriefs + assignedRequests }) };
 };

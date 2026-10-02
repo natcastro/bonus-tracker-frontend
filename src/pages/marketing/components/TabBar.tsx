@@ -6,6 +6,7 @@ const TABS = [
   { to: "/marketing/todo", label: "To Do" },
   { to: "/marketing/home", label: "Briefs" },
   { to: "/marketing/dashboard", label: "Dashboard" },
+  { to: "/marketing/requests", label: "Solicitudes" },
 ];
 
 export default function TabBar() {

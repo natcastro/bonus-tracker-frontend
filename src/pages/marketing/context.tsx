@@ -2,17 +2,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
-  getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, sendMarketingEmail,
+  getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, markTargetNotificationRead, sendMarketingEmail,
   deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
   getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
   togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
   getTodoTasks, createTodoTask as apiCreateTodoTask, updateTodoTask, deleteTodoTask as apiDeleteTodoTask,
+  getMarketingRequests, createMarketingRequest as apiCreateMarketingRequest, updateMarketingRequest,
 } from "../../services/api";
 import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
-import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels } from "./types";
+import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -89,6 +90,14 @@ interface MarketingCtx {
   // Human-friendly label for a Diseño email — that person's Hub Access nickname if they have
   // one, otherwise the raw email, otherwise "Diseño" when nobody is assigned.
   disenoDisplayName: (email: string | null) => string;
+
+  // Requests — created via a public link by anyone with a company Microsoft login (no Marketing
+  // role needed), always fulfilled by Diseño.
+  requests: MarketingRequest[];
+  createRequest: (title: string, description: string, attachments: string[], sharedWithEmails: string[]) => Promise<number>;
+  assignRequest: (requestId: number, email: string) => Promise<void>;
+  submitRequestDelivery: (requestId: number, link: string, note?: string) => Promise<void>;
+  requesterReview: (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => Promise<void>;
 }
 
 const Ctx = createContext<MarketingCtx | null>(null);
@@ -105,6 +114,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<MarketingNotification[]>([]);
   const [privateTasks, setPrivateTasks] = useState<PrivateTask[]>([]);
   const [todoTasks, setTodoTasks] = useState<TodoTask[]>([]);
+  const [requests, setRequests] = useState<MarketingRequest[]>([]);
   const [notifyEmails, setNotifyEmails] = useState<MarketingNotifyEmails>(DEFAULT_NOTIFY_EMAILS);
   // Keyed by lowercased email — sourced from each person's Hub Access nickname, so a name never
   // has to be typed twice (once for login access, once for Marketing notifications).
@@ -131,12 +141,23 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return nicknames[email.toLowerCase()] || email;
   };
 
+  // Someone with no Marketing role (just visiting the public request link) never needs
+  // Briefs/To Do/private-task data — not fetching it at all (rather than just not rendering it)
+  // keeps that data out of their browser entirely.
+  const myRoleForLoad = getRole("MARKETING");
   const reload = useCallback(async () => {
-    const [b, n, t, tt] = await Promise.all([getMarketingBriefs(), getMarketingNotifications(), getPrivateTasks(myEmail), getTodoTasks()]);
+    const hasInternalRole = !!myRoleForLoad;
+    const [n, rq, b, t, tt] = await Promise.all([
+      getMarketingNotifications(hasInternalRole ? undefined : myEmail),
+      getMarketingRequests(),
+      hasInternalRole ? getMarketingBriefs() : Promise.resolve([]),
+      hasInternalRole ? getPrivateTasks(myEmail) : Promise.resolve([]),
+      hasInternalRole ? getTodoTasks() : Promise.resolve([]),
+    ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
-    setBriefs(b); setNotifications(others); setPrivateTasks(t); setTodoTasks(tt);
-  }, [myEmail]);
+    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt);
+  }, [myEmail, myRoleForLoad]);
 
   const createPrivateTask = async (title: string, dueAt: string) => {
     await apiCreatePrivateTask(myEmail, title, dueAt);
@@ -222,6 +243,137 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  const buildRequestStages = (startDate: string) => REQUEST_STAGE_DEFS.map((def, i) => ({
+    ...def, deadline: i === 0 ? addWorkDaysIso(startDate, def.gapDays) : null,
+    link: null, completedAt: null, status: "pending" as const,
+  }));
+
+  // A brand-new request has nobody assigned yet — Carol gets notified and has 24h to assign it
+  // before the round-robin timeout job (extended to also sweep marketing_requests) picks someone
+  // automatically, the same pattern an unassigned brief already uses.
+  const notifyRequestLive = async (title: string, deadline: string | null) => {
+    if (notifyEmails.carol) {
+      await sendMarketingEmail(
+        notifyEmails.carol,
+        `Nueva solicitud sin asignar — ${title}`,
+        emailHtml({
+          intro: "Hay una nueva solicitud (enviada por el enlace público) sin asignar. Entra a la plataforma y asígnala a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
+          reference: title, nextTask: requestStageLabel("delivery"), deadline,
+        }),
+      );
+    }
+    return new Date().toISOString();
+  };
+
+  // No Marketing role is required to create a request — anyone who can log in with their
+  // company Microsoft account (the only auth this whole Hub uses) can reach the public link and
+  // submit one, identified by whatever email they're logged in as.
+  const createRequest = async (title: string, description: string, attachments: string[], sharedWithEmails: string[]): Promise<number> => {
+    if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
+    const today = todayIso();
+    const stages = buildRequestStages(today);
+    const carolNotifiedAt = await notifyRequestLive(title, stages[0].deadline);
+    const created = await apiCreateMarketingRequest({
+      requesterEmail: myEmail, title, description, attachments, sharedWithEmails,
+      assignedDisenoEmail: null, carolNotifiedAt, currentStage: "delivery", status: "in_progress",
+      stages, revisionRounds: 0, completedAt: null,
+    });
+    await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${title}.`);
+    await reload();
+    return created.id;
+  };
+
+  const assignRequest = async (requestId: number, email: string) => {
+    const req = requests.find(r => r.id === requestId);
+    await updateMarketingRequest(requestId, { assignedDisenoEmail: email, carolNotifiedAt: null });
+    if (req) {
+      const stage = req.stages.find(s => s.key === req.currentStage);
+      await sendMarketingEmail(
+        email,
+        `Te asignaron una solicitud — ${req.title}`,
+        emailHtml({ intro: "Te asignaron esta solicitud.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
+      );
+    }
+    await reload();
+  };
+
+  const submitRequestDelivery = async (requestId: number, link: string, note?: string) => {
+    const req = requests.find(r => r.id === requestId);
+    if (!req || req.status === "completed") return;
+    const stageIdx = req.stages.findIndex(s => s.key === req.currentStage);
+    if (stageIdx === -1) return;
+    const stage = req.stages[stageIdx];
+    const today = todayIso();
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+    const nextStage = req.stages[stageIdx + 1];
+    const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
+    const newStages = req.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, link, completedAt: today, status: "done" as const, late: isLate };
+      if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
+      return s;
+    });
+    await updateMarketingRequest(requestId, { stages: newStages, currentStage: nextStage ? nextStage.key : req.currentStage });
+    await notify(null, `Diseño entregó la solicitud "${req.title}".${isLate ? ` (tarde — vencía ${stage.deadline})` : ""}${note ? ` Nota: ${note}` : ""}`);
+    if (nextStage) {
+      await notifyRequester(req.id, req.requesterEmail, `Tu solicitud "${req.title}" ya tiene una entrega — te toca revisarla.`);
+      for (const email of [req.requesterEmail, ...req.sharedWithEmails]) {
+        await sendMarketingEmail(
+          email,
+          `Entrega lista para revisión — ${req.title}`,
+          emailHtml({ intro: "Diseño entregó tu solicitud. Te toca revisarla.", reference: req.title, nextTask: requestStageLabel(nextStage.key), deadline: nextDeadline, note }),
+        );
+      }
+    }
+    await reload();
+  };
+
+  // Only the original requester decides — shared viewers can watch but not approve/reject.
+  const requesterReview = async (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => {
+    const req = requests.find(r => r.id === requestId);
+    if (!req || req.status === "completed") return;
+    if (!myEmail || req.requesterEmail.toLowerCase() !== myEmail.toLowerCase()) {
+      throw new Error("Solo quien creó la solicitud puede aprobarla o pedir cambios.");
+    }
+    const stageIdx = req.stages.findIndex(s => s.key === req.currentStage);
+    if (stageIdx === -1) return;
+    const stage = req.stages[stageIdx];
+    const today = todayIso();
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+
+    if (action === "approve") {
+      const newStages = req.stages.map(s => s.key === stage.key ? { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLate } : s);
+      await updateMarketingRequest(requestId, { stages: newStages, currentStage: "completed", status: "completed", completedAt: today });
+      await notify(null, `Solicitud completada: ${req.title}.${isLate ? " (tarde)" : ""}`);
+      if (req.assignedDisenoEmail) {
+        await sendMarketingEmail(
+          req.assignedDisenoEmail,
+          `Aprobado — ${req.title}`,
+          emailHtml({ intro: "El solicitante aprobó la entrega. La solicitud quedó completada.", reference: req.title, note: opts?.note }),
+        );
+      }
+      await reload();
+      return;
+    }
+
+    const deliveryGap = REQUEST_STAGE_DEFS.find(s => s.key === "delivery")!.gapDays;
+    const deliveryDeadline = addWorkDaysIso(today, deliveryGap);
+    const newStages = req.stages.map(s => {
+      if (s.key === "review") return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const, late: isLate };
+      if (s.key === "delivery") return { ...s, status: "pending" as const, completedAt: null, link: null, late: false, deadline: deliveryDeadline };
+      return s;
+    });
+    await updateMarketingRequest(requestId, { stages: newStages, currentStage: "delivery", revisionRounds: req.revisionRounds + 1 });
+    await notify(null, `Se solicitaron cambios en: ${req.title}.${isLate ? " (tarde)" : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
+    if (req.assignedDisenoEmail) {
+      await sendMarketingEmail(
+        req.assignedDisenoEmail,
+        `Cambios solicitados — ${req.title}`,
+        emailHtml({ intro: "El solicitante pidió cambios en la entrega.", reference: req.title, nextTask: requestStageLabel("delivery"), deadline: deliveryDeadline, note: opts?.note }),
+      );
+    }
+    await reload();
+  };
+
   const loadNicknames = useCallback(async (emails: MarketingNotifyEmails) => {
     try {
       const map = await getHubNicknames([myEmail, emails.laura, emails.carol, emails.diseno_1, emails.diseno_2, emails.diseno_3]);
@@ -259,9 +411,15 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const disenoRecipients = (brief: MarketingBrief): string[] =>
     brief.assignedDisenoEmail ? [brief.assignedDisenoEmail] : disenoEmailList;
 
-  // Stamped with whoever is doing this right now, so it's filtered out of their own feed in reload().
+  // Always stamped with whoever is doing the action right now — so it never shows back up as a
+  // notification "to" that same person (you don't need to be told about your own action).
   const notify = async (briefId: number | null, message: string) => {
-    await createMarketingNotification(briefId, message, myEmail);
+    await createMarketingNotification(briefId, message, { actorEmail: myEmail });
+  };
+
+  // Pings one specific requester — never the shared laura/diseno/carol broadcast feed.
+  const notifyRequester = async (requestId: number, requesterEmail: string, message: string) => {
+    await createMarketingNotification(null, message, { targetEmail: requesterEmail, requestId, actorEmail: myEmail });
   };
 
   // A brief going live either has someone assigned already (Laura picked at creation/publish, or
@@ -719,16 +877,25 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
-  const readField = (role: MarketingRole) => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
+  const readField = (role: "laura" | "diseno" | "carol") => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
 
+  // Someone with no Marketing role (tracking their own request via the public link) has their
+  // own personal notifications (target_email) instead of a shared laura/diseno/carol inbox.
   const unreadCount = useMemo(() => {
-    if (!authedUser) return 0;
+    if (!authedUser) return notifications.filter(n => !n.readTarget).length;
     const field = readField(authedUser.role);
     return notifications.filter(n => !n[field]).length;
   }, [notifications, authedUser]);
 
   const markNotificationRead = async (id: number) => {
-    if (!authedUser) return;
+    if (!authedUser) {
+      if (!myEmail) return;
+      const notif = notifications.find(n => n.id === id);
+      if (!notif || notif.readTarget) return;
+      await markTargetNotificationRead(myEmail, id);
+      await reload();
+      return;
+    }
     const field = readField(authedUser.role);
     const notif = notifications.find(n => n.id === id);
     if (!notif || notif[field]) return;
@@ -757,6 +924,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,
       notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
+      requests, createRequest, assignRequest, submitRequestDelivery, requesterReview,
     }}>
       {children}
     </Ctx.Provider>
