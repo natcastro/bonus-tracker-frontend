@@ -1,13 +1,25 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
+import { formatDateHuman } from "../theme";
+import StatusPill from "../components/StatusPill";
 import { useMarketing } from "../context";
-import { stageLabel, daysBetweenIso, todayIsoBogota } from "../types";
+import { stageLabel, todoStageLabel, daysBetweenIso, todayIsoBogota } from "../types";
 import type { StageKey } from "../types";
+
+interface DeliveryEntry {
+  completedAt: string;
+  late: boolean;
+  turnaroundDays: number;
+  reference: string;
+  kind: "brief" | "todo";
+  linkTo: string;
+}
 
 interface DisenoStats {
   email: string;
   name: string;
-  entries: { completedAt: string; late: boolean; turnaroundDays: number }[];
+  entries: DeliveryEntry[];
   avgDays: number | null;
   onTimePct: number;
   completedCount: number;
@@ -51,7 +63,10 @@ function subtractDaysIso(iso: string, days: number): string {
 
 export default function TeamDashboardPage() {
   const { briefs, todoTasks, disenoEmailList, disenoDisplayName } = useMarketing();
+  const navigate = useNavigate();
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const published = useMemo(() => briefs.filter(b => b.status !== "draft"), [briefs]);
 
@@ -60,7 +75,7 @@ export default function TeamDashboardPage() {
   // To Do tasks alike. Ranked shortest-first.
   const disenoStats: DisenoStats[] = useMemo(() => {
     return disenoEmailList.map(email => {
-      const entries: { completedAt: string; late: boolean; turnaroundDays: number }[] = [];
+      const entries: DeliveryEntry[] = [];
       for (const b of published) {
         if (!b.assignedDisenoEmail || b.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
         const briefStageSets = b.variants ? b.variants.filter(v => v.applicable).map(v => v.stages) : [b.stages];
@@ -68,7 +83,10 @@ export default function TeamDashboardPage() {
           stages.forEach((s, i) => {
             if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
             const start = (i > 0 ? stages[i - 1].completedAt : b.startDate) ?? b.startDate;
-            entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
+            entries.push({
+              completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+              reference: `${b.reference} — ${stageLabel(s.key)}`, kind: "brief", linkTo: `/marketing/brief/${b.id}`,
+            });
           });
         }
       }
@@ -77,7 +95,10 @@ export default function TeamDashboardPage() {
         t.stages.forEach((s, i) => {
           if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
           const start = (i > 0 ? t.stages[i - 1].completedAt : t.createdAt.slice(0, 10)) ?? t.createdAt.slice(0, 10);
-          entries.push({ completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)) });
+          entries.push({
+            completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+            reference: `${t.title} — ${todoStageLabel(s.key)}`, kind: "todo", linkTo: `/marketing/todo/${t.id}`,
+          });
         });
       }
       const completedCount = entries.length;
@@ -100,10 +121,19 @@ export default function TeamDashboardPage() {
   }, [published, todoTasks, disenoEmailList, disenoDisplayName]);
 
   const selected = disenoStats.find(d => d.email === selectedEmail) ?? null;
+  // The date range only scopes the selected person's own chart/list — the team-wide stats below
+  // stay as the all-time picture.
+  const selectedEntries = useMemo(() => {
+    if (!selected) return [];
+    return selected.entries
+      .filter(e => !dateFrom || e.completedAt >= dateFrom)
+      .filter(e => !dateTo || e.completedAt <= dateTo)
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  }, [selected, dateFrom, dateTo]);
   const selectedWeeks = useMemo(() => {
     if (!selected) return [];
     const map = new Map<string, { total: number; onTime: number }>();
-    selected.entries.forEach(e => {
+    selectedEntries.forEach(e => {
       const wk = isoWeekStart(e.completedAt);
       const cur = map.get(wk) ?? { total: 0, onTime: 0 };
       cur.total++;
@@ -118,7 +148,7 @@ export default function TeamDashboardPage() {
       out.push({ label: wk.slice(5), total: v.total, onTime: v.onTime });
     }
     return out;
-  }, [selected]);
+  }, [selectedEntries]);
 
   // Every completed stage across every brief — the raw material for every chart below. For a
   // variant-mode brief, each applicable variant's own completed stages flatten in alongside
@@ -231,26 +261,46 @@ export default function TeamDashboardPage() {
           ))}
         </div>
 
-        {selected && (
+        {selected && (() => {
+          const count = selectedEntries.length;
+          const onTime = selectedEntries.filter(e => !e.late).length;
+          const onTimePct = count > 0 ? Math.round((100 * onTime) / count) : 100;
+          const avgDays = count > 0 ? selectedEntries.reduce((s, e) => s + e.turnaroundDays, 0) / count : null;
+          return (
           <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.25rem", marginTop: "1rem", boxShadow: MT.shadow }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: MT.text1 }}>{selected.name}</h2>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
+                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+                }} />
+                <span style={{ color: MT.text3, fontSize: 12 }}>—</span>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Hasta" style={{
+                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+                }} />
+                {(dateFrom || dateTo) && (
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} style={{
+                    fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer", color: MT.text2,
+                    background: "none", border: "none", textDecoration: "underline",
+                  }}>Limpiar</button>
+                )}
+              </div>
               <div style={{ display: "flex", gap: "1.25rem" }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{selected.avgDays === null ? "—" : formatAht(selected.avgDays)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{avgDays === null ? "—" : formatAht(avgDays)}</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>AHT</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.text1 }}>{selected.completedCount}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.text1 }}>{count}</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>Entregas</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: selected.onTimePct >= 80 ? MT.primary : MT.warn }}>{selected.onTimePct}%</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: onTimePct >= 80 ? MT.primary : MT.warn }}>{onTimePct}%</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>A tiempo</div>
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 110, borderBottom: `1px solid ${MT.border}`, paddingBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 110, borderBottom: `1px solid ${MT.border}`, paddingBottom: 4, marginBottom: "1.1rem" }}>
               {selectedWeeks.map(w => {
                 const h = Math.min(80, w.total * 18);
                 return (
@@ -262,8 +312,37 @@ export default function TeamDashboardPage() {
                 );
               })}
             </div>
+
+            {/* The actual deliveries behind the chart above — not just a count. */}
+            <p style={{ fontWeight: 700, fontSize: 11.5, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
+              Entregas {dateFrom || dateTo ? "en el rango seleccionado" : ""}
+            </p>
+            {selectedEntries.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Sin entregas en este rango.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", maxHeight: 280, overflowY: "auto", border: `1px solid ${MT.border}`, borderRadius: 8 }}>
+                {selectedEntries.map((e, i) => (
+                  <div
+                    key={i}
+                    onClick={() => navigate(e.linkTo)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "0.55rem 0.8rem", cursor: "pointer",
+                      borderTop: i === 0 ? "none" : `1px solid ${MT.border}`,
+                    }}
+                    onMouseEnter={ev => (ev.currentTarget.style.background = MT.surfaceAlt)}
+                    onMouseLeave={ev => (ev.currentTarget.style.background = "transparent")}
+                  >
+                    <span style={{ fontSize: 11, color: MT.text3, minWidth: 78 }}>{formatDateHuman(e.completedAt)}</span>
+                    <span style={{ flex: 1, fontSize: 12.5, color: MT.text1, fontWeight: 600 }}>{e.reference}</span>
+                    <span style={{ fontSize: 10.5, color: MT.text3, textTransform: "uppercase" }}>{e.kind === "brief" ? "Brief" : "To Do"}</span>
+                    {e.late ? <StatusPill solid color={MT.danger} label="Tarde" /> : <StatusPill color={MT.moss} label="A tiempo" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* KPI strip */}

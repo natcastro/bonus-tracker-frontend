@@ -9,6 +9,7 @@ import { todoStageLabel, requestStageLabel, isPastDeadline } from "../types";
 import type { TodoTask, MarketingRequest } from "../types";
 import { moodBird } from "../../../components/moodBird";
 import { LinkIcon } from "../../../components/icons";
+import DisenoFilterButton from "../components/DisenoFilterButton";
 
 // Only a late Diseño stage counts as "overdue" — a task waiting on Carol's review never shows
 // as late, since that delay isn't Diseño's to answer for.
@@ -31,10 +32,16 @@ type BoardItem =
   | { kind: "request"; id: number; title: string; assignedDisenoEmail: string | null; status: "in_progress" | "completed"; sortKey: string; overdue: boolean; request: MarketingRequest };
 
 export default function TodoPage() {
-  const { todoTasks, disenoDisplayName, requests } = useMarketing();
+  const { todoTasks, disenoDisplayName, disenoEmailList, requests } = useMarketing();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_progress" | "completed">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "todo" | "request">("all");
+  const [disenoActive, setDisenoActive] = useState(false);
+  // Empty = every Diseño person, once the Diseño filter is active.
+  const [disenoSelection, setDisenoSelection] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   // Solicitudes asignadas a Diseño show up right alongside To Do tasks on the same public board —
   // visible to everyone, editable only by whoever it's assigned to (enforced on the detail page).
@@ -62,7 +69,14 @@ export default function TodoPage() {
   const filtered = useMemo(() => items
     .filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()))
     .filter(i => statusFilter === "all" || i.status === statusFilter)
-    .sort((a, b) => b.sortKey.localeCompare(a.sortKey)), [items, search, statusFilter]);
+    .filter(i => typeFilter === "all" || i.kind === typeFilter)
+    .filter(i => {
+      if (!disenoActive || disenoSelection.length === 0) return true;
+      return !!i.assignedDisenoEmail && disenoSelection.includes(i.assignedDisenoEmail.toLowerCase());
+    })
+    .filter(i => !dateFrom || i.sortKey >= dateFrom)
+    .filter(i => !dateTo || i.sortKey <= dateTo)
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey)), [items, search, statusFilter, typeFilter, disenoActive, disenoSelection, dateFrom, dateTo]);
 
   const kpi = (label: string, value: string | number, color: string, last?: boolean) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0.6rem 0.9rem", flex: 1, minWidth: 110, borderRight: last ? "none" : `1px solid ${MT.border}` }}>
@@ -119,6 +133,22 @@ export default function TodoPage() {
           {segButton(statusFilter === "in_progress", () => setStatusFilter("in_progress"), "En proceso")}
           {segButton(statusFilter === "completed", () => setStatusFilter("completed"), "Completado")}
         </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {segButton(typeFilter === "all", () => setTypeFilter("all"), "Ambos")}
+          {segButton(typeFilter === "todo", () => setTypeFilter("todo"), "To Do")}
+          {segButton(typeFilter === "request", () => setTypeFilter("request"), "Externo")}
+        </div>
+        <DisenoFilterButton
+          active={disenoActive} onActivate={() => setDisenoActive(v => !v)}
+          selected={disenoSelection} onChangeSelected={setDisenoSelection}
+          options={disenoEmailList} disenoDisplayName={disenoDisplayName}
+        />
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+        }} />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Hasta" style={{
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+        }} />
       </div>
 
       {/* Board */}

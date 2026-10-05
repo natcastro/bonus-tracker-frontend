@@ -10,6 +10,7 @@ import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline, currentActiveStages } from "../types";
 import type { MarketingBrief, MarketingRole } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
+import DisenoFilterButton from "../components/DisenoFilterButton";
 
 const MONTHLY_GOAL = 8;
 
@@ -51,7 +52,7 @@ function groupOf(b: MarketingBrief): GroupKey {
 }
 
 export default function DashboardPage() {
-  const { briefs: allBriefs, disenoDisplayName } = useMarketing();
+  const { briefs: allBriefs, disenoDisplayName, disenoEmailList } = useMarketing();
   // Private/pending tasks live only in "Mis tareas" — Vista general only shows published briefs.
   const briefs = useMemo(() => allBriefs.filter(b => b.status !== "draft"), [allBriefs]);
   const navigate = useNavigate();
@@ -59,6 +60,8 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all"|"in_progress"|"completed">("all");
   const [responsibleFilter, setResponsibleFilter] = useState<"all"|"laura"|"diseno">("all");
+  // Empty = every Diseño person, once "diseno" is the active responsibleFilter.
+  const [disenoSelection, setDisenoSelection] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({ overdue: false, active: false, completed: true });
@@ -84,6 +87,9 @@ export default function DashboardPage() {
     if (responsibleFilter !== "all") {
       const stage = representativeStage(b);
       if (b.status !== "in_progress" || !stage || stage.role !== responsibleFilter) return false;
+      if (responsibleFilter === "diseno" && disenoSelection.length > 0) {
+        if (!b.assignedDisenoEmail || !disenoSelection.includes(b.assignedDisenoEmail.toLowerCase())) return false;
+      }
     }
     if (dateFrom && b.startDate < dateFrom) return false;
     if (dateTo && b.startDate > dateTo) return false;
@@ -168,10 +174,14 @@ export default function DashboardPage() {
           {segButton(statusFilter === "in_progress", () => setStatusFilter("in_progress"), "En proceso", "st-ip")}
           {segButton(statusFilter === "completed", () => setStatusFilter("completed"), "Completado", "st-done")}
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {segButton(responsibleFilter === "all", () => setResponsibleFilter("all"), "Todos", "r-all")}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {segButton(responsibleFilter === "all", () => setResponsibleFilter("all"), "Cualquiera", "r-all")}
           {segButton(responsibleFilter === "laura", () => setResponsibleFilter("laura"), <><Avatar role="laura" size={15} />Laura</>, "r-laura")}
-          {segButton(responsibleFilter === "diseno", () => setResponsibleFilter("diseno"), <><Avatar role="diseno" size={15} />Diseño</>, "r-diseno")}
+          <DisenoFilterButton
+            active={responsibleFilter === "diseno"} onActivate={() => setResponsibleFilter("diseno")}
+            selected={disenoSelection} onChangeSelected={setDisenoSelection}
+            options={disenoEmailList} disenoDisplayName={disenoDisplayName}
+          />
         </div>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
           fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
