@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
@@ -26,6 +26,17 @@ export default function NewRequestPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [createdId, setCreatedId] = useState<number | null>(null);
+
+  // Prefill from the Microsoft login's display name — still editable, since a split on the first
+  // space doesn't always land right for compound surnames.
+  useEffect(() => {
+    if (name && name !== email && !nombre && !apellido) {
+      const parts = name.trim().split(/\s+/);
+      setNombre(parts[0] ?? "");
+      setApellido(parts.slice(1).join(" "));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, email]);
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
