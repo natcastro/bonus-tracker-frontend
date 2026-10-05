@@ -6,6 +6,8 @@ import {
 } from "../types";
 import type { TaskCategory } from "../types";
 
+export const LANGUAGE_OPTIONS = ["Español", "Inglés", "Ambos", "Otro"] as const;
+
 export interface TaskCategoryState {
   category: TaskCategory | null;
   selectedType: string | null;
@@ -16,19 +18,19 @@ export interface TaskCategoryState {
   ancho: string;
   alto: string;
   ubicacion: string;
+  idioma: string;
   videoApp: string;
   videoFormato: string;
   videoOrientacion: string;
   videoSonido: string;
   videoSubtitulos: string;
-  videoIdioma: string;
 }
 
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
   tipoMedio: "", area: "",
-  customMeasurements: false, ancho: "", alto: "", ubicacion: "",
-  videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "", videoIdioma: "",
+  customMeasurements: false, ancho: "", alto: "", ubicacion: "", idioma: "",
+  videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "",
 };
 
 function typesForCategory(category: TaskCategory | null): readonly string[] {
@@ -77,8 +79,8 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
     if (s.videoOrientacion) lines.push(`Orientación: ${s.videoOrientacion}`);
     if (s.videoSonido) lines.push(`Sonido: ${s.videoSonido}`);
     if (s.videoSubtitulos) lines.push(`Subtítulos: ${s.videoSubtitulos}`);
-    if (s.videoIdioma) lines.push(`Idioma: ${s.videoIdioma}`);
   }
+  if (s.idioma) lines.push(`Idioma: ${s.idioma}`);
   return lines.join("\n");
 }
 
@@ -246,11 +248,14 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
               <SegButtons options={["Sí", "No"]} value={state.videoSubtitulos} onChange={v => set({ videoSubtitulos: v })} />
             </div>
           </div>
-          <div>
-            <label style={labelStyle}>Idioma</label>
-            <SegButtons options={["Español", "Inglés"]} value={state.videoIdioma} onChange={v => set({ videoIdioma: v })} />
-          </div>
         </>
+      )}
+
+      {state.category && (
+        <div>
+          <label style={labelStyle}>¿En qué idioma?</label>
+          <SegButtons options={LANGUAGE_OPTIONS} value={state.idioma} onChange={v => set({ idioma: v })} />
+        </div>
       )}
     </div>
   );
