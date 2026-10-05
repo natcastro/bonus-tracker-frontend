@@ -96,7 +96,7 @@ interface MarketingCtx {
   requests: MarketingRequest[];
   createRequest: (opts: {
     taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
-    startDate: string; assignedDisenoEmail?: string;
+    deadline: string; assignedDisenoEmail?: string;
   }) => Promise<number>;
   assignRequest: (requestId: number, email: string) => Promise<void>;
   submitRequestDelivery: (requestId: number, link: string, note?: string) => Promise<void>;
@@ -254,8 +254,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
-  const buildRequestStages = (startDate: string) => REQUEST_STAGE_DEFS.map((def, i) => ({
-    ...def, deadline: i === 0 ? addWorkDaysIso(startDate, def.gapDays) : null,
+  // The requester picks their own deadline for the first stage directly (not a start date fed
+  // through a fixed gap) — later stages stay null until the previous one is actually done.
+  const buildRequestStages = (firstDeadline: string) => REQUEST_STAGE_DEFS.map((def, i) => ({
+    ...def, deadline: i === 0 ? firstDeadline : null,
     link: null, completedAt: null, status: "pending" as const,
   }));
 
@@ -289,10 +291,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // submit one, identified by whatever email they're logged in as.
   const createRequest = async (opts: {
     taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
-    startDate: string; assignedDisenoEmail?: string;
+    deadline: string; assignedDisenoEmail?: string;
   }): Promise<number> => {
     if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
-    const stages = buildRequestStages(opts.startDate);
+    const stages = buildRequestStages(opts.deadline);
     const assignment = await notifyRequestLive(opts.title, opts.assignedDisenoEmail, stages[0].deadline);
     const created = await apiCreateMarketingRequest({
       requesterEmail: myEmail, taskType: opts.taskType, title: opts.title, description: opts.description,

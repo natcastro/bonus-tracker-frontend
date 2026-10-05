@@ -18,15 +18,14 @@ export default function NewRequestPage() {
   const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState(todayIso());
+  const [deadline, setDeadline] = useState(todayIso());
   const [assignedDisenoEmail, setAssignedDisenoEmail] = useState("");
-  const [sharedWith, setSharedWith] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [createdId, setCreatedId] = useState<number | null>(null);
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
@@ -38,32 +37,56 @@ export default function NewRequestPage() {
     if (!nombre.trim() || !apellido.trim()) { setError("Escribe tu nombre y apellido."); return; }
     if (!taskCategoryIsComplete(cat)) { setError("Selecciona la categoría y el tipo de pieza."); return; }
     if (!description.trim()) { setError("Explica qué necesitas."); return; }
+    if (!assignedDisenoEmail) { setError("Selecciona a quién se le hace la solicitud."); return; }
     setBusy(true); setError("");
     try {
       setUploading(true);
       const attachments: string[] = [];
       for (const f of files) attachments.push(await uploadMarketingRequestFile(email, f));
       setUploading(false);
-      const sharedWithEmails = sharedWith.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
       const title = taskCategoryTitle(cat);
       const taskType = cat.category === "videos" ? "Video" : (cat.selectedType ?? "");
-      const identityBlock = [
-        `Nombre: ${nombre.trim()} ${apellido.trim()}`,
-        telefono.trim() ? `Teléfono: ${telefono.trim()}` : "",
-      ].filter(Boolean).join("\n");
+      const identityBlock = `Nombre: ${nombre.trim()} ${apellido.trim()}`;
       const detailsBlock = taskCategoryDetailsBlock(cat);
       const fullDescription = [identityBlock, detailsBlock, description.trim()].filter(Boolean).join("\n—\n");
       const id = await createRequest({
-        taskType, title, description: fullDescription, attachments, sharedWithEmails,
-        startDate, assignedDisenoEmail: assignedDisenoEmail || undefined,
+        taskType, title, description: fullDescription, attachments, sharedWithEmails: [],
+        deadline, assignedDisenoEmail,
       });
-      navigate(`/marketing/request/${id}`);
+      setCreatedId(id);
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear la solicitud.");
     } finally {
       setBusy(false);
     }
   };
+
+  if (createdId !== null) {
+    return (
+      <div style={{ minHeight: "100vh", background: MT.bg, fontFamily: MT.font, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
+          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "2rem", boxShadow: MT.shadow, textAlign: "center" }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>✅</div>
+            <h1 style={{ margin: "0 0 10px", fontSize: 19, fontWeight: 800, color: MT.text1 }}>Tu solicitud ha sido enviada</h1>
+            <p style={{ margin: "0 0 14px", fontSize: 13.5, color: MT.text2, lineHeight: 1.6 }}>
+              Diseño ya fue notificado y empezará a trabajar en ella. Te estaremos escribiendo por correo
+              con cada avance, siempre con un enlace para que puedas hacer seguimiento al progreso y
+              aprobar o pedir ajustes cuando llegue el momento.
+            </p>
+            <p style={{ margin: "0 0 20px", fontSize: 12.5, color: MT.text3, lineHeight: 1.6 }}>
+              Por favor permanece atento a tu correo durante el proceso — si no respondes a los correos
+              de seguimiento en los días indicados, tu solicitud podría quedar en pausa o cancelarse por
+              falta de respuesta.
+            </p>
+            <button onClick={() => navigate(`/marketing/request/${createdId}`)} style={{
+              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", width: "100%",
+            }}>Ver el seguimiento de mi solicitud</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: MT.bg, fontFamily: MT.font }}>
@@ -77,41 +100,35 @@ export default function NewRequestPage() {
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Nombre</label>
-              <input style={fieldStyle} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" autoFocus />
+              <input style={fieldStyle} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" autoComplete="off" autoFocus />
             </div>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Apellido</label>
-              <input style={fieldStyle} value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Apellido" />
+              <input style={fieldStyle} value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Apellido" autoComplete="off" />
             </div>
           </div>
 
-          <label style={labelStyle}>Número celular (opcional)</label>
-          <input style={{ ...fieldStyle, marginBottom: 14 }} value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="+57 300 0000000" />
+          <label style={labelStyle}>Correo electrónico corporativo</label>
+          <input style={{ ...fieldStyle, marginBottom: 14, color: MT.text2, background: MT.surfaceAlt }} value={name && name !== email ? `${name} — ${email}` : email} disabled readOnly />
 
           <div style={{ marginBottom: 14 }}>
             <TaskCategoryFields state={cat} onChange={setCat} />
           </div>
 
-          <label style={labelStyle}>¿Qué necesitas?</label>
-          <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas, tamaños, fecha de uso, etc." />
+          <label style={labelStyle}>Descripción del pedido</label>
+          <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas..." />
 
-          <label style={labelStyle}>¿Cuándo necesitas que se empiece?</label>
-          <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <label style={labelStyle}>¿Para cuándo necesitas esto? (fecha límite)</label>
+          <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={deadline} onChange={e => setDeadline(e.target.value)} />
 
-          <label style={labelStyle}>¿A quién se asignaría?</label>
-          <select style={{ ...fieldStyle, marginBottom: 14 }} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
-            <option value="">No sé — que decida Karol</option>
+          <label style={labelStyle}>¿A quién se le hace la solicitud?</label>
+          <select style={{ ...fieldStyle, marginBottom: 14 }} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)} required>
+            <option value="" disabled>Selecciona a alguien de Diseño...</option>
             {disenoEmailList.map(em => <option key={em} value={em}>{disenoDisplayName(em)}</option>)}
           </select>
 
           <label style={labelStyle}>Archivos o referencias (opcional)</label>
-          <input type="file" multiple style={{ ...fieldStyle, marginBottom: 14, padding: "6px" }} onChange={e => setFiles(Array.from(e.target.files ?? []))} />
-
-          <label style={labelStyle}>Compartir con (opcional — otros correos @formatucuerpo.com, separados por coma)</label>
-          <input style={{ ...fieldStyle, marginBottom: 14 }} value={sharedWith} onChange={e => setSharedWith(e.target.value)} placeholder="colega@formatucuerpo.com" />
-
-          <label style={labelStyle}>Tu correo electrónico</label>
-          <input style={{ ...fieldStyle, marginBottom: 18, color: MT.text2, background: MT.surfaceAlt }} value={name && name !== email ? `${name} — ${email}` : email} disabled readOnly />
+          <input type="file" multiple style={{ ...fieldStyle, marginBottom: 18, padding: "6px" }} onChange={e => setFiles(Array.from(e.target.files ?? []))} />
 
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
 

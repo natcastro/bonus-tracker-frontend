@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import {
   TASK_CATEGORIES, PUBLICIDAD_TYPES, GRAN_FORMATO_TYPES, TODO_TASK_TYPES,
-  VIDEO_APPS, VIDEO_FORMATS, REQUEST_COUNTRIES,
+  VIDEO_APPS, VIDEO_FORMATS,
 } from "../types";
 import type { TaskCategory } from "../types";
 
@@ -11,7 +11,6 @@ export interface TaskCategoryState {
   selectedType: string | null;
   customType: string;
   tipoMedio: string;
-  pais: string;
   area: string;
   customMeasurements: boolean;
   ancho: string;
@@ -27,7 +26,7 @@ export interface TaskCategoryState {
 
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
-  tipoMedio: "", pais: "", area: "",
+  tipoMedio: "", area: "",
   customMeasurements: false, ancho: "", alto: "", ubicacion: "",
   videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "", videoIdioma: "",
 };
@@ -63,7 +62,6 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
   const lines: string[] = [];
   if (s.category === "publicidad" || s.category === "gran_formato") {
     if (s.tipoMedio) lines.push(`Tipo de medio: ${s.tipoMedio}`);
-    if (s.pais) lines.push(`País: ${s.pais}`);
     if (s.area.trim()) lines.push(`Área que solicita: ${s.area.trim()}`);
   }
   if (s.category === "gran_formato") {
@@ -188,18 +186,9 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
             <label style={labelStyle}>Tipo de medio</label>
             <SegButtons options={["Impresión", "Digital Virtual"]} value={state.tipoMedio} onChange={v => set({ tipoMedio: v })} />
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>País que hace la solicitud</label>
-              <select style={fieldStyle} value={state.pais} onChange={e => set({ pais: e.target.value })}>
-                <option value="">Seleccionar...</option>
-                {REQUEST_COUNTRIES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Área que solicita (opcional)</label>
-              <input style={fieldStyle} value={state.area} onChange={e => set({ area: e.target.value })} placeholder="Ej. Ventas" />
-            </div>
+          <div>
+            <label style={labelStyle}>Área que solicita (opcional)</label>
+            <input style={fieldStyle} value={state.area} onChange={e => set({ area: e.target.value })} placeholder="Ej. Ventas" />
           </div>
         </>
       )}

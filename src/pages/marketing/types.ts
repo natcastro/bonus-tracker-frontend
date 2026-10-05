@@ -281,7 +281,6 @@ export const GRAN_FORMATO_TYPES = [
 
 export const VIDEO_APPS = ["Facebook", "Instagram", "Amazon", "Otro"] as const;
 export const VIDEO_FORMATS = ["Story", "Post", "No aplica"] as const;
-export const REQUEST_COUNTRIES = ["Colombia", "México", "Estados Unidos"] as const;
 
 export type TodoStageKey = "proposal" | "review" | "adjustments" | "finalReview" | "finalAdjustments" | "approved";
 
