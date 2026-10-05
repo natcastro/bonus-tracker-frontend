@@ -387,7 +387,7 @@ export default function MyTasksPage() {
                     </div>
                   )}
                 </div>
-                <DeadlineBadge deadline={stage.deadline!} />
+                <DeadlineBadge deadline={stage.deadline} />
               </button>
             );
           })}

@@ -30,13 +30,19 @@ function countdownText(diffMs: number): string {
   return `${prefix} ${sec} segundo${sec !== 1 ? "s" : ""}`;
 }
 
-export default function DeadlineBadge({ deadline, compact }: { deadline: string; compact?: boolean }) {
+export default function DeadlineBadge({ deadline, compact }: { deadline: string | null | undefined; compact?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // A bad/missing deadline must never crash the page (Intl.DateTimeFormat throws on an invalid
+  // Date) — every caller is supposed to guard this, but a stale or unusual record can still slip through.
+  if (!deadline || isNaN(new Date(`${deadline}T12:00:00-05:00`).getTime())) {
+    return <span style={{ fontSize: compact ? 11 : 12, color: MT.text3 }}>Sin fecha límite</span>;
+  }
 
   const target = deadlineTimestamp(deadline);
   const diffMs = target - now;

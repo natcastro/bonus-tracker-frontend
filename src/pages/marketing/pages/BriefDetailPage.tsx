@@ -390,14 +390,14 @@ export default function BriefDetailPage() {
                 : <>Esperando a {currentStage?.role === "laura" ? "Laura" : "Diseño"} — etapa actual: <strong>{stageLabel(activeCurrentStage)}</strong></>}
             </span>
           </div>
-          {currentStage && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {currentStage?.deadline && <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
         </div>
       ) : isPublish ? (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — Confirmar publicación
           </p>
-          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
           {noteField}
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
           <button disabled={busy} onClick={() => run(() => doConfirmPublish(noteInput.trim() || undefined))} style={{
@@ -413,7 +413,7 @@ export default function BriefDetailPage() {
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — {stageLabel(activeCurrentStage)}
           </p>
-          {currentStage && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline!} /></div>}
+          {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
 
           {DESIGN_STAGES.has(activeCurrentStage) && (
             <>
