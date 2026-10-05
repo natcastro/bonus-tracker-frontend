@@ -3,9 +3,10 @@ import { MT } from "../theme";
 import { useMarketing } from "../context";
 import TaskCategoryFields, { EMPTY_TASK_CATEGORY_STATE, taskCategoryIsComplete, taskCategoryTitle, taskCategoryDetailsBlock } from "./TaskCategoryFields";
 import type { TaskCategoryState } from "./TaskCategoryFields";
+import DisenoAssigneePicker from "./DisenoAssigneePicker";
 
 export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
-  const { createTodoTask, disenoEmailList, disenoDisplayName } = useMarketing();
+  const { createTodoTask, disenoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
   const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [description, setDescription] = useState("");
   const [emailNote, setEmailNote] = useState("");
@@ -71,10 +72,10 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
 
           <div>
             <label style={labelStyle}>Asignar a</label>
-            <select style={inputStyle} value={assignedEmail} onChange={e => setAssignedEmail(e.target.value)} required>
-              <option value="" disabled>Selecciona a alguien de Diseño...</option>
-              {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
-            </select>
+            <DisenoAssigneePicker
+              value={assignedEmail} onChange={setAssignedEmail}
+              options={disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
+            />
           </div>
 
           {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}

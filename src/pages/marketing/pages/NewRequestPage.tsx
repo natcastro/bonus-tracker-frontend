@@ -7,12 +7,13 @@ import { uploadMarketingRequestFile } from "../../../services/api";
 import { todayIso } from "../types";
 import TaskCategoryFields, { EMPTY_TASK_CATEGORY_STATE, taskCategoryIsComplete, taskCategoryTitle, taskCategoryDetailsBlock } from "../components/TaskCategoryFields";
 import type { TaskCategoryState } from "../components/TaskCategoryFields";
+import DisenoAssigneePicker from "../components/DisenoAssigneePicker";
 
 // The public entry point — reachable by anyone with a company Microsoft login, no Marketing role
 // needed. Someone internal copies this page's URL (from the Solicitudes tab) and sends it to
 // whoever needs to ask Diseño for something.
 export default function NewRequestPage() {
-  const { createRequest, disenoEmailList, disenoDisplayName } = useMarketing();
+  const { createRequest, disenoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
   const { email, name } = useHubAccess();
   const navigate = useNavigate();
   const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
@@ -133,10 +134,12 @@ export default function NewRequestPage() {
           <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={deadline} onChange={e => setDeadline(e.target.value)} />
 
           <label style={labelStyle}>¿A quién se le hace la solicitud?</label>
-          <select style={{ ...fieldStyle, marginBottom: 14 }} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)} required>
-            <option value="" disabled>Selecciona a alguien de Diseño...</option>
-            {disenoEmailList.map(em => <option key={em} value={em}>{disenoDisplayName(em)}</option>)}
-          </select>
+          <div style={{ marginBottom: 14 }}>
+            <DisenoAssigneePicker
+              value={assignedDisenoEmail} onChange={setAssignedDisenoEmail}
+              options={disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
+            />
+          </div>
 
           <label style={labelStyle}>Archivos o referencias (opcional)</label>
           <input type="file" multiple style={{ ...fieldStyle, marginBottom: 18, padding: "6px" }} onChange={e => setFiles(Array.from(e.target.files ?? []))} />

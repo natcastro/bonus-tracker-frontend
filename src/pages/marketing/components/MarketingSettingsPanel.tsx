@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
 import { getMarketingAccessDirectory } from "../../../services/api";
-import type { MarketingAccessPerson, MarketingNotifyEmails, MarketingNotifySlot } from "../../../services/api";
+import type { MarketingAccessPerson, MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } from "../../../services/api";
 
 const SLOTS: { slot: MarketingNotifySlot; label: string; role: MarketingAccessPerson["role"] }[] = [
   { slot: "laura",    label: "Laura",    role: "admin" },
@@ -12,9 +12,14 @@ const SLOTS: { slot: MarketingNotifySlot; label: string; role: MarketingAccessPe
   { slot: "diseno_3", label: "Diseño 3", role: "staff" },
 ];
 
+const DISENO_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3"];
+
 export default function MarketingSettingsPanel({ onClose }: { onClose: () => void }) {
-  const { notifyEmails, updateNotifyEmail } = useMarketing();
+  const { notifyEmails, updateNotifyEmail, updateNotifyCountry } = useMarketing();
   const [emails, setEmails] = useState<MarketingNotifyEmails>(notifyEmails);
+  const [countries, setCountries] = useState<Record<DisenoNotifySlot, string>>({
+    diseno_1: notifyEmails.diseno_1_country, diseno_2: notifyEmails.diseno_2_country, diseno_3: notifyEmails.diseno_3_country,
+  });
   const [people, setPeople] = useState<MarketingAccessPerson[]>([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,6 +35,9 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
     try {
       for (const { slot } of SLOTS) {
         await updateNotifyEmail(slot, emails[slot].trim());
+      }
+      for (const slot of DISENO_SLOTS) {
+        await updateNotifyCountry(slot, countries[slot].trim());
       }
       setSaved(true);
     } catch (err: any) {
@@ -68,17 +76,30 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
               const options = people.filter(p => p.role === role);
               const current = emails[slot];
               const currentKnown = options.some(p => p.email === current);
+              const isDiseno = DISENO_SLOTS.includes(slot as DisenoNotifySlot);
               return (
-                <div key={slot}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>{label}</label>
-                  <select
-                    style={fieldStyle} value={current}
-                    onChange={e => setEmails(prev => ({ ...prev, [slot]: e.target.value }))}
-                  >
-                    <option value="">Sin asignar</option>
-                    {!currentKnown && current && <option value={current}>{current} (no asignado en Accesos)</option>}
-                    {options.map(p => <option key={p.email} value={p.email}>{p.nickname || p.email}</option>)}
-                  </select>
+                <div key={slot} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>{label}</label>
+                    <select
+                      style={fieldStyle} value={current}
+                      onChange={e => setEmails(prev => ({ ...prev, [slot]: e.target.value }))}
+                    >
+                      <option value="">Sin asignar</option>
+                      {!currentKnown && current && <option value={current}>{current} (no asignado en Accesos)</option>}
+                      {options.map(p => <option key={p.email} value={p.email}>{p.nickname || p.email}</option>)}
+                    </select>
+                  </div>
+                  {isDiseno && (
+                    <div style={{ width: 130 }}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>País</label>
+                      <input
+                        style={fieldStyle} value={countries[slot as DisenoNotifySlot]}
+                        onChange={e => setCountries(prev => ({ ...prev, [slot]: e.target.value }))}
+                        placeholder="Ej. Colombia"
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

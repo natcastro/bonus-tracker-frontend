@@ -1805,6 +1805,7 @@ export async function uploadMarketingRequestFile(requesterEmail: string, file: F
 }
 
 export type MarketingNotifySlot = "laura" | "carol" | "diseno_1" | "diseno_2" | "diseno_3";
+export type DisenoNotifySlot = "diseno_1" | "diseno_2" | "diseno_3";
 
 export interface MarketingNotifyEmails {
   laura: string;
@@ -1812,24 +1813,39 @@ export interface MarketingNotifyEmails {
   diseno_1: string;
   diseno_2: string;
   diseno_3: string;
+  // Which country each Diseño slot corresponds to — shown next to their name wherever someone
+  // picks who a request/task goes to, so the requester knows who handles their country.
+  diseno_1_country: string;
+  diseno_2_country: string;
+  diseno_3_country: string;
 }
 
 const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3"];
+const DISENO_NOTIFY_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3"];
 
 // Display names come from each person's Hub Access nickname (see getHubNicknames) — this table
 // only maps a Marketing slot to an email address, so a name never has to be typed twice.
 export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails> {
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
-  const emails: MarketingNotifyEmails = { laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "" };
+  const emails: MarketingNotifyEmails = {
+    laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "",
+    diseno_1_country: "", diseno_2_country: "", diseno_3_country: "",
+  };
   (data ?? []).forEach((r: any) => {
     if (NOTIFY_SLOTS.includes(r.role)) emails[r.role as MarketingNotifySlot] = r.email ?? "";
+    if (DISENO_NOTIFY_SLOTS.includes(r.role)) emails[`${r.role as DisenoNotifySlot}_country`] = r.country ?? "";
   });
   return emails;
 }
 
 export async function setMarketingNotifyEmail(role: MarketingNotifySlot, email: string): Promise<void> {
   const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
+  if (error) throw error;
+}
+
+export async function setMarketingNotifyCountry(role: DisenoNotifySlot, country: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, country });
   if (error) throw error;
 }
 

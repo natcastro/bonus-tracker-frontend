@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, markTargetNotificationRead, sendMarketingEmail,
-  deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail,
+  deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail, setMarketingNotifyCountry,
   getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
   togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
   getTodoTasks, createTodoTask as apiCreateTodoTask, updateTodoTask, deleteTodoTask as apiDeleteTodoTask,
   getMarketingRequests, createMarketingRequest as apiCreateMarketingRequest, updateMarketingRequest,
 } from "../../services/api";
-import type { MarketingNotifyEmails, MarketingNotifySlot } from "../../services/api";
+import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
@@ -22,6 +22,9 @@ const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   diseno_1: "marketplaces@formatucuerpo.com",
   diseno_2: "",
   diseno_3: "",
+  diseno_1_country: "",
+  diseno_2_country: "",
+  diseno_3_country: "",
 };
 
 // Absolute link into the app for this email — the only way back in for someone with no Marketing
@@ -97,6 +100,9 @@ interface MarketingCtx {
   // Human-friendly label for a Diseño email — that person's Hub Access nickname if they have
   // one, otherwise the raw email, otherwise "Diseño" when nobody is assigned.
   disenoDisplayName: (email: string | null) => string;
+  // Which country that Diseño person's slot was configured with — "" if not set yet.
+  disenoCountry: (email: string) => string;
+  updateNotifyCountry: (slot: DisenoNotifySlot, country: string) => Promise<void>;
 
   // Requests — created via a public link by anyone with a company Microsoft login (no Marketing
   // role needed), always fulfilled by Diseño.
@@ -150,6 +156,16 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (!email) return "Diseño";
     return nicknames[email.toLowerCase()] || email;
   };
+
+  const disenoCountryByEmail = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (notifyEmails.diseno_1) map[notifyEmails.diseno_1.toLowerCase()] = notifyEmails.diseno_1_country;
+    if (notifyEmails.diseno_2) map[notifyEmails.diseno_2.toLowerCase()] = notifyEmails.diseno_2_country;
+    if (notifyEmails.diseno_3) map[notifyEmails.diseno_3.toLowerCase()] = notifyEmails.diseno_3_country;
+    return map;
+  }, [notifyEmails]);
+
+  const disenoCountry = (email: string): string => disenoCountryByEmail[email.toLowerCase()] || "";
 
   // Someone with no Marketing role (just visiting the public request link) never needs
   // Briefs/To Do/private-task data — not fetching it at all (rather than just not rendering it)
@@ -427,6 +443,9 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           diseno_1: emails.diseno_1 || DEFAULT_NOTIFY_EMAILS.diseno_1,
           diseno_2: emails.diseno_2 || DEFAULT_NOTIFY_EMAILS.diseno_2,
           diseno_3: emails.diseno_3 || DEFAULT_NOTIFY_EMAILS.diseno_3,
+          diseno_1_country: emails.diseno_1_country || DEFAULT_NOTIFY_EMAILS.diseno_1_country,
+          diseno_2_country: emails.diseno_2_country || DEFAULT_NOTIFY_EMAILS.diseno_2_country,
+          diseno_3_country: emails.diseno_3_country || DEFAULT_NOTIFY_EMAILS.diseno_3_country,
         };
         setNotifyEmails(merged);
         loadNicknames(merged);
@@ -439,6 +458,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const next = { ...notifyEmails, [slot]: email };
     setNotifyEmails(next);
     await loadNicknames(next);
+  };
+
+  const updateNotifyCountry = async (slot: DisenoNotifySlot, country: string) => {
+    await setMarketingNotifyCountry(slot, country);
+    setNotifyEmails(prev => ({ ...prev, [`${slot}_country`]: country }));
   };
 
   // Diseño-directed emails go only to whoever claimed the brief, once someone has —
@@ -972,7 +996,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,
-      notifyEmails, disenoEmailList, updateNotifyEmail, disenoDisplayName,
+      notifyEmails, disenoEmailList, updateNotifyEmail, updateNotifyCountry, disenoDisplayName, disenoCountry,
       requests, createRequest, assignRequest, submitRequestDelivery, requesterReview,
     }}>
       {children}
