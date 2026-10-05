@@ -6,7 +6,7 @@ import NewBriefModal from "../components/NewBriefModal";
 import NewTodoTaskModal from "../components/NewTodoTaskModal";
 import DeadlineBadge from "../components/DeadlineBadge";
 import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
-import { stageLabel, todoStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
+import { stageLabel, todoStageLabel, requestStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
 
 function formatDueIn(dueAt: string): { label: string; overdue: boolean } {
   const diffMs = new Date(dueAt).getTime() - Date.now();
@@ -20,7 +20,7 @@ function formatDueIn(dueAt: string): { label: string; overdue: boolean } {
 }
 
 export default function MyTasksPage() {
-  const { authedUser, briefs, todoTasks, privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask } = useMarketing();
+  const { authedUser, briefs, todoTasks, requests, privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask } = useMarketing();
   const navigate = useNavigate();
   const [showNew, setShowNew] = useState(false);
   const [showNewTodo, setShowNewTodo] = useState(false);
@@ -112,6 +112,19 @@ export default function MyTasksPage() {
         return (sa.deadline ?? "").localeCompare(sb.deadline ?? "");
       });
   }, [todoTasks, myRole, authedUser?.email]);
+
+  // Solicitudes assigned to you work exactly like To Do tasks — they belong in the same "mis
+  // tareas" list, not off in a separate corner only Solicitudes/To Do shows.
+  const myPendingRequests = useMemo(() => {
+    if (myRole !== "diseno") return [];
+    return requests
+      .filter(r => r.status === "in_progress" && r.assignedDisenoEmail?.toLowerCase() === authedUser?.email.toLowerCase())
+      .sort((a, b) => {
+        const da = a.stages.find(s => s.key === a.currentStage)?.deadline ?? "";
+        const db = b.stages.find(s => s.key === b.currentStage)?.deadline ?? "";
+        return da.localeCompare(db);
+      });
+  }, [requests, myRole, authedUser?.email]);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>
@@ -427,6 +440,47 @@ export default function MyTasksPage() {
                     </span>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{t.title}</div>
+                  {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {myPendingRequests.length > 0 && (
+        <div style={{ marginTop: "1.75rem" }}>
+          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+            Solicitudes asignadas a ti
+          </p>
+          <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+            {myPendingRequests.map(r => {
+              const stage = r.stages.find(s => s.key === r.currentStage)!;
+              const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
+              const color = overdue ? MT.danger : MT.violet;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => navigate(`/marketing/request/${r.id}`)}
+                  style={{
+                    background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
+                    borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                    display: "flex", flexDirection: "column", gap: "0.9rem",
+                    minWidth: 260, maxWidth: 340, flex: "1 1 260px",
+                    boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <span style={{ width: 42, height: 42, borderRadius: 8, background: color + "12", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <LinkIcon size={20} color={color} />
+                    </span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                      {requestStageLabel(stage.key)}
+                    </span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{r.title}</div>
                   {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
                 </button>
               );

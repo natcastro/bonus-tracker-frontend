@@ -6,7 +6,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
 import { todoStageLabel, requestStageLabel, isPastDeadline } from "../types";
-import type { TodoTask } from "../types";
+import type { TodoTask, MarketingRequest } from "../types";
 import { moodBird } from "../../../components/moodBird";
 import { LinkIcon } from "../../../components/icons";
 
@@ -19,40 +19,50 @@ function isOverdueTodo(t: TodoTask): boolean {
   return !!stage.deadline && isPastDeadline(stage.deadline);
 }
 
+function isOverdueRequest(r: MarketingRequest): boolean {
+  if (r.status !== "in_progress") return false;
+  const stage = r.stages.find(s => s.key === r.currentStage);
+  if (!stage || stage.role !== "diseno") return false;
+  return !!stage.deadline && isPastDeadline(stage.deadline);
+}
+
+type BoardItem =
+  | { kind: "todo"; id: number; title: string; assignedDisenoEmail: string; status: "in_progress" | "completed"; sortKey: string; overdue: boolean; task: TodoTask }
+  | { kind: "request"; id: number; title: string; assignedDisenoEmail: string | null; status: "in_progress" | "completed"; sortKey: string; overdue: boolean; request: MarketingRequest };
+
 export default function TodoPage() {
-  const { todoTasks, disenoDisplayName, authedUser, requests } = useMarketing();
+  const { todoTasks, disenoDisplayName, requests } = useMarketing();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_progress" | "completed">("all");
 
-  // Solicitudes don't get their own tab for Diseño (that's Laura/Karol's view) — their own
-  // assigned ones show up here instead, alongside To Do tasks.
-  const myRequests = useMemo(() => {
-    if (authedUser?.role !== "diseno") return [];
-    return requests
-      .filter(r => r.status === "in_progress" && r.assignedDisenoEmail?.toLowerCase() === authedUser.email.toLowerCase())
-      .sort((a, b) => {
-        const da = a.stages.find(s => s.key === a.currentStage)?.deadline ?? "";
-        const db = b.stages.find(s => s.key === b.currentStage)?.deadline ?? "";
-        return da.localeCompare(db);
-      });
-  }, [requests, authedUser]);
+  // Solicitudes asignadas a Diseño show up right alongside To Do tasks on the same public board —
+  // visible to everyone, editable only by whoever it's assigned to (enforced on the detail page).
+  const items = useMemo<BoardItem[]>(() => {
+    const todoItems: BoardItem[] = todoTasks.map(t => ({
+      kind: "todo", id: t.id, title: t.title, assignedDisenoEmail: t.assignedDisenoEmail,
+      status: t.status, task: t, overdue: isOverdueTodo(t),
+      sortKey: t.stages.find(s => s.key === t.currentStage)?.deadline ?? t.completedAt ?? "",
+    }));
+    const requestItems: BoardItem[] = requests.map(r => ({
+      kind: "request", id: r.id, title: r.title, assignedDisenoEmail: r.assignedDisenoEmail,
+      status: r.status, request: r, overdue: isOverdueRequest(r),
+      sortKey: r.stages.find(s => s.key === r.currentStage)?.deadline ?? r.completedAt ?? "",
+    }));
+    return [...todoItems, ...requestItems];
+  }, [todoTasks, requests]);
 
-  const pending = todoTasks.filter(t => t.status === "in_progress");
-  const onTime = pending.filter(t => !isOverdueTodo(t));
-  const late = pending.filter(t => isOverdueTodo(t));
-  const completed = todoTasks.filter(t => t.status === "completed");
+  const pending = items.filter(i => i.status === "in_progress");
+  const onTime = pending.filter(i => !i.overdue);
+  const late = pending.filter(i => i.overdue);
+  const completed = items.filter(i => i.status === "completed");
   const onTimePct = pending.length > 0 ? Math.round((100 * onTime.length) / pending.length) : 100;
   const bird = moodBird(onTimePct);
 
-  const filtered = useMemo(() => todoTasks
-    .filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase()))
-    .filter(t => statusFilter === "all" || t.status === statusFilter)
-    .sort((a, b) => {
-      const sa = a.stages.find(s => s.key === a.currentStage)?.deadline ?? a.completedAt ?? "";
-      const sb = b.stages.find(s => s.key === b.currentStage)?.deadline ?? b.completedAt ?? "";
-      return sb.localeCompare(sa);
-    }), [todoTasks, search, statusFilter]);
+  const filtered = useMemo(() => items
+    .filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()))
+    .filter(i => statusFilter === "all" || i.status === statusFilter)
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey)), [items, search, statusFilter]);
 
   const kpi = (label: string, value: string | number, color: string, last?: boolean) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0.6rem 0.9rem", flex: 1, minWidth: 110, borderRight: last ? "none" : `1px solid ${MT.border}` }}>
@@ -76,7 +86,7 @@ export default function TodoPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
-          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Tareas rápidas de Karol — separado de Briefs</p>
+          <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Tareas rápidas de Karol y solicitudes asignadas a Diseño</p>
         </div>
         <img className="ftc-mascot" src={bird.src} alt={bird.label} title={`${onTimePct}% a tiempo — ${bird.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
       </div>
@@ -111,19 +121,21 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* Task list */}
+      {/* Board */}
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden", boxShadow: MT.shadow }}>
         {filtered.length === 0 ? (
           <p style={{ padding: "2rem", textAlign: "center", color: MT.text3, fontSize: 13, margin: 0 }}>No hay tareas To Do para este filtro.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {filtered.map((t, i) => {
-              const stage = t.stages.find(s => s.key === t.currentStage);
-              const overdue = isOverdueTodo(t);
+            {filtered.map((item, i) => {
+              const isTodo = item.kind === "todo";
+              const stage = isTodo
+                ? item.task.stages.find(s => s.key === item.task.currentStage)
+                : item.request.stages.find(s => s.key === item.request.currentStage);
               return (
                 <div
-                  key={t.id}
-                  onClick={() => navigate(`/marketing/todo/${t.id}`)}
+                  key={`${item.kind}-${item.id}`}
+                  onClick={() => navigate(isTodo ? `/marketing/todo/${item.id}` : `/marketing/request/${item.id}`)}
                   style={{
                     display: "flex", alignItems: "center", gap: 12, padding: "0.75rem 1.1rem", cursor: "pointer",
                     borderTop: i === 0 ? "none" : `1px solid ${MT.border}`,
@@ -131,59 +143,26 @@ export default function TodoPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ width: 32, height: 32, borderRadius: 8, background: `${MT.clay}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <PaletteIcon size={16} color={MT.clay} />
+                  <span style={{ width: 32, height: 32, borderRadius: 8, background: `${isTodo ? MT.clay : MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {isTodo ? <PaletteIcon size={16} color={MT.clay} /> : <LinkIcon size={16} color={MT.violet} />}
                   </span>
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{t.title}</span>
-                  <span style={{ fontSize: 11.5, color: MT.text3, minWidth: 90 }}>{disenoDisplayName(t.assignedDisenoEmail)}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{item.title}</span>
+                  <span style={{ fontSize: 11.5, color: MT.text3, minWidth: 90 }}>
+                    {isTodo ? disenoDisplayName(item.assignedDisenoEmail) : (item.assignedDisenoEmail ? disenoDisplayName(item.assignedDisenoEmail) : "Sin asignar")}
+                  </span>
                   <StatusPill
-                    solid={t.status === "completed"}
-                    color={t.status === "completed" ? MT.primary : MT.clay}
-                    label={t.status === "completed" ? "✓ Completado" : todoStageLabel(t.currentStage)}
+                    solid={item.status === "completed"}
+                    color={item.status === "completed" ? MT.primary : (isTodo ? MT.clay : MT.violet)}
+                    label={item.status === "completed" ? "✓ Completado" : (isTodo ? todoStageLabel(item.task.currentStage) : requestStageLabel(item.request.currentStage))}
                   />
                   {stage?.deadline && <DeadlineBadge deadline={stage.deadline} compact />}
-                  {overdue && <StatusPill solid color={MT.danger} label="⚠ Urgente" />}
+                  {item.overdue && <StatusPill solid color={MT.danger} label="⚠ Urgente" />}
                 </div>
               );
             })}
           </div>
         )}
       </div>
-
-      {myRequests.length > 0 && (
-        <div style={{ marginTop: "1.5rem" }}>
-          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
-            Solicitudes asignadas a ti
-          </p>
-          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radius, overflow: "hidden", boxShadow: MT.shadow }}>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {myRequests.map((r, i) => {
-                const stage = r.stages.find(s => s.key === r.currentStage);
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => navigate(`/marketing/request/${r.id}`)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 12, padding: "0.75rem 1.1rem", cursor: "pointer",
-                      borderTop: i === 0 ? "none" : `1px solid ${MT.border}`,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <span style={{ width: 32, height: 32, borderRadius: 8, background: `${MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <LinkIcon size={16} color={MT.violet} />
-                    </span>
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{r.title}</span>
-                    <span style={{ fontSize: 11.5, color: MT.text3 }}>{r.requesterEmail}</span>
-                    <StatusPill solid color={MT.violet} label={requestStageLabel(r.currentStage)} />
-                    {stage?.deadline && <DeadlineBadge deadline={stage.deadline} compact />}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
