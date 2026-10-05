@@ -435,13 +435,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   // Always stamped with whoever is doing the action right now — so it never shows back up as a
   // notification "to" that same person (you don't need to be told about your own action).
+  // Best-effort, like sendMarketingEmail below — the in-app activity log must never block the
+  // actual workflow action (creating a brief, assigning a task, etc.) just because a notification
+  // failed to write (e.g. a newer column isn't migrated into this Supabase project yet).
   const notify = async (briefId: number | null, message: string) => {
-    await createMarketingNotification(briefId, message, { actorEmail: myEmail });
+    try { await createMarketingNotification(briefId, message, { actorEmail: myEmail }); }
+    catch (err) { console.error("Failed to create notification:", err); }
   };
 
   // Pings one specific requester — never the shared laura/diseno/carol broadcast feed.
   const notifyRequester = async (requestId: number, requesterEmail: string, message: string) => {
-    await createMarketingNotification(null, message, { targetEmail: requesterEmail, requestId, actorEmail: myEmail });
+    try { await createMarketingNotification(null, message, { targetEmail: requesterEmail, requestId, actorEmail: myEmail }); }
+    catch (err) { console.error("Failed to create requester notification:", err); }
   };
 
   // A brief going live either has someone assigned already (Laura picked at creation/publish, or
