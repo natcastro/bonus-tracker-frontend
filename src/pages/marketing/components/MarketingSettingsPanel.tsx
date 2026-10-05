@@ -37,7 +37,7 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
         await updateNotifyEmail(slot, emails[slot].trim());
       }
       for (const slot of DISENO_SLOTS) {
-        await updateNotifyCountry(slot, countries[slot].trim());
+        await updateNotifyCountry(slot, countries[slot].trim(), emails[slot].trim());
       }
       setSaved(true);
     } catch (err: any) {

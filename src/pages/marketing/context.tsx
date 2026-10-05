@@ -102,7 +102,7 @@ interface MarketingCtx {
   disenoDisplayName: (email: string | null) => string;
   // Which country that Diseño person's slot was configured with — "" if not set yet.
   disenoCountry: (email: string) => string;
-  updateNotifyCountry: (slot: DisenoNotifySlot, country: string) => Promise<void>;
+  updateNotifyCountry: (slot: DisenoNotifySlot, country: string, email: string) => Promise<void>;
 
   // Requests — created via a public link by anyone with a company Microsoft login (no Marketing
   // role needed), always fulfilled by Diseño.
@@ -460,8 +460,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await loadNicknames(next);
   };
 
-  const updateNotifyCountry = async (slot: DisenoNotifySlot, country: string) => {
-    await setMarketingNotifyCountry(slot, country);
+  // `email` is passed in by the caller (not read from this closure's own notifyEmails) since the
+  // caller may have just saved a new email for this same slot moments earlier in the same batch —
+  // this component's state wouldn't have re-rendered yet to reflect that.
+  const updateNotifyCountry = async (slot: DisenoNotifySlot, country: string, email: string) => {
+    await setMarketingNotifyCountry(slot, country, email);
     setNotifyEmails(prev => ({ ...prev, [`${slot}_country`]: country }));
   };
 

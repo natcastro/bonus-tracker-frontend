@@ -1840,15 +1840,15 @@ export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails>
 }
 
 export async function setMarketingNotifyEmail(role: MarketingNotifySlot, email: string): Promise<void> {
-  // Without an explicit onConflict target, a plain upsert can't tell this is meant to update the
-  // existing row for this role — it falls back to inserting a new one, which (for the
-  // country-only upsert below) fails outright since `email` is required and not provided.
-  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email }, { onConflict: "role" });
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email });
   if (error) throw error;
 }
 
-export async function setMarketingNotifyCountry(role: DisenoNotifySlot, country: string): Promise<void> {
-  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, country }, { onConflict: "role" });
+// Takes the slot's current email too (even though it isn't changing) — without a confirmed unique
+// constraint on `role`, an upsert can't be trusted to update the existing row instead of inserting
+// a new one, and a country-only insert would fail outright since `email` is required.
+export async function setMarketingNotifyCountry(role: DisenoNotifySlot, country: string, email: string): Promise<void> {
+  const { error } = await supabase.from("marketing_notify_emails").upsert({ role, email, country });
   if (error) throw error;
 }
 
