@@ -24,8 +24,14 @@ const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   diseno_3: "",
 };
 
-function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null; note?: string }): string {
-  const { intro, reference, nextTask, deadline, note } = opts;
+// Absolute link into the app for this email — the only way back in for someone with no Marketing
+// role (a request's own requester), and a handy shortcut for everyone else.
+function appUrl(path: string): string {
+  return `${window.location.origin}${path}`;
+}
+
+function emailHtml(opts: { intro: string; reference: string; nextTask?: string; deadline?: string | null; note?: string; link?: string }): string {
+  const { intro, reference, nextTask, deadline, note, link } = opts;
   return `
     <div style="font-family: -apple-system, sans-serif; color: #2C2A20;">
       <p>${intro}</p>
@@ -33,6 +39,7 @@ function emailHtml(opts: { intro: string; reference: string; nextTask?: string; 
       ${nextTask ? `<p><strong>Próxima tarea:</strong> ${nextTask}</p>` : ""}
       ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 6:30 PM hora de Colombia</p>` : ""}
       ${note ? `<p><strong>Nota:</strong> ${note}</p>` : ""}
+      ${link ? `<p><a href="${link}" style="display:inline-block;margin-top:10px;padding:10px 18px;background:#231F20;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;">Ver y responder</a></p>` : ""}
       <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>
     </div>
   `;
@@ -193,7 +200,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => {
     const today = todayIso();
     const stages = buildTodoStages(today);
-    await apiCreateTodoTask({
+    const created = await apiCreateTodoTask({
       taskType, title, description, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
     });
     await notify(null, `Karol asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
@@ -201,7 +208,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await sendMarketingEmail(
       assignedDisenoEmail,
       `Nueva tarea (To Do) — ${title}`,
-      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody }),
+      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody, link: appUrl(`/marketing/todo/${created.id}`) }),
     );
     await reload();
   };
@@ -239,6 +246,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           emailHtml({
             intro: `Se avanzó la tarea "${task.title}". Te toca continuar.`,
             reference: task.title, nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline, note,
+            link: appUrl(`/marketing/todo/${task.id}`),
           }),
         );
       }
@@ -264,14 +272,15 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // If the requester picked a specific Diseño person, they get assigned and notified directly —
   // "No sé" leaves it unassigned, Carol gets notified and has 24h to assign it before the
   // round-robin timeout job (extended to also sweep marketing_requests) picks someone automatically.
-  const notifyRequestLive = async (title: string, assignedDisenoEmail: string | undefined, deadline: string | null) => {
+  const notifyRequestLive = async (requestId: number, title: string, assignedDisenoEmail: string | null, deadline: string | null) => {
+    const link = appUrl(`/marketing/request/${requestId}`);
     if (assignedDisenoEmail) {
       await sendMarketingEmail(
         assignedDisenoEmail,
         `Nueva solicitud — ${title}`,
-        emailHtml({ intro: "Te asignaron una nueva solicitud.", reference: title, nextTask: requestStageLabel("delivery"), deadline }),
+        emailHtml({ intro: "Te asignaron una nueva solicitud.", reference: title, nextTask: requestStageLabel("delivery"), deadline, link }),
       );
-      return { assignedDisenoEmail, carolNotifiedAt: null as string | null };
+      return;
     }
     if (notifyEmails.carol) {
       await sendMarketingEmail(
@@ -279,29 +288,31 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         `Nueva solicitud sin asignar — ${title}`,
         emailHtml({
           intro: "Hay una nueva solicitud (enviada por el enlace público) sin asignar. Entra a la plataforma y asígnala a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
-          reference: title, nextTask: requestStageLabel("delivery"), deadline,
+          reference: title, nextTask: requestStageLabel("delivery"), deadline, link: appUrl("/marketing/requests"),
         }),
       );
     }
-    return { assignedDisenoEmail: null as string | null, carolNotifiedAt: new Date().toISOString() };
   };
 
   // No Marketing role is required to create a request — anyone who can log in with their
   // company Microsoft account (the only auth this whole Hub uses) can reach the public link and
-  // submit one, identified by whatever email they're logged in as.
+  // submit one, identified by whatever email they're logged in as. The row is created first so the
+  // notification email can link straight to it.
   const createRequest = async (opts: {
     taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
     deadline: string; assignedDisenoEmail?: string;
   }): Promise<number> => {
     if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
     const stages = buildRequestStages(opts.deadline);
-    const assignment = await notifyRequestLive(opts.title, opts.assignedDisenoEmail, stages[0].deadline);
+    const assignedDisenoEmail = opts.assignedDisenoEmail ?? null;
+    const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
     const created = await apiCreateMarketingRequest({
       requesterEmail: myEmail, taskType: opts.taskType, title: opts.title, description: opts.description,
       attachments: opts.attachments, sharedWithEmails: opts.sharedWithEmails,
       currentStage: "delivery", status: "in_progress",
-      stages, revisionRounds: 0, completedAt: null, ...assignment,
+      stages, revisionRounds: 0, completedAt: null, assignedDisenoEmail, carolNotifiedAt,
     });
+    await notifyRequestLive(created.id, opts.title, assignedDisenoEmail, stages[0].deadline);
     await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${opts.title}.`);
     await reload();
     return created.id;
@@ -315,7 +326,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       await sendMarketingEmail(
         email,
         `Te asignaron una solicitud — ${req.title}`,
-        emailHtml({ intro: "Te asignaron esta solicitud.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
+        emailHtml({ intro: "Te asignaron esta solicitud.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null, link: appUrl(`/marketing/request/${requestId}`) }),
       );
     }
     await reload();
@@ -344,7 +355,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         await sendMarketingEmail(
           email,
           `Entrega lista para revisión — ${req.title}`,
-          emailHtml({ intro: "Diseño entregó tu solicitud. Te toca revisarla.", reference: req.title, nextTask: requestStageLabel(nextStage.key), deadline: nextDeadline, note }),
+          emailHtml({ intro: "Diseño entregó tu solicitud. Te toca revisarla.", reference: req.title, nextTask: requestStageLabel(nextStage.key), deadline: nextDeadline, note, link: appUrl(`/marketing/request/${req.id}`) }),
         );
       }
     }
@@ -372,7 +383,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         await sendMarketingEmail(
           req.assignedDisenoEmail,
           `Aprobado — ${req.title}`,
-          emailHtml({ intro: "El solicitante aprobó la entrega. La solicitud quedó completada.", reference: req.title, note: opts?.note }),
+          emailHtml({ intro: "El solicitante aprobó la entrega. La solicitud quedó completada.", reference: req.title, note: opts?.note, link: appUrl(`/marketing/request/${req.id}`) }),
         );
       }
       await reload();
@@ -392,7 +403,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       await sendMarketingEmail(
         req.assignedDisenoEmail,
         `Cambios solicitados — ${req.title}`,
-        emailHtml({ intro: "El solicitante pidió cambios en la entrega.", reference: req.title, nextTask: requestStageLabel("delivery"), deadline: deliveryDeadline, note: opts?.note }),
+        emailHtml({ intro: "El solicitante pidió cambios en la entrega.", reference: req.title, nextTask: requestStageLabel("delivery"), deadline: deliveryDeadline, note: opts?.note, link: appUrl(`/marketing/request/${req.id}`) }),
       );
     }
     await reload();
@@ -454,14 +465,15 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // A brief going live either has someone assigned already (Laura picked at creation/publish, or
   // Carol picked later) — that person gets emailed directly — or it doesn't, in which case Carol
   // gets notified and has 24h to assign it before the round-robin job picks someone automatically.
-  const notifyBriefLive = async (reference: string, assignedDisenoEmail: string | undefined, deadline: string | null) => {
+  const notifyBriefLive = async (briefId: number, reference: string, assignedDisenoEmail: string | null, deadline: string | null) => {
+    const link = appUrl(`/marketing/brief/${briefId}`);
     if (assignedDisenoEmail) {
       await sendMarketingEmail(
         assignedDisenoEmail,
         `Nuevo brief — ${reference}`,
-        emailHtml({ intro: "Te asignaron un nuevo brief.", reference, nextTask: stageLabel("proposal"), deadline }),
+        emailHtml({ intro: "Te asignaron un nuevo brief.", reference, nextTask: stageLabel("proposal"), deadline, link }),
       );
-      return { assignedDisenoEmail, carolNotifiedAt: null as string | null };
+      return;
     }
     if (notifyEmails.carol) {
       await sendMarketingEmail(
@@ -469,11 +481,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         `Nuevo brief sin asignar — ${reference}`,
         emailHtml({
           intro: "Hay un nuevo brief sin asignar. Entra a la plataforma y asígnalo a alguien de Diseño — tienes 24 horas antes de que se asigne automáticamente.",
-          reference, nextTask: stageLabel("proposal"), deadline,
+          reference, nextTask: stageLabel("proposal"), deadline, link,
         }),
       );
     }
-    return { assignedDisenoEmail: null as string | null, carolNotifiedAt: new Date().toISOString() };
   };
 
   const buildStages = (startDate: string, briefLink: string) => STAGE_DEFS.map((def, i) => {
@@ -498,13 +509,15 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => {
     const stages = buildStages(startDate, briefLink);
     const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
-    const assignment = await notifyBriefLive(reference, assignedDisenoEmail, nextDeadline);
-    await createMarketingBrief({
+    const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
+    const created = await createMarketingBrief({
       reference, productLine, startDate, estimatedStartDate: null, currentStage: "proposal", status: "in_progress",
       stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
       completedAt: null, publicationLinks: {}, linksApprovedByKarol: false,
-      variants: buildVariants(startDate, variantKeys ?? []), ...assignment,
+      variants: buildVariants(startDate, variantKeys ?? []),
+      assignedDisenoEmail: assignedDisenoEmail ?? null, carolNotifiedAt,
     });
+    await notifyBriefLive(created.id, reference, assignedDisenoEmail ?? null, nextDeadline);
     await notify(null, `Laura creó un nuevo brief: ${reference}.`);
     await reload();
   };
@@ -528,10 +541,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
     const stages = buildStages(today, brief.stages.find(s => s.key === "brief")?.link ?? "");
     const nextDeadline = addWorkDaysIso(today, STAGE_DEFS[1].gapDays);
-    const assignment = await notifyBriefLive(brief.reference, assignedDisenoEmail, nextDeadline);
+    const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
     await updateMarketingBrief(briefId, {
-      startDate: today, estimatedStartDate: null, currentStage: "proposal", status: "in_progress", stages, ...assignment,
+      startDate: today, estimatedStartDate: null, currentStage: "proposal", status: "in_progress", stages,
+      assignedDisenoEmail: assignedDisenoEmail ?? null, carolNotifiedAt,
     });
+    await notifyBriefLive(briefId, brief.reference, assignedDisenoEmail ?? null, nextDeadline);
     await notify(null, `Laura publicó el brief: ${brief.reference}.`);
     await reload();
   };
@@ -568,6 +583,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           nextTask: stageLabel(nextStage.key),
           deadline: nextDeadline,
           note,
+          link: appUrl(`/marketing/brief/${briefId}`),
         }),
       );
     }
@@ -605,6 +621,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
             nextTask: stageLabel("publish"),
             deadline: publishDeadline,
             note: opts?.note,
+            link: appUrl(`/marketing/brief/${briefId}`),
           }),
         );
       }
@@ -646,6 +663,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
             nextTask: stageLabel(nextStage.key),
             deadline: nextDeadline,
             note: opts?.note,
+            link: appUrl(`/marketing/brief/${briefId}`),
           }),
         );
       }
@@ -683,6 +701,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           nextTask: stageLabel("adjustments2"),
           deadline: adjustments2Deadline,
           note,
+          link: appUrl(`/marketing/brief/${briefId}`),
         }),
       );
     }
@@ -701,7 +720,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await sendMarketingEmail(
       notifyEmails.laura,
       `Publicado — ${brief.reference}`,
-      emailHtml({ intro: "Diseño confirmó que ya se publicó. El brief quedó completado.", reference: brief.reference, note }),
+      emailHtml({ intro: "Diseño confirmó que ya se publicó. El brief quedó completado.", reference: brief.reference, note, link: appUrl(`/marketing/brief/${briefId}`) }),
     );
     await reload();
   };
@@ -734,7 +753,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       await sendMarketingEmail(
         email,
         `Te asignaron un brief — ${brief.reference}`,
-        emailHtml({ intro: "Te asignaron este brief.", reference: brief.reference, nextTask: stage ? stageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null }),
+        emailHtml({ intro: "Te asignaron este brief.", reference: brief.reference, nextTask: stage ? stageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null, link: appUrl(`/marketing/brief/${briefId}`) }),
       );
     }
     await reload();
@@ -776,7 +795,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await sendMarketingEmail(
       notifyEmails.laura,
       `Tienes una revisión pendiente — ${brief.reference} (${labels})`,
-      emailHtml({ intro: `Diseño subió una propuesta para ${labels}. Te toca revisar.`, reference: brief.reference, deadline: anyNextDeadline, note }),
+      emailHtml({ intro: `Diseño subió una propuesta para ${labels}. Te toca revisar.`, reference: brief.reference, deadline: anyNextDeadline, note, link: appUrl(`/marketing/brief/${briefId}`) }),
     );
     await reload();
   };
@@ -806,7 +825,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         await sendMarketingEmail(
           email,
           `Aprobado — confirma publicación de ${label} (${brief.reference})`,
-          emailHtml({ intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("publish"), deadline: publishDeadline, note: opts?.note }),
+          emailHtml({ intro: "Laura aprobó sin cambios. Falta que confirmes que ya se publicó.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("publish"), deadline: publishDeadline, note: opts?.note, link: appUrl(`/marketing/brief/${briefId}`) }),
         );
       }
       await reload();
@@ -831,7 +850,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         await sendMarketingEmail(
           email,
           `Ajustes solicitados — ${label} (${brief.reference})`,
-          emailHtml({ intro: "Laura solicitó ajustes en la última entrega.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel(nextStage.key), deadline: nextDeadline, note: opts?.note }),
+          emailHtml({ intro: "Laura solicitó ajustes en la última entrega.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel(nextStage.key), deadline: nextDeadline, note: opts?.note, link: appUrl(`/marketing/brief/${briefId}`) }),
         );
       }
     }
@@ -859,7 +878,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       await sendMarketingEmail(
         email,
         `Revisión adicional — ${label} (${brief.reference})`,
-        emailHtml({ intro: "Laura solicitó una revisión adicional sobre el cierre final.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("adjustments2"), deadline: adjustments2Deadline, note }),
+        emailHtml({ intro: "Laura solicitó una revisión adicional sobre el cierre final.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("adjustments2"), deadline: adjustments2Deadline, note, link: appUrl(`/marketing/brief/${briefId}`) }),
       );
     }
     await reload();
@@ -884,6 +903,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       emailHtml({
         intro: allDone ? "Todas las variantes fueron aprobadas y publicadas. El brief quedó completado." : "Diseño confirmó que esta variante ya se publicó.",
         reference: allDone ? brief.reference : `${brief.reference} — ${label}`, note,
+        link: appUrl(`/marketing/brief/${briefId}`),
       }),
     );
     await reload();
