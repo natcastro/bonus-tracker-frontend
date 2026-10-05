@@ -240,6 +240,49 @@ export const TODO_TASK_TYPES = [
   "Otro",
 ] as const;
 
+// ── Category-first type picker — the person picks one of these 4 before seeing the specific
+// options/fields that actually apply, instead of one long flat dropdown. Used by both the
+// internal To Do creation form and the public request link.
+
+export type TaskCategory = "publicidad" | "gran_formato" | "piezas_digitales" | "videos";
+
+export const TASK_CATEGORIES: { key: TaskCategory; label: string }[] = [
+  { key: "publicidad", label: "Publicidad" },
+  { key: "gran_formato", label: "Gran Formato" },
+  { key: "piezas_digitales", label: "P. Digitales" },
+  { key: "videos", label: "Videos" },
+];
+
+export const PUBLICIDAD_TYPES = [
+  "Pendones (100x200)",
+  "Pendones (100x150)",
+  "Pendones (70x100)",
+  "Volantes media carta (21x14)",
+  "Volantes 1/4 de carta (10.5x14)",
+  "Posters (70x100)",
+  "Stickers (Adhesivos)",
+  "Backings",
+  "Tarjetas de presentación (COL-MEX 9.5x5cm)",
+  "Tarjetas de presentación (USA 3.5x2 in)",
+  "Trípticos (pegable de 3 cuerpos 63x28cm)",
+  "Otro",
+] as const;
+
+export const GRAN_FORMATO_TYPES = [
+  "Aviso luminoso fachada (varía el modelo según el país)",
+  "Vinilo adhesivo vidrios (color blanco, no permite el paso de la luz)",
+  "Microperforado adhesivo para vidrios",
+  "Círculo luminoso con logo FTC",
+  "Retablos (impresión en vinilo adhesivo montado sobre marcos de madera)",
+  "Otro",
+] as const;
+
+// Piezas Digitales reuses TODO_TASK_TYPES as-is — it's already exactly this list.
+
+export const VIDEO_APPS = ["Facebook", "Instagram", "Amazon", "Otro"] as const;
+export const VIDEO_FORMATS = ["Story", "Post", "No aplica"] as const;
+export const REQUEST_COUNTRIES = ["Colombia", "México", "Estados Unidos"] as const;
+
 export type TodoStageKey = "proposal" | "review" | "adjustments" | "finalReview" | "finalAdjustments" | "approved";
 
 export interface TodoStage {

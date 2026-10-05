@@ -1,38 +1,30 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { TODO_TASK_TYPES } from "../types";
+import TaskCategoryFields, { EMPTY_TASK_CATEGORY_STATE, taskCategoryIsComplete, taskCategoryTitle, taskCategoryDetailsBlock } from "./TaskCategoryFields";
+import type { TaskCategoryState } from "./TaskCategoryFields";
 
 export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
   const { createTodoTask, disenoEmailList, disenoDisplayName } = useMarketing();
-  const [query, setQuery] = useState("");
-  const [taskType, setTaskType] = useState<string | null>(null);
-  const [showOptions, setShowOptions] = useState(false);
-  const [customTitle, setCustomTitle] = useState("");
+  const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [description, setDescription] = useState("");
   const [emailNote, setEmailNote] = useState("");
   const [assignedEmail, setAssignedEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const filteredTypes = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return TODO_TASK_TYPES;
-    return TODO_TASK_TYPES.filter(t => t.toLowerCase().includes(q));
-  }, [query]);
-
-  const isOtro = taskType === "Otro";
-  const title = isOtro ? customTitle.trim() : (taskType ?? "");
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskType) { setError("Selecciona el tipo de tarea."); return; }
-    if (isOtro && !customTitle.trim()) { setError("Escribe cómo se llama la tarea."); return; }
+    if (!taskCategoryIsComplete(cat)) { setError("Selecciona la categoría y el tipo de pieza."); return; }
     if (!assignedEmail) { setError("Asigna la tarea a alguien de Diseño."); return; }
+    const title = taskCategoryTitle(cat);
+    const detailsBlock = taskCategoryDetailsBlock(cat);
+    const fullDescription = [detailsBlock, description.trim()].filter(Boolean).join("\n—\n");
+    const taskType = cat.category === "videos" ? "Video" : (cat.selectedType ?? "");
     setSaving(true);
     setError("");
     try {
-      await createTodoTask(taskType, title, description.trim(), assignedEmail, emailNote.trim() || undefined);
+      await createTodoTask(taskType, title, fullDescription, assignedEmail, emailNote.trim() || undefined);
       onClose();
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear la tarea.");
@@ -50,52 +42,14 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(44,42,32,0.35)" }} />
-      <div style={{ position: "relative", width: 460, maxWidth: "92vw", background: MT.surface, borderRadius: MT.radiusLg, boxShadow: MT.shadowLg, padding: 26 }}>
+      <div style={{ position: "relative", width: 460, maxWidth: "92vw", maxHeight: "88vh", overflowY: "auto", background: MT.surface, borderRadius: MT.radiusLg, boxShadow: MT.shadowLg, padding: 26 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
           Nueva tarea (To Do)
         </div>
         <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>Selecciona a continuación el tipo de arte a realizar</h3>
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ position: "relative" }}>
-            <label style={labelStyle}>Tipo de tarea</label>
-            <input
-              style={inputStyle}
-              value={taskType ? (isOtro ? "Otro" : taskType) : query}
-              onChange={e => { setQuery(e.target.value); setTaskType(null); setShowOptions(true); }}
-              onFocus={() => setShowOptions(true)}
-              placeholder="Escribe para buscar..."
-              autoFocus
-            />
-            {showOptions && !taskType && (
-              <div style={{
-                position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 10,
-                background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg,
-                maxHeight: 220, overflowY: "auto",
-              }}>
-                {filteredTypes.length === 0 ? (
-                  <div style={{ padding: "10px 12px", fontSize: 12.5, color: MT.text3 }}>Sin resultados — elige "Otro" y describe la tarea.</div>
-                ) : (
-                  filteredTypes.map(t => (
-                    <div
-                      key={t}
-                      onClick={() => { setTaskType(t); setQuery(t); setShowOptions(false); }}
-                      style={{ padding: "9px 12px", fontSize: 13, color: MT.text1, cursor: "pointer" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                    >{t}</div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {isOtro && (
-            <div>
-              <label style={labelStyle}>¿Cómo se llama la tarea?</label>
-              <input style={inputStyle} value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Describe la tarea..." required />
-            </div>
-          )}
+          <TaskCategoryFields state={cat} onChange={setCat} />
 
           <div>
             <label style={labelStyle}>Descripción de la tarea</label>
