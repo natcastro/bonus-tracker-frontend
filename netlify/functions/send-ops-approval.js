@@ -3,6 +3,11 @@ import crypto from "node:crypto";
 const TENANT_ID = "e2f6e61f-1d89-4193-82a7-b62dae532dc1";
 const CLIENT_ID = "369c616f-761a-4533-bdb7-bd6ddd9359b4";
 
+// Only company mailboxes may receive the breakdown (HR + copies) — never an external address.
+const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || "formatucuerpo.com").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+const MAX_COPIES = 3;
+const isCompanyEmail = (e) => /^[^@\s]+@[^@\s]+$/.test(e) && ALLOWED_DOMAINS.includes(e.split("@")[1].toLowerCase());
+
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const json = (statusCode, obj) => ({ statusCode, body: JSON.stringify(obj) });
 const b64 = (s) => Buffer.from(s, "base64url");
@@ -52,7 +57,7 @@ async function getGraphToken() {
   return data.access_token;
 }
 
-async function sendGraphMail(to, cc, subject, html) {
+async function sendGraphMail(to, ccList, subject, html) {
   const sender = process.env.MAIL_SENDER_ADDRESS;
   if (!sender) throw new Error("MAIL_SENDER_ADDRESS not configured");
   const token = await getGraphToken();
@@ -64,7 +69,7 @@ async function sendGraphMail(to, cc, subject, html) {
         subject,
         body: { contentType: "HTML", content: html },
         toRecipients: [{ emailAddress: { address: to } }],
-        ccRecipients: cc ? [{ emailAddress: { address: cc } }] : [],
+        ccRecipients: ccList.map((address) => ({ emailAddress: { address } })),
       },
     }),
   });
@@ -87,9 +92,13 @@ export const handler = async (event) => {
   const settings = (await sres.json())?.[0];
   const approver = String(settings?.approver_email || "").toLowerCase().trim();
   const hr = String(settings?.hr_email || "").trim();
-  const copy = String(settings?.copy_email || "").trim();
+  const copies = String(settings?.copy_email || "").split(",").map((e) => e.trim()).filter(Boolean);
   if (!approver || !hr) return json(400, { error: "Approval settings are not configured yet." });
   if (signedInAs !== approver) return json(403, { error: `${signedInAs || "This account"} is not authorized to approve.` });
+
+  if (copies.length > MAX_COPIES) return json(400, { error: `At most ${MAX_COPIES} copy recipients are allowed.` });
+  const external = [hr, ...copies].filter((e) => !isCompanyEmail(e));
+  if (external.length) return json(400, { error: `Blocked: only company emails (@${ALLOWED_DOMAINS.join(", @")}) can receive this. Not allowed: ${external.join(", ")}` });
 
   const money = (n) => `$${Number(n || 0).toFixed(2)}`;
   const blocks = agents.map((a) => `
@@ -107,7 +116,7 @@ export const handler = async (event) => {
   </div>`;
 
   try {
-    await sendGraphMail(hr, copy, `Bonus breakdown — ${team || "Operations"} — ${periodLabel}`, html);
+    await sendGraphMail(hr, copies, `Bonus breakdown — ${team || "Operations"} — ${periodLabel}`, html);
   } catch (e) { return json(500, { error: e.message }); }
 
   const total = agents.reduce((s, a) => s + Number(a.total || 0), 0);

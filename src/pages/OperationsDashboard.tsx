@@ -22,6 +22,11 @@ import {
 import { useHubAccess } from "../auth/HubAccessContext";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
+// Only company mailboxes may receive the HR breakdown (also enforced server-side).
+const APPROVAL_EMAIL_DOMAIN = "formatucuerpo.com";
+const MAX_APPROVAL_COPIES = 3;
+const isCompanyEmail = (e: string) => e.toLowerCase().endsWith(`@${APPROVAL_EMAIL_DOMAIN}`);
+
 const ADMIN_PASSWORD = "ops2026!";
 
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
@@ -316,7 +321,7 @@ export default function OperationsDashboard() {
   const [approving, setApproving] = useState(false);
   const [approvalMsg, setApprovalMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showApprovalSettings, setShowApprovalSettings] = useState(false);
-  const [approvalForm, setApprovalForm] = useState({ approverEmail: "", hrEmail: "", copyEmail: "" });
+  const [approvalForm, setApprovalForm] = useState({ approverEmail: "", hrEmail: "", copies: ["", "", ""] as string[] });
   const [approvalSettingsMsg, setApprovalSettingsMsg] = useState("");
 
   useEffect(() => {
@@ -326,13 +331,21 @@ export default function OperationsDashboard() {
 
   const openApprovalSettings = async () => {
     setApprovalSettingsMsg("");
-    try { setApprovalForm(await getOpsApprovalSettings()); } catch { /* table not created yet */ }
+    try {
+      const cur = await getOpsApprovalSettings();
+      const copies = cur.copyEmail.split(",").map((e) => e.trim()).filter(Boolean).slice(0, MAX_APPROVAL_COPIES);
+      while (copies.length < MAX_APPROVAL_COPIES) copies.push("");
+      setApprovalForm({ approverEmail: cur.approverEmail, hrEmail: cur.hrEmail, copies });
+    } catch { /* table not created yet */ }
     setShowApprovalSettings(true);
   };
 
   const saveApprovalSettings = async () => {
+    const copies = approvalForm.copies.map((e) => e.trim()).filter(Boolean);
+    const bad = [approvalForm.approverEmail.trim(), approvalForm.hrEmail.trim(), ...copies].filter((e) => e && !isCompanyEmail(e));
+    if (bad.length) { setApprovalSettingsMsg(`Only @${APPROVAL_EMAIL_DOMAIN} emails are allowed. Not allowed: ${bad.join(", ")}`); return; }
     try {
-      await saveOpsApprovalSettings(approvalForm);
+      await saveOpsApprovalSettings({ approverEmail: approvalForm.approverEmail, hrEmail: approvalForm.hrEmail, copyEmail: copies.join(",") });
       setApprovalSettingsMsg("Saved ✓");
     } catch (e: any) {
       setApprovalSettingsMsg(`Error: ${e.message ?? e}`);
@@ -870,10 +883,14 @@ export default function OperationsDashboard() {
               <label>HR email (receives the breakdown)</label>
               <input type="email" className="form-control" value={approvalForm.hrEmail} onChange={(e) => setApprovalForm({ ...approvalForm, hrEmail: e.target.value })} placeholder="hr@company.com" />
             </div>
-            <div className="form-group">
-              <label>Copy to (optional)</label>
-              <input type="email" className="form-control" value={approvalForm.copyEmail} onChange={(e) => setApprovalForm({ ...approvalForm, copyEmail: e.target.value })} placeholder="you@company.com" />
-            </div>
+            {approvalForm.copies.map((c, i) => (
+              <div className="form-group" key={i}>
+                <label>Copy to {i + 1} (optional)</label>
+                <input type="email" className="form-control" value={c} placeholder={`copy${i + 1}@${APPROVAL_EMAIL_DOMAIN}`}
+                  onChange={(e) => setApprovalForm({ ...approvalForm, copies: approvalForm.copies.map((x, j) => (j === i ? e.target.value : x)) })} />
+              </div>
+            ))}
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Only @{APPROVAL_EMAIL_DOMAIN} addresses are accepted.</p>
             {approvalSettingsMsg && <p style={{ fontSize: "0.875rem" }}>{approvalSettingsMsg}</p>}
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowApprovalSettings(false)}>Close</button>
