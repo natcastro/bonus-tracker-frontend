@@ -70,11 +70,18 @@ export default function OperationsDashboard() {
   const isAdmin = !!access?.isAdmin;
   const { instance: msal, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState("summary");
-  const defaultCycle = getCurrentCycleDefault();
+  const defaultCycle = (() => {
+    try {
+      const ctx = sessionStorage.getItem("ops_approval_idtoken") && JSON.parse(sessionStorage.getItem("ops_approval_ctx") || "null");
+      if (ctx?.year && ctx?.cycleId) return { year: String(ctx.year), cycleId: String(ctx.cycleId) };
+    } catch { /* ignore */ }
+    return getCurrentCycleDefault();
+  })();
   const [year, setYear] = useState(defaultCycle.year);
   const [cycleId, setCycleId] = useState(defaultCycle.cycleId);
   const [cycles, setCycles] = useState(() => getCyclesForYear(Number(defaultCycle.year)));
 
+  const [loadedFor, setLoadedFor] = useState("");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [appeals, setAppeals] = useState<OpsAppeal[]>([]);
   const [handlingTimes, setHandlingTimes] = useState<OpsHandlingTime[]>([]);
@@ -103,6 +110,7 @@ export default function OperationsDashboard() {
     setHandlingTimes(ht);
     setTiktokScores(tk);
     setAmazonPerformance(apf);
+    setLoadedFor(`${year}-${cycleId}`);
   }, [year, cycleId]);
 
   useEffect(() => { load(); }, [load]);
@@ -331,22 +339,41 @@ export default function OperationsDashboard() {
     }
   };
 
+  // Step 1: force a fresh Microsoft sign-in (full redirect — a popup can't reliably return here).
   const approveAndSend = async () => {
     setApproving(true);
     setApprovalMsg(null);
     try {
-      // Force a fresh sign-in (password prompt) so the approver proves who they are right now.
-      const auth = await msal.acquireTokenPopup({
+      sessionStorage.setItem("ops_approval_ctx", JSON.stringify({ year, cycleId }));
+      await msal.acquireTokenRedirect({
         scopes: ["openid", "profile"], prompt: "login", loginHint: accounts[0]?.username,
+        state: "/operations?approve=1",
       });
+    } catch (e: any) {
+      setApproving(false);
+      setApprovalMsg({ ok: false, text: e?.errorMessage || e?.message || "Could not start sign-in." });
+    }
+  };
+
+  // Step 2: back from the sign-in — once this cycle's data is loaded, send the breakdown.
+  const [approvalToken] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem("ops_approval_idtoken");
+    } catch { return null; }
+  });
+  const [approvalSent, setApprovalSent] = useState(false);
+
+  const sendApproval = async (idToken: string) => {
+    setApproving(true);
+    setApprovalMsg(null);
+    try {
       const money = (n: number) => Math.round(n * 100) / 100;
       const payload = {
-        idToken: auth.idToken, year, cycleId, team: "Operations",
+        idToken, year, cycleId, team: "Operations",
         periodLabel: `${cycleDates.from} to ${cycleDates.to}`,
         agents: agentTotals.map((t) => {
-          const cap = (c: number) => c;
           const rows = [
-            { label: "Appeals", amount: money(t.appealCapped), cap: cap(t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP) },
+            { label: "Appeals", amount: money(t.appealCapped), cap: t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP },
             { label: "Handling Time", amount: money(t.handling), cap: t.isFullTime ? FULLTIME_HANDLING_CAP : 0 },
             ...(t.isFullTime ? [{ label: "Amazon Performance", amount: money(t.amazonPerf), cap: FULLTIME_AMAZON_PERF_CAP }] : []),
             { label: "TikTok Score", amount: money(t.tiktok), cap: t.isFullTime ? FULLTIME_TIKTOK_CAP : 0 },
@@ -362,11 +389,23 @@ export default function OperationsDashboard() {
       setApprovalMsg({ ok: true, text: `Sent to HR (${out.sentTo}). Approved by ${out.approvedBy}.` });
       setLastApproval(await getLastOpsApproval(Number(year), cycleId));
     } catch (e: any) {
-      setApprovalMsg({ ok: false, text: e?.errorMessage || e?.message || "Could not send." });
+      setApprovalMsg({ ok: false, text: e?.message || "Could not send." });
     } finally {
       setApproving(false);
     }
   };
+
+  useEffect(() => {
+    if (!approvalToken || approvalSent || !loadedFor || agentTotals.length === 0) return;
+    let ctx: { year: string; cycleId: string } | null = null;
+    try { ctx = JSON.parse(sessionStorage.getItem("ops_approval_ctx") || "null"); } catch { /* ignore */ }
+    if (ctx && (ctx.year !== year || ctx.cycleId !== cycleId)) return; // wait for the restored cycle
+    setApprovalSent(true);
+    sessionStorage.removeItem("ops_approval_ctx");
+    sessionStorage.removeItem("ops_approval_idtoken");
+    sendApproval(approvalToken);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approvalToken, approvalSent, loadedFor, agentTotals.length, year, cycleId]);
 
   return (
     <div>
