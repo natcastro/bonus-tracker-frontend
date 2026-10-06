@@ -1,0 +1,22 @@
+name: TikTok connect (one-time)
+
+# Run manually once: paste the authorization code from TikTok Shop. The server exchanges it for
+# tokens and stores them; CRON_SECRET stays in GitHub and never has to be handled by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      auth_code:
+        description: "Authorization code from TikTok Shop (the ?code=... value)"
+        required: true
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exchange authorization code
+        env:
+          AUTH_CODE: ${{ inputs.auth_code }}
+        run: |
+          curl -s -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/tiktok-sps-sync?authCode=${AUTH_CODE}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" | tee out.json
+          grep -q '"ok":true' out.json
