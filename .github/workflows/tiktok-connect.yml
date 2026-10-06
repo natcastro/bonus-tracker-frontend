@@ -17,6 +17,11 @@ jobs:
         env:
           AUTH_CODE: ${{ inputs.auth_code }}
         run: |
-          curl -s -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/tiktok-sps-sync?authCode=${AUTH_CODE}" \
+          # Accept either the bare code or the whole "...&locale=en&shop_region=US" tail / "code=" prefix.
+          CODE="$(printf '%s' "$AUTH_CODE" | tr -d '[:space:]')"
+          CODE="${CODE#*code=}"
+          CODE="${CODE%%&*}"
+          echo "Code length: ${#CODE} characters"
+          curl -s -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/tiktok-sps-sync?authCode=${CODE}" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" | tee out.json
           grep -q '"ok":true' out.json
