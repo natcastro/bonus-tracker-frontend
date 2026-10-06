@@ -65,7 +65,7 @@ async function getAuth() {
 const usDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());
 
 function pickScore(d) {
-  for (const k of ["score", "shop_score", "overall_score", "sps_score", "total_score", "shop_performance_score"]) {
+  for (const k of ["sps_score", "score", "shop_score", "overall_score", "sps_score", "total_score", "shop_performance_score"]) {
     if (d?.[k] != null && !isNaN(Number(d[k]))) return Number(d[k]);
   }
   return null;
@@ -99,7 +99,7 @@ export const handler = async (event) => {
 
     const data = await apiGet("/analytics/202606/shop_performances/overview", { shop_cipher: auth.shop_cipher, locale: "en-US" }, auth.access_token);
     const score = pickScore(data);
-    const tier = data?.tier ?? data?.tier_name ?? null;
+    const tier = data?.sps_tier_text ?? data?.sps_tier ?? data?.tier ?? null;
     const day = usDay();
     const r = await supa("tiktok_sps_daily", {
       method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
