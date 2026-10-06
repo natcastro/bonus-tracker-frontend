@@ -27,12 +27,12 @@ export const FULLTIME_EFFECTIVE_CYCLE_START = "2026-09-24";
 
 export const FULLTIME_APPEALS_CAP = 250;
 export const FULLTIME_HANDLING_CAP = 40;
-export const FULLTIME_TIKTOK_CAP = 60;
-export const FULLTIME_AMAZON_PERF_CAP = 20;
+export const FULLTIME_TIKTOK_CAP = 50;
+export const FULLTIME_AMAZON_PERF_CAP = 30;
 export const FULLTIME_TOTAL_CAP = 370;
 
 export const AMAZON_PERFORMANCE_BONUS: Record<string, number> = {
-  good: 20,
+  good: 30,
   regular: 5,
   poor: 0,
 };
@@ -45,4 +45,17 @@ export function calcHandlingTimeBonusFullTime(hours: number): number {
   if (hours <= 36)   return 16;
   if (hours <= 38.5) return 8;
   return 0;
+}
+
+// Full-time TikTok account score → value for a full cycle (max $50), prorated by days like the hourly scale.
+export function tiktokCycleValueFullTime(score: number): number {
+  if (score <= 3.9) return 0;
+  if (score <= 4.0) return 20;
+  if (score <= 4.4) return 30;
+  if (score <= 4.5) return 40;
+  return 50;
+}
+
+export function calcTikTokBonusFullTime(scores: { score: number; duration: number }[], daysInCycle: number): number {
+  return scores.reduce((t, e) => t + (tiktokCycleValueFullTime(e.score) / daysInCycle) * e.duration, 0);
 }

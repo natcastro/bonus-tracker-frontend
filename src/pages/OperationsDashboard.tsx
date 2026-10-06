@@ -14,7 +14,7 @@ import {
 import {
   OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus,
   FULLTIME_EFFECTIVE_CYCLE_START, FULLTIME_APPEALS_CAP, FULLTIME_HANDLING_CAP, FULLTIME_TIKTOK_CAP,
-  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime,
+  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime,
 } from "../services/opsBonus";
 import { useHubAccess } from "../auth/HubAccessContext";
 
@@ -131,7 +131,9 @@ export default function OperationsDashboard() {
   // Her historical records and past cycles remain fully visible/unaffected.
   const visibleAgents = agents.filter((ag) => ag.id !== LINDA_AGENT_ID || cycleFrom < LINDA_LAST_CYCLE_START);
 
-  const agentTotals = agents.map((ag) => {
+  const tiktokBonusFullTime = calcTikTokBonusFullTime(tiktokScores, cycleDays);
+
+  const agentTotals = visibleAgents.map((ag) => {
     const agAppeals = appeals.filter((a) => a.agentId === ag.id && a.status === "completed" && !a.invalidated);
     const appealRaw = agAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
     const ht = handlingTimes.find((h) => h.agentId === ag.id);
@@ -140,7 +142,7 @@ export default function OperationsDashboard() {
     if (isThomasFullTime) {
       const appealCapped = Math.min(appealRaw, FULLTIME_APPEALS_CAP);
       const handling = ht ? calcHandlingTimeBonusFullTime(ht.hours) : 0;
-      const tiktok = Math.min(tiktokBonus, FULLTIME_TIKTOK_CAP);
+      const tiktok = Math.min(tiktokBonusFullTime, FULLTIME_TIKTOK_CAP);
       const perf = amazonPerformance.find((p) => p.agentId === ag.id);
       const amazonPerf = perf ? Math.min(AMAZON_PERFORMANCE_BONUS[perf.rating] ?? 0, FULLTIME_AMAZON_PERF_CAP) : 0;
       const raw = appealCapped + handling + tiktok + amazonPerf;
@@ -192,7 +194,7 @@ export default function OperationsDashboard() {
 
   useEffect(() => {
     const forms: Record<number, string> = {};
-    agents.forEach((ag) => {
+    visibleAgents.forEach((ag) => {
       const ht = handlingTimes.find((h) => h.agentId === ag.id);
       forms[ag.id] = ht ? String(ht.hours) : "";
     });
@@ -336,7 +338,7 @@ export default function OperationsDashboard() {
             <div className="card">
               <h3>Category Breakdown</h3>
               <table className="data-table">
-                <thead><tr><th>Category</th>{agents.map((a) => <th key={a.id}>{a.name}</th>)}</tr></thead>
+                <thead><tr><th>Category</th>{visibleAgents.map((a) => <th key={a.id}>{a.name}</th>)}</tr></thead>
                 <tbody>
                   <tr>
                     <td>Appeals</td>
@@ -461,7 +463,8 @@ export default function OperationsDashboard() {
                       const raw = appeals
                         .filter((a) => (filterAgentId === 0 || a.agentId === filterAgentId) && a.status === "completed" && !a.invalidated)
                         .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
-                      const cap = filterAgentId === THOMAS_AGENT_ID && isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
+                      const onlyThomas = filterAgentId === THOMAS_AGENT_ID || (filterAgentId === 0 && visibleAgents.every((a) => a.id === THOMAS_AGENT_ID));
+                      const cap = onlyThomas && isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
                       return <>Total Bonus: ${Math.min(raw, cap).toFixed(2)} (cap ${cap})</>;
                     })()}
                   </div>
@@ -656,7 +659,7 @@ export default function OperationsDashboard() {
             <div className="card" style={{ overflowX: "auto" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3>Scores</h3>
-                <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>Total Bonus: ${tiktokBonus.toFixed(2)}</div>
+                <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>Total Bonus: ${(isFullTimeCycle ? tiktokBonusFullTime : tiktokBonus).toFixed(2)}</div>
               </div>
               <table className="data-table">
                 <thead><tr><th>Date Range</th><th>Score</th><th>Tier Value</th><th>Earned</th><th>Actions</th></tr></thead>
@@ -664,8 +667,11 @@ export default function OperationsDashboard() {
                   {[...tiktokScores].sort((a, b) => b.date.localeCompare(a.date)).map((t) => {
                     const s = t.score;
                     let mv = 0;
-                    if (s <= 4.0) mv = 20; else if (s <= 4.4) mv = 30; else if (s <= 4.6) mv = 60;
-                    else if (s <= 4.7) mv = 70; else if (s <= 4.8) mv = 80; else mv = 100;
+                    if (isFullTimeCycle) mv = tiktokCycleValueFullTime(s);
+                    else {
+                      if (s <= 4.0) mv = 20; else if (s <= 4.4) mv = 30; else if (s <= 4.6) mv = 60;
+                      else if (s <= 4.7) mv = 70; else if (s <= 4.8) mv = 80; else mv = 100;
+                    }
                     const earned = (mv / cycleDays) * t.duration;
                     const endDate = new Date(t.date);
                     endDate.setDate(endDate.getDate() + t.duration - 1);
