@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import type { OpsApproval } from "../services/api";
+import { useMsal } from "@azure/msal-react";
 import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore, OpsAmazonPerformance } from "../types";
 import {
   getAgents, updateAgentName, createAgent, verifySuperAdmin,
@@ -7,6 +9,7 @@ import {
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
   getOpsAmazonPerformance, upsertOpsAmazonPerformance,
+  getOpsApprovalSettings, saveOpsApprovalSettings, getLastOpsApproval,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault, getCycleFromDate, getCycleDatesFromId, calcTikTokBonus,
@@ -65,6 +68,7 @@ export default function OperationsDashboard() {
   const navigate = useNavigate();
   const { access } = useHubAccess();
   const isAdmin = !!access?.isAdmin;
+  const { instance: msal, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState("summary");
   const defaultCycle = getCurrentCycleDefault();
   const [year, setYear] = useState(defaultCycle.year);
@@ -125,7 +129,8 @@ export default function OperationsDashboard() {
   const cycleDays = cycleInfo?.days ?? 15;
   const tiktokBonus = calcTikTokBonus(tiktokScores, cycleDays);
 
-  const cycleFrom = getCycleDatesFromId(year, cycleId).from;
+  const cycleDates = getCycleDatesFromId(year, cycleId);
+  const cycleFrom = cycleDates.from;
   const isFullTimeCycle = cycleFrom >= FULLTIME_EFFECTIVE_CYCLE_START;
   // Linda left Sep 12, 2026 — hide her from any cycle starting on/after that date.
   // Her historical records and past cycles remain fully visible/unaffected.
@@ -298,6 +303,71 @@ export default function OperationsDashboard() {
     return null;
   };
 
+  // ── Approve & send to HR (only the configured approver can succeed — verified server-side)
+  const [lastApproval, setLastApproval] = useState<OpsApproval | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [approvalMsg, setApprovalMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [showApprovalSettings, setShowApprovalSettings] = useState(false);
+  const [approvalForm, setApprovalForm] = useState({ approverEmail: "", hrEmail: "", copyEmail: "" });
+  const [approvalSettingsMsg, setApprovalSettingsMsg] = useState("");
+
+  useEffect(() => {
+    setApprovalMsg(null);
+    getLastOpsApproval(Number(year), cycleId).then(setLastApproval).catch(() => setLastApproval(null));
+  }, [year, cycleId]);
+
+  const openApprovalSettings = async () => {
+    setApprovalSettingsMsg("");
+    try { setApprovalForm(await getOpsApprovalSettings()); } catch { /* table not created yet */ }
+    setShowApprovalSettings(true);
+  };
+
+  const saveApprovalSettings = async () => {
+    try {
+      await saveOpsApprovalSettings(approvalForm);
+      setApprovalSettingsMsg("Saved ✓");
+    } catch (e: any) {
+      setApprovalSettingsMsg(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  const approveAndSend = async () => {
+    setApproving(true);
+    setApprovalMsg(null);
+    try {
+      // Force a fresh sign-in (password prompt) so the approver proves who they are right now.
+      const auth = await msal.acquireTokenPopup({
+        scopes: ["openid", "profile"], prompt: "login", loginHint: accounts[0]?.username,
+      });
+      const money = (n: number) => Math.round(n * 100) / 100;
+      const payload = {
+        idToken: auth.idToken, year, cycleId, team: "Operations",
+        periodLabel: `${cycleDates.from} to ${cycleDates.to}`,
+        agents: agentTotals.map((t) => {
+          const cap = (c: number) => c;
+          const rows = [
+            { label: "Appeals", amount: money(t.appealCapped), cap: cap(t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP) },
+            { label: "Handling Time", amount: money(t.handling), cap: t.isFullTime ? FULLTIME_HANDLING_CAP : 0 },
+            ...(t.isFullTime ? [{ label: "Amazon Performance", amount: money(t.amazonPerf), cap: FULLTIME_AMAZON_PERF_CAP }] : []),
+            { label: "TikTok Score", amount: money(t.tiktok), cap: t.isFullTime ? FULLTIME_TIKTOK_CAP : 0 },
+          ];
+          return { name: t.agent.name, rows, total: money(t.total), totalCap: t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP };
+        }),
+      };
+      const resp = await fetch("/.netlify/functions/send-ops-approval", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const out = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(out.error ?? `Request failed (${resp.status})`);
+      setApprovalMsg({ ok: true, text: `Sent to HR (${out.sentTo}). Approved by ${out.approvedBy}.` });
+      setLastApproval(await getLastOpsApproval(Number(year), cycleId));
+    } catch (e: any) {
+      setApprovalMsg({ ok: false, text: e?.errorMessage || e?.message || "Could not send." });
+    } finally {
+      setApproving(false);
+    }
+  };
+
   return (
     <div>
       <nav className="top-nav">
@@ -314,6 +384,7 @@ export default function OperationsDashboard() {
           <select className="month-selector" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
             {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          {isAdmin && <button className="btn btn-secondary btn-sm" onClick={openApprovalSettings} title="Approval settings (admin only)">⚙ Approval settings</button>}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
         </div>
       </nav>
@@ -381,6 +452,18 @@ export default function OperationsDashboard() {
                 </div>
               );
             })()}
+
+            <div className="card" style={{ marginTop: "1rem" }}>
+              <h3>Approval</h3>
+              <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: "0.25rem 0 1rem" }}>
+                Sends this cycle's bonus breakdown ({cycleDates.from} – {cycleDates.to}) to HR. Only the designated approver can send it, and must sign in again to confirm.
+              </p>
+              <button className="btn btn-primary" onClick={approveAndSend} disabled={approving || agentTotals.length === 0}>
+                {approving ? "Waiting for sign-in…" : "Approve & send to HR"}
+              </button>
+              {approvalMsg && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: approvalMsg.ok ? "#16a34a" : "#dc2626" }}>{approvalMsg.text}</p>}
+              {lastApproval && <p style={{ marginTop: "0.75rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>Last approved by {lastApproval.approvedBy} on {new Date(lastApproval.approvedAt).toLocaleString()}.</p>}
+            </div>
           </section>
         )}
 
@@ -734,6 +817,32 @@ export default function OperationsDashboard() {
           </section>
         )}
       </main>
+
+      {/* Approval settings (admin only) */}
+      {showApprovalSettings && isAdmin && (
+        <div className="modal-overlay active">
+          <div className="modal">
+            <div className="modal-header"><h3>Approval settings</h3></div>
+            <div className="form-group">
+              <label>Approver email (the only person who can approve)</label>
+              <input type="email" className="form-control" value={approvalForm.approverEmail} onChange={(e) => setApprovalForm({ ...approvalForm, approverEmail: e.target.value })} placeholder="catalina@company.com" />
+            </div>
+            <div className="form-group">
+              <label>HR email (receives the breakdown)</label>
+              <input type="email" className="form-control" value={approvalForm.hrEmail} onChange={(e) => setApprovalForm({ ...approvalForm, hrEmail: e.target.value })} placeholder="hr@company.com" />
+            </div>
+            <div className="form-group">
+              <label>Copy to (optional)</label>
+              <input type="email" className="form-control" value={approvalForm.copyEmail} onChange={(e) => setApprovalForm({ ...approvalForm, copyEmail: e.target.value })} placeholder="you@company.com" />
+            </div>
+            {approvalSettingsMsg && <p style={{ fontSize: "0.875rem" }}>{approvalSettingsMsg}</p>}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShowApprovalSettings(false)}>Close</button>
+              <button className="btn btn-primary" onClick={saveApprovalSettings}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Modal */}
       {showPassword && (

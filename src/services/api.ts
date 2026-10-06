@@ -1922,3 +1922,27 @@ export async function deleteHubAccess(email: string): Promise<void> {
   const { error } = await supabase.from("hub_access").delete().eq("email", email);
   if (error) throw error;
 }
+
+// ── Operations: bonus approval → HR ──────────────────────────────────────────
+
+export interface OpsApprovalSettings { approverEmail: string; hrEmail: string; copyEmail: string }
+export interface OpsApproval { approvedBy: string; sentTo: string; approvedAt: string }
+
+export async function getOpsApprovalSettings(): Promise<OpsApprovalSettings> {
+  const { data, error } = await supabase.from("ops_approval_settings").select("*").eq("id", 1).maybeSingle();
+  if (error) throw error;
+  return { approverEmail: data?.approver_email ?? "", hrEmail: data?.hr_email ?? "", copyEmail: data?.copy_email ?? "" };
+}
+
+export async function saveOpsApprovalSettings(s: OpsApprovalSettings): Promise<void> {
+  const { error } = await supabase.from("ops_approval_settings").upsert({
+    id: 1, approver_email: s.approverEmail.trim().toLowerCase(), hr_email: s.hrEmail.trim().toLowerCase(), copy_email: s.copyEmail.trim().toLowerCase(),
+  });
+  if (error) throw error;
+}
+
+export async function getLastOpsApproval(year: number, cycleId: string): Promise<OpsApproval | null> {
+  const { data } = await supabase.from("ops_approvals").select("*").eq("year", year).eq("cycle_id", cycleId)
+    .order("approved_at", { ascending: false }).limit(1).maybeSingle();
+  return data ? { approvedBy: data.approved_by, sentTo: data.sent_to, approvedAt: data.approved_at } : null;
+}
