@@ -59,3 +59,29 @@ export function tiktokCycleValueFullTime(score: number): number {
 export function calcTikTokBonusFullTime(scores: { score: number; duration: number }[], daysInCycle: number): number {
   return scores.reduce((t, e) => t + (tiktokCycleValueFullTime(e.score) / daysInCycle) * e.duration, 0);
 }
+
+// ── TikTok score: manual entries + automatic daily Shop Performance Score ────
+const addDays = (d: string, n: number) => {
+  const t = new Date(`${d}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + n);
+  return t.toISOString().slice(0, 10);
+};
+
+// Manual entries always win. Days inside [from, to] that no manual entry covers but that have an
+// automatic daily score are turned into runs of consecutive equal scores (negative ids = automatic).
+export function mergeTikTokEntries(
+  manual: { id: number; date: string; score: number; duration: number; year: number; cycleId: string }[],
+  daily: { day: string; score: number }[],
+  from: string, to: string, year: number, cycleId: string,
+) {
+  const covered = new Set<string>();
+  manual.forEach((m) => { for (let i = 0; i < m.duration; i++) covered.add(addDays(m.date, i)); });
+  const days = daily.filter((d) => d.day >= from && d.day <= to && !covered.has(d.day)).sort((a, b) => a.day.localeCompare(b.day));
+  const auto: typeof manual = [];
+  for (const d of days) {
+    const last = auto[auto.length - 1];
+    if (last && last.score === d.score && addDays(last.date, last.duration) === d.day) last.duration += 1;
+    else auto.push({ id: -(auto.length + 1), date: d.day, score: d.score, duration: 1, year, cycleId });
+  }
+  return [...manual, ...auto];
+}

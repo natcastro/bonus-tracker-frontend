@@ -1,0 +1,15 @@
+name: TikTok SPS daily sync
+
+on:
+  schedule:
+    - cron: "0 15 * * *"   # once a day, 15:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch today's Shop Performance Score
+        run: |
+          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/tiktok-sps-sync" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

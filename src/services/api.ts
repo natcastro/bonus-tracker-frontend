@@ -1946,3 +1946,12 @@ export async function getLastOpsApproval(year: number, cycleId: string): Promise
     .order("approved_at", { ascending: false }).limit(1).maybeSingle();
   return data ? { approvedBy: data.approved_by, sentTo: data.sent_to, approvedAt: data.approved_at } : null;
 }
+
+// ── TikTok Shop: daily Shop Performance Score (filled by the tiktok-sps-sync function) ──
+
+export async function getTiktokSpsDaily(from: string, to: string): Promise<{ day: string; score: number }[]> {
+  const { data, error } = await supabase.from("tiktok_sps_daily").select("day, score")
+    .gte("day", from).lte("day", to).not("score", "is", null).order("day");
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({ day: r.day, score: Number(r.score) }));
+}

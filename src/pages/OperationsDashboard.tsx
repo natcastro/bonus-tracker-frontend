@@ -9,7 +9,7 @@ import {
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
   getOpsAmazonPerformance, upsertOpsAmazonPerformance,
-  getOpsApprovalSettings, saveOpsApprovalSettings, getLastOpsApproval,
+  getOpsApprovalSettings, saveOpsApprovalSettings, getLastOpsApproval, getTiktokSpsDaily,
 } from "../services/api";
 import {
   getCyclesForYear, getCurrentCycleDefault, getCycleFromDate, getCycleDatesFromId, calcTikTokBonus,
@@ -17,7 +17,7 @@ import {
 import {
   OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus,
   FULLTIME_EFFECTIVE_CYCLE_START, FULLTIME_APPEALS_CAP, FULLTIME_HANDLING_CAP, FULLTIME_TIKTOK_CAP,
-  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime,
+  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime, mergeTikTokEntries,
 } from "../services/opsBonus";
 import { useHubAccess } from "../auth/HubAccessContext";
 
@@ -90,7 +90,8 @@ export default function OperationsDashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [appeals, setAppeals] = useState<OpsAppeal[]>([]);
   const [handlingTimes, setHandlingTimes] = useState<OpsHandlingTime[]>([]);
-  const [tiktokScores, setTiktokScores] = useState<OpsTikTokScore[]>([]);
+  const [tiktokManual, setTiktokManual] = useState<OpsTikTokScore[]>([]);
+  const [spsDaily, setSpsDaily] = useState<{ day: string; score: number }[]>([]);
   const [amazonPerformance, setAmazonPerformance] = useState<OpsAmazonPerformance[]>([]);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -113,7 +114,9 @@ export default function OperationsDashboard() {
     setAgents(ag);
     setAppeals(ap);
     setHandlingTimes(ht);
-    setTiktokScores(tk);
+    setTiktokManual(tk);
+    const rng = getCycleDatesFromId(year, cycleId);
+    setSpsDaily(await getTiktokSpsDaily(rng.from, rng.to).catch(() => []));
     setAmazonPerformance(apf);
     setLoadedFor(`${year}-${cycleId}`);
   }, [year, cycleId]);
@@ -140,6 +143,8 @@ export default function OperationsDashboard() {
 
   const cycleInfo = getCyclesForYear(Number(year)).find((c) => c.id === cycleId);
   const cycleDays = cycleInfo?.days ?? 15;
+  const cycleRangeForTikTok = getCycleDatesFromId(year, cycleId);
+  const tiktokScores = mergeTikTokEntries(tiktokManual, spsDaily, cycleRangeForTikTok.from, cycleRangeForTikTok.to, Number(year), cycleId);
   const tiktokBonus = calcTikTokBonus(tiktokScores, cycleDays);
 
   const cycleDates = getCycleDatesFromId(year, cycleId);
@@ -816,7 +821,9 @@ export default function OperationsDashboard() {
                         <td>{t.score}</td>
                         <td>${mv.toFixed(2)}</td>
                         <td>+${earned.toFixed(2)}</td>
-                        <td><button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button></td>
+                        <td>{t.id < 0
+                          ? <span className="badge" title="Pulled automatically from TikTok Shop each day" style={{ background: "#e0f2fe", color: "#075985", border: "none" }}>Auto · TikTok</span>
+                          : <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
                       </tr>
                     );
                   })}
