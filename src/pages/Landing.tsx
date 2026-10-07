@@ -230,16 +230,6 @@ export default function Landing() {
               onClick={() => directGo("MGMT")}
             />
           )}
-          {hasTeam("LOGISTICS") && (
-            <HubCard
-              icon={<PackageIcon color="#b45309" />}
-              eyebrow="Operaciones"
-              title="Logística"
-              subtitle="Gestión de envíos y productos"
-              color="#b45309"
-              onClick={() => directGo("LOGISTICS")}
-            />
-          )}
           {hasTeam("MARKETING") && (
             <HubCard
               icon={<PaletteIcon color="#3E6B45" />}
@@ -250,18 +240,8 @@ export default function Landing() {
               onClick={() => directGo("MARKETING")}
             />
           )}
-          {hasTeam("DEVOLUCIONES") && (
-            <HubCard
-              icon={<ReturnIcon color="#be123c" />}
-              eyebrow="Equipo"
-              title="Devoluciones"
-              subtitle="Órdenes, tracking y cajas devueltas"
-              color="#be123c"
-              onClick={() => directGo("DEVOLUCIONES")}
-            />
-          )}
         </div>
-        {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("LOGISTICS") && !hasTeam("MARKETING") && !hasTeam("DEVOLUCIONES") && (
+        {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("MARKETING") && (
           <p style={{ color: "#6B7280", marginTop: "1.5rem", position: "relative", zIndex: 1 }}>No tienes ningún equipo asignado todavía.</p>
         )}
 
