@@ -51,7 +51,7 @@ function lateExplanation(s: MarketingStage, notifs: { createdAt: string; message
   if (!s.deadline) return `Entregado: ${when}.`;
   const limitMs = deadlineTimestamp(s.deadline);
   const diffMin = Math.round((at.ts.getTime() - limitMs) / 60000);
-  const limit = `${formatDateHuman(s.deadline)}, 6:30 p. m.`;
+  const limit = `${formatDateHuman(s.deadline)}, 5:30 p. m.`;
   if (diffMin <= 0) return `Entregado: ${when}. Límite actual: ${limit}. Con el horario actual estaba a tiempo; se marcó tarde con un horario de corte anterior.`;
   const h = Math.floor(diffMin / 60), m = diffMin % 60;
   return `Entregado: ${when}. Límite: ${limit}. Pasó el límite por ${h > 0 ? `${h} h ` : ""}${m} min.`;

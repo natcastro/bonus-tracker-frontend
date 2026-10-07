@@ -40,7 +40,7 @@ function emailHtml(opts: { intro: string; reference: string; nextTask?: string; 
       <p>${intro}</p>
       <p><strong>Referencia:</strong> ${reference}</p>
       ${nextTask ? `<p><strong>Próxima tarea:</strong> ${nextTask}</p>` : ""}
-      ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 6:30 PM hora de Colombia</p>` : ""}
+      ${deadline ? `<p><strong>Deadline:</strong> ${formatDateHuman(deadline)}, 5:30 PM hora de Colombia</p>` : ""}
       ${note ? `<p><strong>Nota:</strong> ${note}</p>` : ""}
       ${link ? `<p><a href="${link}" style="display:inline-block;margin-top:10px;padding:10px 18px;background:#231F20;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;">Ver y responder</a></p>` : ""}
       <p style="color:#6B6350;font-size:12px;">FTC Hub — Marketing</p>

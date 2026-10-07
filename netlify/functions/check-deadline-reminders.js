@@ -10,12 +10,12 @@ const SITE_URL = process.env.URL || "https://transcendent-axolotl-027557.netlify
 
 // Must match deadlineTimestamp() in src/pages/marketing/types.ts.
 function deadlineTimestamp(dateIso) {
-  return new Date(`${dateIso}T18:30:00-05:00`).getTime();
+  return new Date(`${dateIso}T17:30:00-05:00`).getTime();
 }
 
 function formatDeadlineHuman(dateIso) {
   const d = new Date(`${dateIso}T00:00:00-05:00`);
-  return `${d.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" })}, 6:30 PM hora de Colombia`;
+  return `${d.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" })}, 5:30 PM hora de Colombia`;
 }
 
 function formatDuration(ms) {
