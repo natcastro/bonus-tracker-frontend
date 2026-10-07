@@ -38,6 +38,8 @@ export default function RequestsPage() {
   // ⋮ menu per row (Laura and Karol): edit, reassign, delete.
   const canManage = authedUser?.role === "laura" || authedUser?.role === "carol";
   const [menuFor, setMenuFor] = useState<number | null>(null);
+  // The list card clips its overflow, so the menu is positioned against the viewport instead.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editing, setEditing] = useState<MarketingRequest | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -49,7 +51,9 @@ export default function RequestsPage() {
     if (menuFor === null) return;
     const close = () => setMenuFor(null);
     window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
   }, [menuFor]);
 
   const run = async (fn: () => Promise<void>, done: () => void) => {
@@ -116,11 +120,15 @@ export default function RequestsPage() {
                   <span style={{ fontSize: 11, color: MT.text3, minWidth: 70, textAlign: "right" }}>{formatDateHuman(r.createdAt.slice(0, 10))}</span>
                   {canManage && (
                     <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                      <button aria-label="Acciones" title="Acciones" onClick={() => setMenuFor(menuFor === r.id ? null : r.id)} style={{
+                      <button aria-label="Acciones" title="Acciones" onClick={e => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                        setMenuFor(menuFor === r.id ? null : r.id);
+                      }} style={{
                         background: "none", border: "none", cursor: "pointer", fontSize: 20, lineHeight: 1, color: MT.text2, padding: "2px 8px", borderRadius: 6,
                       }}>⋮</button>
                       {menuFor === r.id && (
-                        <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 20, background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg, minWidth: 150, overflow: "hidden" }}>
+                        <div style={{ position: "fixed", right: menuPos.right, top: menuPos.top, zIndex: 1000, background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg, minWidth: 150, overflow: "hidden" }}>
                           {[
                             { label: "Editar", color: MT.text1, act: () => { setEditing(r); setEditTitle(r.title); setEditDesc(r.description); setError(""); } },
                             { label: "Reasignar", color: MT.text1, act: () => { setReassigning(r); setReassignEmail(""); setError(""); } },
