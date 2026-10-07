@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
-import { GlobeIcon, ToolsIcon, ChartIcon, PackageIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon, ReturnIcon } from "../components/icons";
+import { GlobeIcon, ToolsIcon, ChartIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon } from "../components/icons";
 import fcSymbol from "../assets/brand/fc-symbol.png";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING" | "DEVOLUCIONES";
