@@ -1580,10 +1580,33 @@ export async function createMarketingBrief(b: Omit<MarketingBrief, "id" | "creat
   return mapMarketingBrief(data);
 }
 
+// Records the exact completion time of every stage that has just been completed, so late flags can
+// be explained later. Stages that were already done with the same completion date are left alone.
+function stampCompletions(next: any, prev: any): any {
+  if (!Array.isArray(next)) return next;
+  const now = new Date().toISOString();
+  return next.map((s: any) => {
+    if (s?.status !== "done") {
+      if (s?.completedTs) { const { completedTs: _drop, ...rest } = s; return rest; }
+      return s;
+    }
+    const was = Array.isArray(prev) ? prev.find((p: any) => p.key === s.key) : null;
+    if (was?.status === "done" && was?.completedAt === s.completedAt) return s.completedTs || !was.completedTs ? s : { ...s, completedTs: was.completedTs };
+    return { ...s, completedTs: now };
+  });
+}
+
 export async function updateMarketingBrief(id: number, patch: Partial<Omit<MarketingBrief, "id"|"createdAt"|"updatedAt">>): Promise<void> {
   const dbPatch: any = { updated_at: new Date().toISOString() };
   if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
   if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.stages !== undefined || patch.variants !== undefined) {
+    const { data: prev } = await supabase.from("marketing_briefs").select("stages, variants").eq("id", id).maybeSingle();
+    if (patch.stages !== undefined) patch = { ...patch, stages: stampCompletions(patch.stages, prev?.stages) };
+    if (patch.variants !== undefined && Array.isArray(patch.variants)) {
+      patch = { ...patch, variants: patch.variants.map((v: any) => ({ ...v, stages: stampCompletions(v.stages, (prev?.variants ?? []).find((pv: any) => pv.key === v.key)?.stages) })) as any };
+    }
+  }
   if (patch.stages !== undefined) dbPatch.stages = patch.stages;
   if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
   if (patch.estimatedStartDate !== undefined) dbPatch.estimated_start_date = patch.estimatedStartDate;
@@ -1955,4 +1978,11 @@ export async function getTiktokSpsDaily(from: string, to: string): Promise<{ day
     .gte("day", from).lte("day", to).not("score", "is", null).order("day");
   if (error) throw error;
   return (data ?? []).map((r: any) => ({ day: r.day, score: Number(r.score) }));
+}
+
+// Timestamps of a brief's workflow notifications — used to explain older late flags that predate completedTs.
+export async function getBriefNotificationTimes(briefId: number): Promise<{ createdAt: string; message: string }[]> {
+  const { data, error } = await supabase.from("marketing_notifications").select("created_at, message").eq("brief_id", briefId).order("created_at");
+  if (error) return [];
+  return (data ?? []).map((r: any) => ({ createdAt: r.created_at, message: r.message ?? "" }));
 }

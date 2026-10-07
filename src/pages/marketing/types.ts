@@ -20,6 +20,8 @@ export interface MarketingStage {
   deadline: string | null; // yyyy-mm-dd — null until the previous stage is done and this one becomes current
   link: string | null;
   completedAt: string | null; // yyyy-mm-dd
+  // Exact moment (ISO) the stage was completed — stamped by updateMarketingBrief; absent on older stages.
+  completedTs?: string;
   status: "pending" | "done";
   decision?: "approved" | "changes_requested" | "extra_revision";
   late?: boolean;

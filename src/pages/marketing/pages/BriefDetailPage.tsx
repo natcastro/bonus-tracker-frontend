@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MT, formatDateHuman, formatRelative, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
@@ -7,9 +7,9 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
-import type { PublicationPlatform, StageKey, VariantKey, BriefVariant } from "../types";
-import { uploadMarketingReviewImage } from "../../../services/api";
+import { stageLabel, isPastDeadline, deadlineTimestamp, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
+import type { PublicationPlatform, StageKey, VariantKey, BriefVariant, MarketingStage } from "../types";
+import { uploadMarketingReviewImage, getBriefNotificationTimes } from "../../../services/api";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
 
@@ -33,6 +33,30 @@ function variantDotColor(v: BriefVariant): string {
   return MT.moss;
 }
 
+// When a stage was really delivered, in Colombia time. Newer stages store the exact moment; older ones
+// are reconstructed from that day's "Diseño subió…"/"Laura…" notification.
+const bogotaDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(d);
+const bogotaTimeFmt = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+function deliveredAt(s: MarketingStage, notifs: { createdAt: string; message: string }[]): { ts: Date; exact: boolean } | null {
+  if (s.completedTs) return { ts: new Date(s.completedTs), exact: true };
+  if (!s.completedAt) return null;
+  const prefix = s.role === "diseno" ? "Diseño subió" : "Laura";
+  const match = notifs.filter(n => n.message.startsWith(prefix) && bogotaDate(new Date(n.createdAt)) === s.completedAt).pop();
+  return match ? { ts: new Date(match.createdAt), exact: false } : null;
+}
+function lateExplanation(s: MarketingStage, notifs: { createdAt: string; message: string }[]): string {
+  const at = deliveredAt(s, notifs);
+  if (!at) return "No quedó guardada la hora exacta de esta entrega.";
+  const when = `${bogotaTimeFmt.format(at.ts)} (hora Colombia)${at.exact ? "" : " — según la notificación de ese día"}`;
+  if (!s.deadline) return `Entregado: ${when}.`;
+  const limitMs = deadlineTimestamp(s.deadline);
+  const diffMin = Math.round((at.ts.getTime() - limitMs) / 60000);
+  const limit = `${formatDateHuman(s.deadline)}, 6:30 p. m.`;
+  if (diffMin <= 0) return `Entregado: ${when}. Límite actual: ${limit}. Con el horario actual estaba a tiempo; se marcó tarde con un horario de corte anterior.`;
+  const h = Math.floor(diffMin / 60), m = diffMin % 60;
+  return `Entregado: ${when}. Límite: ${limit}. Pasó el límite por ${h > 0 ? `${h} h ` : ""}${m} min.`;
+}
+
 export default function BriefDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -54,6 +78,11 @@ export default function BriefDetailPage() {
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [editingStage, setEditingStage] = useState<StageKey | null>(null);
+  const [lateOpen, setLateOpen] = useState<StageKey | null>(null);
+  const [briefNotifTimes, setBriefNotifTimes] = useState<{ createdAt: string; message: string }[]>([]);
+  useEffect(() => {
+    if (brief?.id) getBriefNotificationTimes(brief.id).then(setBriefNotifTimes).catch(() => setBriefNotifTimes([]));
+  }, [brief?.id]);
   const [editValue, setEditValue] = useState("");
   const [showReassign, setShowReassign] = useState(false);
   const [linkDrafts, setLinkDrafts] = useState<Partial<Record<PublicationPlatform, string>>>({});
@@ -298,7 +327,7 @@ export default function BriefDetailPage() {
             const isEditing = editingStage === s.key;
             return (
               <div key={s.key} style={{
-                display: "flex", alignItems: "center", padding: "0.6rem 0.75rem",
+                display: "flex", alignItems: "center", flexWrap: "wrap", padding: "0.6rem 0.75rem",
                 background: isCurrent ? MT.mossSoft : MT.surfaceAlt,
                 border: isCurrent ? `1px solid ${MT.moss}50` : "1px solid transparent",
                 borderRadius: 8, gap: 10,
@@ -310,10 +339,16 @@ export default function BriefDetailPage() {
                   label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
                 />
                 {s.status === "done" && s.late && (
-                  <span title="Se completó después de su fecha límite" style={{
-                    fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`,
-                    borderRadius: 999, padding: "2px 7px", flexShrink: 0,
-                  }}>⚠ tarde</span>
+                  <button type="button" onClick={() => setLateOpen(lateOpen === s.key ? null : s.key)}
+                    title="Ver a qué hora se entregó" style={{
+                    fontFamily: MT.font, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`,
+                    border: "none", cursor: "pointer", borderRadius: 999, padding: "2px 7px", flexShrink: 0,
+                  }}>⚠ tarde {lateOpen === s.key ? "▴" : "▾"}</button>
+                )}
+                {s.status === "done" && s.late && lateOpen === s.key && (
+                  <div style={{ flexBasis: "100%", order: 99, fontSize: 12, color: MT.text1, background: `${MT.danger}0F`, border: `1px solid ${MT.danger}30`, borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
+                    {lateExplanation(s, briefNotifTimes)}
+                  </div>
                 )}
                 {isEditing ? (
                   <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center" }}>
