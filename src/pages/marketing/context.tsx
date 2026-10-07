@@ -7,7 +7,7 @@ import {
   getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
   togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
   getTodoTasks, createTodoTask as apiCreateTodoTask, updateTodoTask, deleteTodoTask as apiDeleteTodoTask,
-  getMarketingRequests, createMarketingRequest as apiCreateMarketingRequest, updateMarketingRequest,
+  getMarketingRequests, createMarketingRequest as apiCreateMarketingRequest, updateMarketingRequest, deleteMarketingRequest,
 } from "../../services/api";
 import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } from "../../services/api";
 import { useHubAccess } from "../../auth/HubAccessContext";
@@ -112,6 +112,8 @@ interface MarketingCtx {
     deadline: string; assignedDisenoEmail?: string;
   }) => Promise<number>;
   assignRequest: (requestId: number, email: string) => Promise<void>;
+  editRequest: (requestId: number, changes: { title: string; description: string }) => Promise<void>;
+  deleteRequest: (requestId: number) => Promise<void>;
   submitRequestDelivery: (requestId: number, link: string, note?: string) => Promise<void>;
   requesterReview: (requestId: number, action: "approve" | "request_changes", opts?: { note?: string }) => Promise<void>;
 }
@@ -345,6 +347,19 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         emailHtml({ intro: "Te asignaron esta solicitud.", reference: req.title, nextTask: stage ? requestStageLabel(stage.key) : undefined, deadline: stage?.deadline ?? null, link: appUrl(`/marketing/request/${requestId}`) }),
       );
     }
+    await reload();
+  };
+
+  // Laura and Karol manage the Solicitudes list: edit text, remove a request entirely.
+  const editRequest = async (requestId: number, changes: { title: string; description: string }) => {
+    if (authedUser?.role !== "laura" && authedUser?.role !== "carol") throw new Error("Solo Laura o Karol pueden editar solicitudes.");
+    await updateMarketingRequest(requestId, { title: changes.title.trim(), description: changes.description.trim() });
+    await reload();
+  };
+
+  const deleteRequest = async (requestId: number) => {
+    if (authedUser?.role !== "laura" && authedUser?.role !== "carol") throw new Error("Solo Laura o Karol pueden eliminar solicitudes.");
+    await deleteMarketingRequest(requestId);
     await reload();
   };
 
@@ -1000,7 +1015,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,
       notifyEmails, disenoEmailList, updateNotifyEmail, updateNotifyCountry, disenoDisplayName, disenoCountry,
-      requests, createRequest, assignRequest, submitRequestDelivery, requesterReview,
+      requests, createRequest, assignRequest, editRequest, deleteRequest, submitRequestDelivery, requesterReview,
     }}>
       {children}
     </Ctx.Provider>

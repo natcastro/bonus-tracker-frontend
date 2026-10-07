@@ -1807,6 +1807,8 @@ export async function createMarketingRequest(r: Omit<MarketingRequest, "id" | "c
 
 export async function updateMarketingRequest(id: number, patch: Partial<Omit<MarketingRequest, "id" | "createdAt">>): Promise<void> {
   const dbPatch: any = {};
+  if (patch.title !== undefined) dbPatch.title = patch.title;
+  if (patch.description !== undefined) dbPatch.description = patch.description;
   if (patch.currentStage !== undefined) dbPatch.current_stage = patch.currentStage;
   if (patch.status !== undefined) dbPatch.status = patch.status;
   if (patch.stages !== undefined) dbPatch.stages = patch.stages;
@@ -1816,6 +1818,11 @@ export async function updateMarketingRequest(id: number, patch: Partial<Omit<Mar
   if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt;
   if (patch.sharedWithEmails !== undefined) dbPatch.shared_with_emails = patch.sharedWithEmails;
   const { error } = await supabase.from("marketing_requests").update(dbPatch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteMarketingRequest(id: number): Promise<void> {
+  const { error } = await supabase.from("marketing_requests").delete().eq("id", id);
   if (error) throw error;
 }
 
