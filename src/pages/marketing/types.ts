@@ -34,13 +34,28 @@ export interface MarketingStage {
 export const PUBLICATION_PLATFORMS = [
   { key: "tiktokShop",     label: "TikTok Shop" },
   { key: "tiktokShopMx",   label: "TikTok Shop México" },
-  { key: "amazon",         label: "Amazon" },
-  { key: "shopify",        label: "Shopify" },
+  { key: "amazonUs",       label: "Amazon USA" },
+  { key: "amazonMx",       label: "Amazon MX" },
+  { key: "shopifyCo",      label: "Shopify Colombia" },
+  { key: "shopifyUs",      label: "Shopify USA" },
+  { key: "shopifyMx",      label: "Shopify MX" },
   { key: "mercadoLibreMx", label: "Mercado Libre México" },
-  { key: "mercadoLibreCo", label: "Mercado Libre Colombia" },
 ] as const;
 export type PublicationPlatform = typeof PUBLICATION_PLATFORMS[number]["key"];
 export type PublicationLinks = Partial<Record<PublicationPlatform, string>>;
+
+// Briefs saved before the 25-Sep split stored single "amazon" / "shopify" links (both for the US
+// store) and a Mercado Libre Colombia link that no longer exists. Map them forward when reading;
+// the old keys disappear from the row the next time a link is saved.
+export function normalizePublicationLinks(raw: Record<string, string> | null | undefined): PublicationLinks {
+  const out: Record<string, string> = { ...(raw ?? {}) };
+  if (out.amazon && !out.amazonUs) out.amazonUs = out.amazon;
+  if (out.shopify && !out.shopifyUs) out.shopifyUs = out.shopify;
+  delete out.amazon;
+  delete out.shopify;
+  delete out.mercadoLibreCo;
+  return out as PublicationLinks;
+}
 
 // ── Variants — some products come in up to 4 physical variants, each needing its own proposal,
 // review and approval cycle instead of sharing one. Laura picks which apply when she creates the

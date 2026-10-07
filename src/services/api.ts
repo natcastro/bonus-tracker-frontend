@@ -12,6 +12,7 @@ import type {
   DevolucionesUpload, DevolucionesRow,
 } from "../types";
 import type { MarketingBrief, MarketingNotification, MarketingRequest, PrivateTask, TodoTask } from "../pages/marketing/types";
+import { normalizePublicationLinks } from "../pages/marketing/types";
 
 const USA_PASSWORD = "usa2026";
 const MEX_PASSWORD = "mex2026";
@@ -1542,7 +1543,7 @@ function mapMarketingBrief(r: any): MarketingBrief {
     updatedAt: r.updated_at,
     assignedDisenoEmail: r.assigned_diseno_email ?? null,
     carolNotifiedAt: r.carol_notified_at ?? null,
-    publicationLinks: r.publication_links ?? {},
+    publicationLinks: normalizePublicationLinks(r.publication_links),
     linksApprovedByKarol: r.links_approved ?? false,
     variants: Array.isArray(r.variants) ? r.variants : null,
   };
