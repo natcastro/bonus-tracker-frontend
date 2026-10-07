@@ -4,7 +4,7 @@ import type { OpsApproval } from "../services/api";
 import { useMsal } from "@azure/msal-react";
 import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore, OpsAmazonPerformance } from "../types";
 import {
-  getAgents, updateAgentName, createAgent, verifySuperAdmin,
+  getAgents, updateAgentName, createAgent,
   getOpsAppeals, addOpsAppeal, updateOpsAppeal, deleteOpsAppeal, invalidateOpsAppeal, revalidateOpsAppeal,
   getOpsHandlingTime, upsertOpsHandlingTime,
   getOpsTikTokScores, addOpsTikTokScore, deleteOpsTikTokScore,
@@ -27,7 +27,10 @@ const APPROVAL_EMAIL_DOMAIN = "formatucuerpo.com";
 const MAX_APPROVAL_COPIES = 3;
 const isCompanyEmail = (e: string) => e.toLowerCase().endsWith(`@${APPROVAL_EMAIL_DOMAIN}`);
 
-const ADMIN_PASSWORD = "ops2026!";
+// Admin actions in Operations (edit/delete/invalidate, agent changes) are only for this account —
+// no shared password. Matched against the Microsoft login email.
+const OPS_ADMIN_EMAILS = ["amazonassistant@formatucuerpo.com"];
+const ADMIN_ONLY_MSG = "Solo el administrador (amazonassistant@formatucuerpo.com) puede hacer esta acción.";
 
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
 // so historical records/cycles before the cutoffs stay untouched.
@@ -71,8 +74,9 @@ const TABS: [string, string][] = [
 
 export default function OperationsDashboard() {
   const navigate = useNavigate();
-  const { access } = useHubAccess();
-  const isAdmin = !!access?.isAdmin;
+  const { access, email } = useHubAccess();
+  const isAdmin = OPS_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+  const isHubAdmin = !!access?.isAdmin; // only for the approval-settings gear (Natalie)
   const { instance: msal, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState("summary");
   const defaultCycle = (() => {
@@ -94,10 +98,6 @@ export default function OperationsDashboard() {
   const [spsDaily, setSpsDaily] = useState<{ day: string; score: number }[]>([]);
   const [amazonPerformance, setAmazonPerformance] = useState<OpsAmazonPerformance[]>([]);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [password, setPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [editingAppeal, setEditingAppeal] = useState<OpsAppeal | null>(null);
   const [invalidatingAppeal, setInvalidatingAppeal] = useState<OpsAppeal | null>(null);
   const [invalidateNote, setInvalidateNote] = useState("");
@@ -124,21 +124,8 @@ export default function OperationsDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const requireAdmin = (action: () => void) => {
-    setPendingAction(() => action);
-    setPassword("");
-    setPasswordError("");
-    setShowPassword(true);
-  };
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setShowPassword(false);
-      pendingAction?.();
-      setPendingAction(null);
-    } else {
-      setPasswordError("Incorrect password.");
-    }
+    if (!isAdmin) { window.alert(ADMIN_ONLY_MSG); return; }
+    action();
   };
 
   const cycleInfo = getCyclesForYear(Number(year)).find((c) => c.id === cycleId);
@@ -278,37 +265,23 @@ export default function OperationsDashboard() {
   }, [agents]);
 
   const saveAgentName = async (id: number) => {
+    if (!isAdmin) { window.alert(ADMIN_ONLY_MSG); return; }
     await updateAgentName(id, agentNames[id]);
     await load();
   };
 
-  // ── Add Agent (super-admin only)
-  const [addAgentPw, setAddAgentPw] = useState("");
-  const [addAgentPwError, setAddAgentPwError] = useState("");
-  const [addAgentVerified, setAddAgentVerified] = useState(false);
+  // ── Add Agent (admin account only)
   const [newAgentName, setNewAgentName] = useState("");
   const [addAgentSaving, setAddAgentSaving] = useState(false);
 
-  const checkSuperAdmin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (verifySuperAdmin("OPS", addAgentPw)) {
-      setAddAgentVerified(true);
-      setAddAgentPwError("");
-    } else {
-      setAddAgentPwError("Contraseña incorrecta.");
-    }
-  };
-
   const submitNewAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAgentName.trim()) return;
+    if (!newAgentName.trim() || !isAdmin) return;
     setAddAgentSaving(true);
     try {
       await createAgent(newAgentName.trim(), "OPS");
       await load();
       setNewAgentName("");
-      setAddAgentVerified(false);
-      setAddAgentPw("");
     } finally {
       setAddAgentSaving(false);
     }
@@ -441,7 +414,7 @@ export default function OperationsDashboard() {
           <select className="month-selector" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
             {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          {isAdmin && <button className="btn btn-secondary btn-sm" onClick={openApprovalSettings} title="Approval settings (admin only)">⚙ Approval settings</button>}
+          {isHubAdmin && <button className="btn btn-secondary btn-sm" onClick={openApprovalSettings} title="Approval settings (admin only)">⚙ Approval settings</button>}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
         </div>
       </nav>
@@ -661,12 +634,12 @@ export default function OperationsDashboard() {
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>${a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                         <td>
-                          <button className="btn btn-sm btn-secondary" onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
-                          <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
+                          <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
+                          <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
                           {a.invalidated ? (
-                            <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : "Solo el administrador puede revalidar"} onClick={async () => { await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
+                            <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={async () => { await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
                           ) : (
-                            <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : "Solo el administrador puede invalidar"} onClick={() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
+                            <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
                           )}
                         </td>
                       </tr>
@@ -823,7 +796,7 @@ export default function OperationsDashboard() {
                         <td>+${earned.toFixed(2)}</td>
                         <td>{t.id < 0
                           ? <span className="badge" title="Pulled automatically from TikTok Shop each day" style={{ background: "#e0f2fe", color: "#075985", border: "none" }}>Auto · TikTok</span>
-                          : <button className="btn btn-sm btn-danger" onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
+                          : <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
                       </tr>
                     );
                   })}
@@ -846,30 +819,21 @@ export default function OperationsDashboard() {
                     <label>{ag.name}</label>
                     <input type="text" className="form-control" value={agentNames[ag.id] ?? ""} onChange={(e) => setAgentNames({ ...agentNames, [ag.id]: e.target.value })} />
                   </div>
-                  <button className="btn btn-primary btn-sm" onClick={() => saveAgentName(ag.id)}>Save</button>
+                  <button className="btn btn-primary btn-sm" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => saveAgentName(ag.id)}>Save</button>
                 </div>
               ))}
             </div>
             <div className="card">
               <h3 style={{ marginBottom: "0.25rem" }}>Add Agent</h3>
-              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1rem" }}>Requires admin password + <code>!</code></p>
-              {!addAgentVerified ? (
-                <form onSubmit={checkSuperAdmin} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Admin Password</label>
-                    <input type="password" className="form-control" placeholder="Contraseña admin" value={addAgentPw} onChange={(e) => { setAddAgentPw(e.target.value); setAddAgentPwError(""); }} />
-                    {addAgentPwError && <p className="error-msg">{addAgentPwError}</p>}
-                  </div>
-                  <button type="submit" className="btn btn-primary btn-sm">Verificar</button>
-                </form>
+              {!isAdmin ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>{ADMIN_ONLY_MSG}</p>
               ) : (
                 <form onSubmit={submitNewAgent} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: 400 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: "0.85rem", fontWeight: 500 }}>Nombre del agente</label>
-                    <input type="text" className="form-control" placeholder="Nombre completo" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} autoFocus required />
+                    <input type="text" className="form-control" placeholder="Nombre completo" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} required />
                   </div>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={addAgentSaving}>{addAgentSaving ? "..." : "Agregar"}</button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setAddAgentVerified(false); setAddAgentPw(""); }}>Cancelar</button>
                 </form>
               )}
             </div>
@@ -878,7 +842,7 @@ export default function OperationsDashboard() {
       </main>
 
       {/* Approval settings (admin only) */}
-      {showApprovalSettings && isAdmin && (
+      {showApprovalSettings && isHubAdmin && (
         <div className="modal-overlay active">
           <div className="modal">
             <div className="modal-header"><h3>Approval settings</h3></div>
@@ -903,24 +867,6 @@ export default function OperationsDashboard() {
               <button className="btn btn-secondary" onClick={() => setShowApprovalSettings(false)}>Close</button>
               <button className="btn btn-primary" onClick={saveApprovalSettings}>Save</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Password Modal */}
-      {showPassword && (
-        <div className="modal-overlay active">
-          <div className="modal">
-            <div className="modal-header"><h3>Admin Authorization</h3></div>
-            <p style={{ marginBottom: "1rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>This action requires the admin password.</p>
-            <form onSubmit={handlePasswordSubmit}>
-              <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" autoFocus required />
-              {passwordError && <p className="error-msg">{passwordError}</p>}
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowPassword(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Authorize</button>
-              </div>
-            </form>
           </div>
         </div>
       )}
