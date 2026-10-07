@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatDateHuman, ROLE_CFG } from "../theme";
@@ -8,9 +8,11 @@ import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline, currentActiveStages } from "../types";
-import type { MarketingBrief, MarketingRole } from "../types";
+import type { MarketingBrief, MarketingRole, MarketingStage } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
 import DisenoFilterButton from "../components/DisenoFilterButton";
+import { lateExplanation } from "../lateInfo";
+import { getBriefNotificationTimes } from "../../../services/api";
 
 const MONTHLY_GOAL = 8;
 
@@ -80,6 +82,25 @@ export default function DashboardPage() {
     : 100;
   const designDelays = [...inProgressBriefs, ...completedThisMonth].reduce((s, b) => s + totalDesignDelayCount(b), 0);
   const bunny = moodBunny(onTimePct);
+
+  // ── Diseño delay history: every Diseño stage that was delivered late, with when it was delivered.
+  const [delaysOpen, setDelaysOpen] = useState(false);
+  const [notifTimes, setNotifTimes] = useState<Record<number, { createdAt: string; message: string }[]>>({});
+  const delayRows = useMemo(() => {
+    const rows: { brief: MarketingBrief; stage: MarketingStage; variant?: string }[] = [];
+    [...inProgressBriefs, ...completedThisMonth].forEach(b => {
+      if (b.variants) b.variants.forEach(v => v.stages.filter(st => st.role === "diseno" && st.status === "done" && st.late).forEach(st => rows.push({ brief: b, stage: st, variant: v.key })));
+      else b.stages.filter(st => st.role === "diseno" && st.status === "done" && st.late).forEach(st => rows.push({ brief: b, stage: st }));
+    });
+    return rows.sort((a, b) => (b.stage.completedAt ?? "").localeCompare(a.stage.completedAt ?? ""));
+  }, [inProgressBriefs, completedThisMonth]);
+  useEffect(() => {
+    if (!delaysOpen) return;
+    const ids = [...new Set(delayRows.map(r => r.brief.id))].filter(id => !notifTimes[id]);
+    if (ids.length === 0) return;
+    Promise.all(ids.map(async id => [id, await getBriefNotificationTimes(id)] as const))
+      .then(res => setNotifTimes(prev => ({ ...prev, ...Object.fromEntries(res) })));
+  }, [delaysOpen, delayRows, notifTimes]);
 
   const filtered = briefs.filter(b => {
     if (search && !b.reference.toLowerCase().includes(search.toLowerCase())) return false;
@@ -152,8 +173,41 @@ export default function DashboardPage() {
         {kpi("Completados", `${completedThisMonth.length}/${MONTHLY_GOAL}`, MT.primary, () => focusGroups(["completed"], "completed"))}
         {kpi("En proceso", inProgress, MT.info, () => focusGroups(["overdue", "active"], "in_progress"))}
         {kpi("A tiempo", `${onTimePct}%`, MT.moss, () => focusGroups(["completed"], "completed"))}
-        {kpi("Retrasos Diseño", designDelays, designDelays > 0 ? MT.danger : MT.text1, () => focusGroups(["overdue"], "in_progress"), true)}
+        {kpi("Retrasos Diseño", designDelays, designDelays > 0 ? MT.danger : MT.text1, () => setDelaysOpen(true), true)}
       </div>
+
+
+      {delaysOpen && (
+        <div onClick={() => setDelaysOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: MT.surface, borderRadius: MT.radiusLg, maxWidth: 720, width: "100%", maxHeight: "85vh", overflow: "auto", padding: "1.25rem 1.4rem", boxShadow: MT.shadowLg, fontFamily: MT.font }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: MT.text1 }}>Historial de retrasos — Diseño</h2>
+              <button onClick={() => setDelaysOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: MT.text2 }} aria-label="Cerrar">×</button>
+            </div>
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: MT.text2 }}>Entregas de Diseño marcadas como tardías (briefs en proceso y completados este mes). Hora en Colombia.</p>
+            {delayRows.length === 0 ? (
+              <p style={{ fontSize: 13, color: MT.text3 }}>Sin retrasos registrados.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {delayRows.map(({ brief, stage, variant }) => (
+                  <div key={`${brief.id}-${variant ?? ""}-${stage.key}`} style={{ border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.danger}`, borderRadius: 8, padding: "0.65rem 0.85rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 800, fontSize: 13, color: MT.text1 }}>{brief.reference}{variant ? ` · ${variant}` : ""} — {stage.label}</span>
+                      <button onClick={() => navigate(`/marketing/brief/${brief.id}`)} style={{ fontFamily: MT.font, fontSize: 12, fontWeight: 700, color: MT.primary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Ver brief →</button>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: MT.text1, marginTop: 4, lineHeight: 1.5 }}>
+                      {notifTimes[brief.id] ? lateExplanation(stage, notifTimes[brief.id]) : "Cargando hora de entrega…"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: 14, textAlign: "right" }}>
+              <button onClick={() => { setDelaysOpen(false); focusGroups(["overdue"], "in_progress"); }} style={{ fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "6px 12px", borderRadius: 7, border: `1px solid ${MT.border}`, background: MT.surface, color: MT.text2 }}>Ver briefs atrasados en proceso</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar: search + filters */}
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.7rem", alignItems: "center" }}>

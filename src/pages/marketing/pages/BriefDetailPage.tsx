@@ -7,8 +7,9 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, deadlineTimestamp, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
-import type { PublicationPlatform, StageKey, VariantKey, BriefVariant, MarketingStage } from "../types";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
+import type { PublicationPlatform, StageKey, VariantKey, BriefVariant } from "../types";
+import { lateExplanation } from "../lateInfo";
 import { uploadMarketingReviewImage, getBriefNotificationTimes } from "../../../services/api";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
@@ -31,30 +32,6 @@ function variantDotColor(v: BriefVariant): string {
   if (label === "Pendiente") return MT.text3;
   if (label === "Cambios solicitados") return MT.danger;
   return MT.moss;
-}
-
-// When a stage was really delivered, in Colombia time. Newer stages store the exact moment; older ones
-// are reconstructed from that day's "Diseño subió…"/"Laura…" notification.
-const bogotaDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(d);
-const bogotaTimeFmt = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
-function deliveredAt(s: MarketingStage, notifs: { createdAt: string; message: string }[]): { ts: Date; exact: boolean } | null {
-  if (s.completedTs) return { ts: new Date(s.completedTs), exact: true };
-  if (!s.completedAt) return null;
-  const prefix = s.role === "diseno" ? "Diseño subió" : "Laura";
-  const match = notifs.filter(n => n.message.startsWith(prefix) && bogotaDate(new Date(n.createdAt)) === s.completedAt).pop();
-  return match ? { ts: new Date(match.createdAt), exact: false } : null;
-}
-function lateExplanation(s: MarketingStage, notifs: { createdAt: string; message: string }[]): string {
-  const at = deliveredAt(s, notifs);
-  if (!at) return "No quedó guardada la hora exacta de esta entrega.";
-  const when = `${bogotaTimeFmt.format(at.ts)} (hora Colombia)${at.exact ? "" : " — según la notificación de ese día"}`;
-  if (!s.deadline) return `Entregado: ${when}.`;
-  const limitMs = deadlineTimestamp(s.deadline);
-  const diffMin = Math.round((at.ts.getTime() - limitMs) / 60000);
-  const limit = `${formatDateHuman(s.deadline)}, 5:30 p. m.`;
-  if (diffMin <= 0) return `Entregado: ${when}. Límite actual: ${limit}. Con el horario actual estaba a tiempo; se marcó tarde con un horario de corte anterior.`;
-  const h = Math.floor(diffMin / 60), m = diffMin % 60;
-  return `Entregado: ${when}. Límite: ${limit}. Pasó el límite por ${h > 0 ? `${h} h ` : ""}${m} min.`;
 }
 
 export default function BriefDetailPage() {
