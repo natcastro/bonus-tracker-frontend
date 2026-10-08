@@ -312,6 +312,8 @@ export interface TodoStage {
   status: "pending" | "done";
   decision?: "approved" | "changes_requested";
   late?: boolean;
+  // true on the stages that were never needed because Karol approved earlier.
+  skipped?: boolean;
   // Written by the check-deadline-reminders Netlify function — tracks which scheduled
   // deadline-alert emails have already gone out for this stage, so it never double-sends.
   remind24hAt?: string;
@@ -319,6 +321,9 @@ export interface TodoStage {
   remind1hAt?: string;
   overdueLastRemindAt?: string;
 }
+
+// Karol's review stages where she can approve outright instead of sending the task around again.
+export const TODO_APPROVABLE_STAGES: TodoStageKey[] = ["review", "finalReview"];
 
 export const TODO_STAGE_DEFS: { key: TodoStageKey; label: string; role: "diseno" | "carol"; gapDays: number }[] = [
   { key: "proposal",         label: "Primera propuesta", role: "diseno", gapDays: 3 },

@@ -13,7 +13,7 @@ import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } fro
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -92,6 +92,7 @@ interface MarketingCtx {
   todoTasks: TodoTask[];
   createTodoTask: (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => Promise<void>;
   advanceTodoTask: (id: number, link: string | undefined, note?: string) => Promise<void>;
+  approveTodoTask: (id: number, note?: string) => Promise<void>;
   deleteTodoTask: (id: number) => Promise<void>;
 
   notifyEmails: MarketingNotifyEmails;
@@ -272,6 +273,35 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     } else {
       await notify(null, `Tarea to do completada: ${task.title}.${isLate ? " (tarde)" : ""}`);
     }
+    await reload();
+  };
+
+  // Karol can approve at either review stage: the task closes right there and the remaining
+  // stages are marked skipped, so a good first delivery doesn't have to go through more rounds.
+  const approveTodoTask = async (id: number, note?: string) => {
+    const task = todoTasks.find(t => t.id === id);
+    if (!task || task.status === "completed") return;
+    if (authedUser?.role !== "carol") throw new Error("Solo Karol puede aprobar esta tarea.");
+    const stageIdx = task.stages.findIndex(s => s.key === task.currentStage);
+    const stage = task.stages[stageIdx];
+    if (!stage || !TODO_APPROVABLE_STAGES.includes(stage.key)) throw new Error("Esta etapa no se puede aprobar directamente.");
+    const today = todayIso();
+    const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
+    const newStages = task.stages.map((s, i) => {
+      if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLate };
+      if (i > stageIdx) return { ...s, deadline: null, skipped: true };
+      return s;
+    });
+    await updateTodoTask(id, { stages: newStages, currentStage: "completed", status: "completed", completedAt: today });
+    await sendMarketingEmail(
+      task.assignedDisenoEmail,
+      `Aprobada — ${task.title}`,
+      emailHtml({
+        intro: `Karol aprobó "${task.title}" en ${todoStageLabel(stage.key)}. No hacen falta más ajustes.`,
+        reference: task.title, note, link: appUrl(`/marketing/todo/${task.id}`),
+      }),
+    );
+    await notify(null, `Karol aprobó la tarea to do "${task.title}" en ${todoStageLabel(stage.key)} — sin más rondas.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
     await reload();
   };
 
@@ -1013,7 +1043,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
-      todoTasks, createTodoTask, advanceTodoTask, deleteTodoTask,
+      todoTasks, createTodoTask, advanceTodoTask, approveTodoTask, deleteTodoTask,
       notifyEmails, disenoEmailList, updateNotifyEmail, updateNotifyCountry, disenoDisplayName, disenoCountry,
       requests, createRequest, assignRequest, editRequest, deleteRequest, submitRequestDelivery, requesterReview,
     }}>

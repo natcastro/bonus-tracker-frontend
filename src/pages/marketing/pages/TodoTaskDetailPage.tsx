@@ -6,13 +6,13 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon } from "../../../components/icons";
-import { todoStageLabel, normalizeUrl } from "../types";
+import { todoStageLabel, normalizeUrl, TODO_APPROVABLE_STAGES } from "../types";
 import { uploadTodoTaskFile } from "../../../services/api";
 
 export default function TodoTaskDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authedUser, todoTasks, advanceTodoTask, deleteTodoTask, disenoDisplayName } = useMarketing();
+  const { authedUser, todoTasks, advanceTodoTask, approveTodoTask, deleteTodoTask, disenoDisplayName } = useMarketing();
   const task = todoTasks.find(t => t.id === Number(id));
   const [link, setLink] = useState("");
   const [note, setNote] = useState("");
@@ -33,6 +33,7 @@ export default function TodoTaskDetailPage() {
   const myRole = authedUser?.role;
   const canAct = task.status === "in_progress" && currentStage?.role === myRole;
   const needsLink = currentStage?.role === "diseno";
+  const canApproveNow = !!currentStage && myRole === "carol" && TODO_APPROVABLE_STAGES.includes(currentStage.key);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -103,7 +104,7 @@ export default function TodoTaskDetailPage() {
                 <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
                 <StatusPill
                   color={s.status === "done" ? MT.primary : isCurrent ? MT.clay : MT.text3}
-                  label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
+                  label={s.skipped ? "— no hizo falta" : s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
                 />
                 {s.status === "done" && s.late && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "2px 7px" }}>⚠ tarde</span>
@@ -159,14 +160,27 @@ export default function TodoTaskDetailPage() {
             value={note} onChange={e => setNote(e.target.value)}
           />
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <button
-            disabled={busy || (needsLink && !link.trim())}
-            onClick={() => run(() => advanceTodoTask(task.id, needsLink ? link.trim() : undefined, note.trim() || undefined))}
-            style={{
-              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}
-          >{busy ? "Enviando..." : task.currentStage === "approved" ? "Aprobar y cerrar" : "Continuar"}</button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {canApproveNow && (
+              <button
+                disabled={busy}
+                onClick={() => run(() => approveTodoTask(task.id, note.trim() || undefined))}
+                style={{
+                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                  background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                }}
+              >{busy ? "Enviando..." : "✓ Aprobar"}</button>
+            )}
+            <button
+              disabled={busy || (needsLink && !link.trim())}
+              onClick={() => run(() => advanceTodoTask(task.id, needsLink ? link.trim() : undefined, note.trim() || undefined))}
+              style={{
+                fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: canApproveNow ? MT.surface : MT.clay, color: canApproveNow ? MT.clay : "#fff",
+                border: canApproveNow ? `1px solid ${MT.clay}` : "none", borderRadius: 8, padding: "10px 18px",
+              }}
+            >{busy ? "Enviando..." : task.currentStage === "approved" ? "Aprobar y cerrar" : canApproveNow ? "Pedir ajustes" : "Continuar"}</button>
+          </div>
         </div>
       )}
     </div>
