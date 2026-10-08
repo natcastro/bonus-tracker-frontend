@@ -19,6 +19,8 @@ export interface TaskCategoryState {
   alto: string;
   ubicacion: string;
   idioma: string;
+  // Free text, only used when idioma is "Otro".
+  idiomaOtro: string;
   videoApp: string;
   videoFormato: string;
   videoOrientacion: string;
@@ -29,7 +31,7 @@ export interface TaskCategoryState {
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
   tipoMedio: "", area: "",
-  customMeasurements: false, ancho: "", alto: "", ubicacion: "", idioma: "",
+  customMeasurements: false, ancho: "", alto: "", ubicacion: "", idioma: "", idiomaOtro: "",
   videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "",
 };
 
@@ -44,6 +46,7 @@ function typesForCategory(category: TaskCategory | null): readonly string[] {
 // category is picked; the other 3 need an actual type (or "Otro" + custom text) selected first.
 export function taskCategoryIsComplete(s: TaskCategoryState): boolean {
   if (!s.category) return false;
+  if (s.idioma === "Otro" && !s.idiomaOtro.trim()) return false;
   if (s.category === "videos") return true;
   if (!s.selectedType) return false;
   if (s.selectedType === "Otro") return s.customType.trim().length > 0;
@@ -80,7 +83,7 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
     if (s.videoSonido) lines.push(`Sonido: ${s.videoSonido}`);
     if (s.videoSubtitulos) lines.push(`Subtítulos: ${s.videoSubtitulos}`);
   }
-  if (s.idioma) lines.push(`Idioma: ${s.idioma}`);
+  if (s.idioma) lines.push(`Idioma: ${s.idioma === "Otro" && s.idiomaOtro.trim() ? s.idiomaOtro.trim() : s.idioma}`);
   return lines.join("\n");
 }
 
@@ -255,6 +258,12 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
         <div>
           <label style={labelStyle}>¿En qué idioma?</label>
           <SegButtons options={LANGUAGE_OPTIONS} value={state.idioma} onChange={v => set({ idioma: v })} />
+          {state.idioma === "Otro" && (
+            <input
+              style={{ ...fieldStyle, marginTop: 8 }} value={state.idiomaOtro} placeholder="¿Cuál idioma? (ej. Portugués)"
+              onChange={e => set({ idiomaOtro: e.target.value })} autoFocus
+            />
+          )}
         </div>
       )}
     </div>
