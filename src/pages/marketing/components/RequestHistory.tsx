@@ -3,6 +3,7 @@ import { normalizeUrl } from "../types";
 import type { MarketingRequest } from "../types";
 
 const when = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+const whenDate = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" });
 
 function fileName(url: string): string {
   try {
@@ -47,7 +48,7 @@ function FileRow({ url }: { url: string }) {
   );
 }
 
-interface Entry { at: string; who: "requester" | "diseno"; title: string; note?: string; files: string[] }
+interface Entry { at: string; who: "requester" | "diseno"; title: string; note?: string; files: string[]; dateOnly?: boolean }
 
 // Every round of the request in order: what was asked, each delivery, and each answer — with the
 // files from every round (the live request only keeps the latest delivery link).
@@ -63,11 +64,16 @@ export default function RequestHistory({ request, viewer, designerName }: { requ
   const review = request.stages.find(s => s.key === "review");
   let deliveries = delivery?.deliveries ?? [];
   // Requests delivered before history was recorded: show the one delivery we still know about.
+  let legacyDelivery = false;
   if (deliveries.length === 0 && delivery?.link && delivery.completedAt) {
-    deliveries = [{ link: delivery.link, at: `${delivery.completedAt}T12:00:00-05:00` }];
+    // Only the day is known — never let it sort before the request itself.
+    const guess = new Date(`${delivery.completedAt}T23:59:00-05:00`).getTime();
+    const afterRequest = new Date(request.createdAt).getTime() + 60_000;
+    deliveries = [{ link: delivery.link, at: new Date(Math.max(guess, afterRequest)).toISOString() }];
+    legacyDelivery = true;
   }
   deliveries.forEach((d, i) => entries.push({
-    at: d.at, who: "diseno",
+    at: d.at, who: "diseno", dateOnly: legacyDelivery,
     title: `Entrega de Diseño${deliveries.length > 1 ? ` #${i + 1}` : ""}${designerName ? ` — ${designerName}` : ""}`,
     note: d.note, files: [d.link],
   }));
@@ -78,7 +84,7 @@ export default function RequestHistory({ request, viewer, designerName }: { requ
       : (viewer === "requester" ? "Pediste cambios" : "El solicitante pidió cambios"),
     note: r.note, files: [],
   }));
-  entries.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  entries.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()); // newest first, same as a brief's activity history
 
   return (
     <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
@@ -90,7 +96,7 @@ export default function RequestHistory({ request, viewer, designerName }: { requ
             <div key={i} style={{ borderLeft: `3px solid ${color}`, background: MT.surfaceAlt, borderRadius: 8, padding: "0.6rem 0.8rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: MT.text1 }}>{e.title}</span>
-                <span style={{ fontSize: 11.5, color: MT.text3 }}>{when.format(new Date(e.at))}</span>
+                <span style={{ fontSize: 11.5, color: MT.text3 }}>{(e.dateOnly ? whenDate : when).format(new Date(e.at))}</span>
               </div>
               {e.note && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: MT.text2, whiteSpace: "pre-wrap" }}>{e.note}</p>}
               {e.files.map(f => <FileRow key={f} url={f} />)}
