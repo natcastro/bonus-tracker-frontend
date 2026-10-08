@@ -405,7 +405,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const nextStage = req.stages[stageIdx + 1];
     const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = req.stages.map((s, i) => {
-      if (i === stageIdx) return { ...s, link, completedAt: today, status: "done" as const, late: isLate };
+      if (i === stageIdx) return {
+        ...s, link, completedAt: today, status: "done" as const, late: isLate,
+        deliveries: [...(s.deliveries ?? []), { link, note: note || undefined, at: new Date().toISOString(), by: myEmail }],
+      };
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
       return s;
     });
@@ -438,7 +441,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
 
     if (action === "approve") {
-      const newStages = req.stages.map(s => s.key === stage.key ? { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLate } : s);
+      const newStages = req.stages.map(s => s.key === stage.key ? {
+        ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLate,
+        reviews: [...(s.reviews ?? []), { decision: "approved" as const, note: opts?.note || undefined, at: new Date().toISOString(), by: myEmail }],
+      } : s);
       await updateMarketingRequest(requestId, { stages: newStages, currentStage: "completed", status: "completed", completedAt: today });
       await notify(null, `Solicitud completada: ${req.title}.${isLate ? " (tarde)" : ""}`);
       if (req.assignedDisenoEmail) {
@@ -455,7 +461,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const deliveryGap = REQUEST_STAGE_DEFS.find(s => s.key === "delivery")!.gapDays;
     const deliveryDeadline = addWorkDaysIso(today, deliveryGap);
     const newStages = req.stages.map(s => {
-      if (s.key === "review") return { ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const, late: isLate };
+      if (s.key === "review") return {
+        ...s, completedAt: today, status: "done" as const, decision: "changes_requested" as const, late: isLate,
+        reviews: [...(s.reviews ?? []), { decision: "changes_requested" as const, note: opts?.note || undefined, at: new Date().toISOString(), by: myEmail }],
+      };
       if (s.key === "delivery") return { ...s, status: "pending" as const, completedAt: null, link: null, late: false, deadline: deliveryDeadline };
       return s;
     });

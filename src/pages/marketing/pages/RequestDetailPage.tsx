@@ -5,6 +5,7 @@ import { useMarketing } from "../context";
 import { useHubAccess } from "../../../auth/HubAccessContext";
 import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
+import RequestHistory from "../components/RequestHistory";
 import { requestStageLabel, normalizeUrl } from "../types";
 import { uploadMarketingRequestFile } from "../../../services/api";
 
@@ -170,6 +171,8 @@ export default function RequestDetailPage() {
           </div>
         )}
 
+        <RequestHistory request={request} viewer="requester" designerName={designer} />
+
         {/* What was asked */}
         <details style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.8rem 1.1rem" }}>
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: MT.text2 }}>Ver lo que pediste</summary>
@@ -254,6 +257,8 @@ export default function RequestDetailPage() {
           <div style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, color: MT.primary, background: MT.primarySoft, padding: "0.25rem 0.6rem", borderRadius: 999 }}>✓ Completada</div>
         )}
       </div>
+
+      <RequestHistory request={request} viewer="internal" designerName={request.assignedDisenoEmail ? disenoDisplayName(request.assignedDisenoEmail) : null} />
 
       {canAssign && request.status === "in_progress" && (
         request.assignedDisenoEmail && !showReassign ? (

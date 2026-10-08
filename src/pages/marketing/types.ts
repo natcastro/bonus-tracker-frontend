@@ -357,6 +357,10 @@ export interface TodoTask {
 
 export type RequestStageKey = "delivery" | "review";
 
+// One entry per round, kept even after changes are requested (the stage's own `link` is cleared then).
+export interface RequestDelivery { link: string; note?: string; at: string; by?: string }
+export interface RequestReview { decision: "approved" | "changes_requested"; note?: string; at: string; by?: string }
+
 export interface RequestStage {
   key: RequestStageKey;
   label: string;
@@ -368,6 +372,8 @@ export interface RequestStage {
   status: "pending" | "done";
   decision?: "approved" | "changes_requested";
   late?: boolean;
+  deliveries?: RequestDelivery[];
+  reviews?: RequestReview[];
   remind24hAt?: string;
   remind12hAt?: string;
   remind1hAt?: string;
