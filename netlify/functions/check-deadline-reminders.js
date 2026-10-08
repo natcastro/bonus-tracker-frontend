@@ -50,6 +50,16 @@ async function patchStages(table, id, stages) {
   if (!resp.ok) throw new Error(`Supabase update failed: ${resp.status} ${await resp.text()}`);
 }
 
+async function patchVariants(id, variants) {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/marketing_briefs?id=eq.${id}`;
+  const resp = await fetch(url, {
+    method: "PATCH",
+    headers: { ...supabaseHeaders(), Prefer: "return=minimal" },
+    body: JSON.stringify({ variants }),
+  });
+  if (!resp.ok) throw new Error(`Supabase update failed: ${resp.status} ${await resp.text()}`);
+}
+
 async function getGraphToken() {
   const tenantId = process.env.AZURE_MAILER_TENANT_ID;
   const clientId = process.env.AZURE_MAILER_CLIENT_ID;
@@ -161,9 +171,60 @@ function responsibleName(role, email, nicknames) {
   return nicknames[(email || "").toLowerCase()] || email || "Diseño";
 }
 
+// Briefs with variants keep their real progress inside entity.variants (the brief's own stages stop
+// moving). Variants sitting at the same stage are reminded together — one email per stage, naming
+// how many variants it covers — and every variant in that group gets the reminder stamped.
+async function processVariantBrief({ entity, notifyEmails, nicknames, taskNameOf, stageLabelOf, idPrefix }) {
+  let sent = 0;
+  let variants = entity.variants;
+  const groups = new Map();
+  for (const v of variants) {
+    if (!v.applicable || v.status !== "in_progress") continue;
+    const stage = (v.stages ?? []).find(st => st.key === v.currentStage);
+    if (!stage || stage.status !== "pending" || !stage.deadline) continue;
+    if (!groups.has(stage.key)) groups.set(stage.key, []);
+    groups.get(stage.key).push({ key: v.key, stage });
+  }
+  for (const [stageKey, members] of groups) {
+    const rep = [...members].sort((a, b) => a.stage.deadline.localeCompare(b.stage.deadline))[0].stage;
+    const remainingMs = deadlineTimestamp(rep.deadline) - Date.now();
+    const tier = pickTier(remainingMs, rep);
+    if (!tier) continue;
+    const recipient = await resolveRecipient(entity, rep, notifyEmails);
+    if (!recipient) continue;
+    const overdue = tier === "overdue";
+    const tierHours = tier === "24h" ? 24 : tier === "12h" ? 12 : 1;
+    const taskName = members.length > 1 ? `${taskNameOf(entity)} (${members.length} variantes)` : taskNameOf(entity);
+    try {
+      await sendGraphMail(
+        recipient,
+        reminderSubject(overdue, tierHours, taskName),
+        reminderEmailHtml({
+          overdue, taskName, stageLabel: stageLabelOf(rep), deadline: formatDeadlineHuman(rep.deadline), remainingMs,
+          responsibleName: responsibleName(rep.role, recipient, nicknames),
+          link: `${SITE_URL}/marketing/${idPrefix}/${entity.id}`,
+        }),
+      );
+      const inGroup = new Set(members.map(m => m.key));
+      variants = variants.map(v => inGroup.has(v.key)
+        ? { ...v, stages: v.stages.map(st => (st.key === stageKey ? markStage(st, tier) : st)) }
+        : v);
+      await patchVariants(entity.id, variants);
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send ${tier} reminder for brief ${entity.id} (${stageKey}):`, err.message);
+    }
+  }
+  return sent;
+}
+
 async function processEntities({ table, rows, idPrefix, taskNameOf, stageLabelOf, notifyEmails, nicknames }) {
   let sent = 0;
   for (const entity of rows) {
+    if (table === "marketing_briefs" && Array.isArray(entity.variants) && entity.variants.length > 0) {
+      sent += await processVariantBrief({ entity, notifyEmails, nicknames, taskNameOf, stageLabelOf, idPrefix });
+      continue;
+    }
     const stages = entity.stages ?? [];
     const idx = stages.findIndex(s => s.key === entity.current_stage);
     if (idx === -1) continue;
