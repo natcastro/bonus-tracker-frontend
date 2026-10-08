@@ -78,7 +78,7 @@ export default function RequestHistory({ request, viewer, designerName }: { requ
       : (viewer === "requester" ? "Pediste cambios" : "El solicitante pidió cambios"),
     note: r.note, files: [],
   }));
-  entries.sort((a, b) => a.at.localeCompare(b.at));
+  entries.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
   return (
     <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
