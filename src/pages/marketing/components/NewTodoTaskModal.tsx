@@ -1,3 +1,4 @@
+import SpecificNotice from "./SpecificNotice";
 import { useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
@@ -54,10 +55,11 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
 
           <div>
             <label style={labelStyle}>Descripción de la tarea</label>
+            <SpecificNotice />
             <textarea
               style={{ ...inputStyle, resize: "vertical", minHeight: 64 }}
               value={description} onChange={e => setDescription(e.target.value)}
-              placeholder="Detalles de lo que necesitas..."
+              placeholder="Detalles de lo que necesitas: medidas, textos, colores, referencias..."
             />
           </div>
 

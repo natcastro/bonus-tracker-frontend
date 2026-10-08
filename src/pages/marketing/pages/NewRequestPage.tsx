@@ -1,3 +1,4 @@
+import SpecificNotice from "../components/SpecificNotice";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
@@ -128,7 +129,8 @@ export default function NewRequestPage() {
           </div>
 
           <label style={labelStyle}>Descripción del pedido</label>
-          <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas..." />
+          <SpecificNotice />
+          <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas: medidas, textos, colores, referencias..." />
 
           <label style={labelStyle}>¿Para cuándo necesitas esto? (fecha límite)</label>
           <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={deadline} onChange={e => setDeadline(e.target.value)} />
