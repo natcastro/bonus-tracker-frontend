@@ -6,7 +6,7 @@ import { HubAccessProvider, useHubAccess } from "./HubAccessContext";
 
 const TEAM_LABELS: Record<string, string> = {
   MEX: "FTC México", OPS: "Operations", APT: "Strategy", TKLIVES: "TikTok Lives",
-  CSQUALITY: "Operational Tools", MGMT: "Management", LOGISTICS: "Logística", MARKETING: "Marketing",
+  CSQUALITY: "Operational Tools", MGMT: "Management", LOGISTICS: "Logística", MARKETING: "Marketing", HR: "HR",
 };
 
 function viewAsLabel(team: string, role: string): string {

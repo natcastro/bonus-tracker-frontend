@@ -13,6 +13,7 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "MGMT",       label: "Management" },
   { key: "LOGISTICS",  label: "Logística" },
   { key: "DEVOLUCIONES", label: "Devoluciones" },
+  { key: "HR",           label: "HR (Recursos Humanos)" },
 ];
 
 const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];

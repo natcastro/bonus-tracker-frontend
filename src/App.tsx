@@ -15,8 +15,9 @@ import LogisticsSelector from "./pages/LogisticsSelector";
 import LogisticsHubApp from "./pages/logistics-hub/LogisticsHubApp";
 import MarketingApp from "./pages/marketing/MarketingApp";
 import DevolucionesDashboard from "./pages/DevolucionesDashboard";
+import HrDashboard from "./pages/HrDashboard";
 
-const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY", "LOGISTICS", "MARKETING", "DEVOLUCIONES"]);
+const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY", "LOGISTICS", "MARKETING", "DEVOLUCIONES", "HR"]);
 
 function ProtectedRoute({ team, children }: { team: string; children: ReactElement }) {
   const saved = sessionStorage.getItem("team");
@@ -66,6 +67,9 @@ export default function App() {
             } />
             <Route path="/marketing/*" element={
               <ProtectedRoute team="MARKETING"><MarketingApp /></ProtectedRoute>
+            } />
+            <Route path="/hr" element={
+              <ProtectedRoute team="HR"><HrDashboard /></ProtectedRoute>
             } />
             <Route path="/devoluciones" element={
               <ProtectedRoute team="DEVOLUCIONES"><DevolucionesDashboard /></ProtectedRoute>
