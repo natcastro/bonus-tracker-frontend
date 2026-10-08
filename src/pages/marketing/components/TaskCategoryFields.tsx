@@ -17,6 +17,8 @@ export interface TaskCategoryState {
   customMeasurements: boolean;
   ancho: string;
   alto: string;
+  // Unit for both measurements — picked by the requester, shown next to the numbers and in the request text.
+  unidad: "cm" | "inch";
   ubicacion: string;
   idioma: string;
   // Free text, only used when idioma is "Otro".
@@ -31,7 +33,7 @@ export interface TaskCategoryState {
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
   tipoMedio: "", area: "",
-  customMeasurements: false, ancho: "", alto: "", ubicacion: "", idioma: "", idiomaOtro: "",
+  customMeasurements: false, ancho: "", alto: "", unidad: "cm", ubicacion: "", idioma: "", idiomaOtro: "",
   videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "",
 };
 
@@ -61,6 +63,8 @@ export function taskCategoryTitle(s: TaskCategoryState): string {
   return s.selectedType === "Otro" ? s.customType.trim() : s.selectedType;
 }
 
+const measure = (value: string, unit: string) => (value.trim() ? `${value.trim()} ${unit}` : "?");
+
 // Folds every category-specific answer into one readable block — prepended to the free-form
 // description, since there's no dedicated column per field (most only apply to one category).
 export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
@@ -70,11 +74,11 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
     if (s.area.trim()) lines.push(`Área que solicita: ${s.area.trim()}`);
   }
   if (s.category === "gran_formato") {
-    if (s.ancho.trim() || s.alto.trim()) lines.push(`Medidas: ${s.ancho.trim() || "?"} x ${s.alto.trim() || "?"}`);
+    if (s.ancho.trim() || s.alto.trim()) lines.push(`Medidas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
     if (s.ubicacion.trim()) lines.push(`Ubicación del impreso: ${s.ubicacion.trim()}`);
   }
   if ((s.category === "publicidad" || s.category === "piezas_digitales") && s.customMeasurements) {
-    lines.push(`Medidas personalizadas: ${s.ancho.trim() || "?"} x ${s.alto.trim() || "?"}`);
+    lines.push(`Medidas personalizadas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
   }
   if (s.category === "videos") {
     if (s.videoApp) lines.push(`App: ${s.videoApp}`);
@@ -105,6 +109,33 @@ function SegButtons({ options, value, onChange }: { options: readonly string[]; 
           color: value === opt ? MT.primary : MT.text2,
         }}>{opt}</button>
       ))}
+    </div>
+  );
+}
+
+// Width/height inputs with a cm / inch switch; the unit shows up inside each field as soon as a number is typed.
+function MeasureInputs({ state, set }: { state: TaskCategoryState; set: (patch: Partial<TaskCategoryState>) => void }) {
+  const numeric = (v: string) => v.replace(/[^0-9.,]/g, "");
+  const field = (value: string, onChange: (v: string) => void, placeholder: string) => (
+    <div style={{ position: "relative", flex: 1 }}>
+      <input
+        style={{ ...fieldStyle, paddingRight: 52 }} value={value} inputMode="decimal"
+        onChange={e => onChange(numeric(e.target.value))} placeholder={placeholder}
+      />
+      {value.trim() && (
+        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12.5, fontWeight: 700, color: MT.text3, pointerEvents: "none" }}>
+          {state.unidad}
+        </span>
+      )}
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <SegButtons options={["cm", "inch"]} value={state.unidad} onChange={v => set({ unidad: v as "cm" | "inch" })} />
+      <div style={{ display: "flex", gap: 10 }}>
+        {field(state.ancho, v => set({ ancho: v }), "Ancho")}
+        {field(state.alto, v => set({ alto: v }), "Alto")}
+      </div>
     </div>
   );
 }
@@ -201,11 +232,8 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
       {state.category === "gran_formato" && (
         <>
           <div>
-            <label style={labelStyle}>Medidas (ancho x alto, en cm o in)</label>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input style={fieldStyle} value={state.ancho} onChange={e => set({ ancho: e.target.value })} placeholder="Ancho" />
-              <input style={fieldStyle} value={state.alto} onChange={e => set({ alto: e.target.value })} placeholder="Alto" />
-            </div>
+            <label style={labelStyle}>Medidas (ancho x alto) — elige cm o inch</label>
+            <MeasureInputs state={state} set={set} />
           </div>
           <div>
             <label style={labelStyle}>¿Dónde estará ubicado el impreso? (opcional)</label>
@@ -219,9 +247,8 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
           <label style={labelStyle}>¿Quieres colocar medidas personalizadas?</label>
           <SegButtons options={["Sí", "No"]} value={state.customMeasurements ? "Sí" : "No"} onChange={v => set({ customMeasurements: v === "Sí" })} />
           {state.customMeasurements && (
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <input style={fieldStyle} value={state.ancho} onChange={e => set({ ancho: e.target.value })} placeholder="Ancho" />
-              <input style={fieldStyle} value={state.alto} onChange={e => set({ alto: e.target.value })} placeholder="Alto" />
+            <div style={{ marginTop: 10 }}>
+              <MeasureInputs state={state} set={set} />
             </div>
           )}
         </div>
