@@ -21,7 +21,7 @@ async function updateBrief(id, patch) {
 }
 
 function deadlineTimestamp(dateIso) {
-  return new Date(`${dateIso}T17:00:00-05:00`).getTime();
+  return new Date(`${dateIso}T17:30:00-05:00`).getTime();
 }
 
 async function getGraphToken() {

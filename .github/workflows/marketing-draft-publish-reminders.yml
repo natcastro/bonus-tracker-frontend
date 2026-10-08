@@ -11,5 +11,8 @@ jobs:
     steps:
       - name: Trigger draft publish reminder check
         run: |
-          curl -sf -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-draft-publish-reminders" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          code=$(curl -s --retry 2 --retry-delay 5 -o response.txt -w '%{http_code}' -X POST "https://transcendent-axolotl-027557.netlify.app/.netlify/functions/check-draft-publish-reminders" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $code"
+          cat response.txt; echo
+          [ "$code" -lt 400 ]
