@@ -20,6 +20,8 @@ export interface TaskCategoryState {
   // Unit for both measurements — picked by the requester, shown next to the numbers and in the request text.
   unidad: "cm" | "inch";
   ubicacion: string;
+  // Optional: whether the large-format print goes indoors or outdoors (affects material/finish).
+  ambiente: "" | "Interior" | "Exterior";
   idioma: string;
   // Free text, only used when idioma is "Otro".
   idiomaOtro: string;
@@ -33,7 +35,7 @@ export interface TaskCategoryState {
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
   tipoMedio: "", area: "",
-  customMeasurements: false, ancho: "", alto: "", unidad: "cm", ubicacion: "", idioma: "", idiomaOtro: "",
+  customMeasurements: false, ancho: "", alto: "", unidad: "cm", ubicacion: "", ambiente: "", idioma: "", idiomaOtro: "",
   videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "",
 };
 
@@ -75,7 +77,8 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
   }
   if (s.category === "gran_formato") {
     if (s.ancho.trim() || s.alto.trim()) lines.push(`Medidas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
-    if (s.ubicacion.trim()) lines.push(`Ubicación del impreso: ${s.ubicacion.trim()}`);
+    const place = [s.ambiente, s.ubicacion.trim()].filter(Boolean).join(" — ");
+    if (place) lines.push(`Ubicación del impreso: ${place}`);
   }
   if ((s.category === "publicidad" || s.category === "piezas_digitales") && s.customMeasurements) {
     lines.push(`Medidas personalizadas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
@@ -237,7 +240,9 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
           </div>
           <div>
             <label style={labelStyle}>¿Dónde estará ubicado el impreso? (opcional)</label>
-            <input style={fieldStyle} value={state.ubicacion} onChange={e => set({ ubicacion: e.target.value })} placeholder="Ej. Tienda Bogotá Centro" />
+            <SegButtons options={["Interior", "Exterior"]} value={state.ambiente}
+              onChange={v => set({ ambiente: state.ambiente === v ? "" : (v as "Interior" | "Exterior") })} />
+            <input style={{ ...fieldStyle, marginTop: 8 }} value={state.ubicacion} onChange={e => set({ ubicacion: e.target.value })} placeholder="Ej. Tienda Bogotá Centro" />
           </div>
         </>
       )}
