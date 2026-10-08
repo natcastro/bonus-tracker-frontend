@@ -34,6 +34,12 @@ export default function TodoTaskDetailPage() {
   const canAct = task.status === "in_progress" && currentStage?.role === myRole;
   const needsLink = currentStage?.role === "diseno";
   const canApproveNow = !!currentStage && myRole === "carol" && TODO_APPROVABLE_STAGES.includes(currentStage.key);
+  const isReview = canApproveNow; // Karol's review stages use the same panel as a brief review
+
+  const fieldStyle: React.CSSProperties = {
+    width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
+    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+  };
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError("");
@@ -135,15 +141,13 @@ export default function TodoTaskDetailPage() {
           {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
 
           <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
-            Link con el arte / entrega{needsLink ? "" : " (opcional)"}
+            {isReview ? "Enlace o imagen con comentarios de ajuste (opcional)" : needsLink ? "Link de SharePoint de la entrega" : "Link con el arte / entrega (opcional)"}
           </label>
-          <input
-            style={{ width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", marginBottom: 8 }}
-            value={link} onChange={e => setLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..."
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <input style={{ ...fieldStyle, marginBottom: 8 }} value={link} onChange={e => setLink(e.target.value)} placeholder="https://formatucuerpo.sharepoint.com/..." />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <input
               type="file"
+              accept={isReview ? "image/*" : undefined}
               disabled={uploading}
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
               style={{ fontSize: 12 }}
@@ -151,36 +155,46 @@ export default function TodoTaskDetailPage() {
             {uploading && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
           </div>
           {link && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(link) && (
-            <img src={link} alt="Entrega" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginBottom: 8, display: "block" }} />
+            <img src={link} alt={isReview ? "Comentario de ajuste" : "Entrega"} style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
           )}
-          {uploadError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 8 }}>{uploadError}</p>}
-          <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6, marginTop: 4 }}>Nota (opcional)</label>
-          <textarea
-            style={{ width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", minHeight: 60 }}
-            value={note} onChange={e => setNote(e.target.value)}
-          />
+          {uploadError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{uploadError}</p>}
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>Nota para el correo (opcional)</label>
+            <textarea
+              value={note} onChange={e => setNote(e.target.value)} rows={2}
+              placeholder="Algo que quieras que la otra persona vea en el correo..."
+              style={{ ...fieldStyle, resize: "vertical", fontFamily: MT.font }}
+            />
+          </div>
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {canApproveNow && (
-              <button
-                disabled={busy}
-                onClick={() => run(() => approveTodoTask(task.id, note.trim() || undefined))}
-                style={{
+
+          {isReview ? (
+            <>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button disabled={busy} onClick={() => run(() => advanceTodoTask(task.id, link.trim() || undefined, note.trim() || undefined))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-                }}
-              >{busy ? "Enviando..." : "✓ Aprobar"}</button>
-            )}
+                  background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                }}>{busy ? "Enviando..." : "Solicitar ajustes / continuar"}</button>
+                <button disabled={busy} onClick={() => run(() => approveTodoTask(task.id, note.trim() || undefined))} style={{
+                  fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
+                }}>✓ Aprobar sin cambios</button>
+              </div>
+              <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
+                Aprobar sin cambios cierra la tarea y avisa a Diseño. Solicitar ajustes la envía de vuelta a Diseño.
+              </p>
+            </>
+          ) : (
             <button
               disabled={busy || (needsLink && !link.trim())}
               onClick={() => run(() => advanceTodoTask(task.id, needsLink ? link.trim() : undefined, note.trim() || undefined))}
               style={{
                 fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: canApproveNow ? MT.surface : MT.clay, color: canApproveNow ? MT.clay : "#fff",
-                border: canApproveNow ? `1px solid ${MT.clay}` : "none", borderRadius: 8, padding: "10px 18px",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
               }}
-            >{busy ? "Enviando..." : task.currentStage === "approved" ? "Aprobar y cerrar" : canApproveNow ? "Pedir ajustes" : "Continuar"}</button>
-          </div>
+            >{busy ? "Enviando..." : task.currentStage === "approved" ? "Aprobar y cerrar" : "Subir y continuar"}</button>
+          )}
         </div>
       )}
     </div>

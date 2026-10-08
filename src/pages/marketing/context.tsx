@@ -264,7 +264,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           `Tu turno — ${task.title}`,
           emailHtml({
             intro: `Se avanzó la tarea "${task.title}". Te toca continuar.`,
-            reference: task.title, nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline, note,
+            reference: task.title, nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline,
+            note: [note, stage.role === "carol" && link ? `Enlace con comentarios de ajuste: ${link}` : ""].filter(Boolean).join(" — ") || undefined,
             link: appUrl(`/marketing/todo/${task.id}`),
           }),
         );
