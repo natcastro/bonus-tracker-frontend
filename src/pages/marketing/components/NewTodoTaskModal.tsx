@@ -17,7 +17,10 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskCategoryIsComplete(cat)) { setError("Selecciona la categoría y el tipo de pieza."); return; }
+    if (!taskCategoryIsComplete(cat)) {
+      setError(cat.category === "videos" ? "Completa el propósito y la descripción detallada del video (y la plataforma si elegiste Otro)." : "Selecciona la categoría y el tipo de pieza.");
+      return;
+    }
     if (!assignedEmail) { setError("Asigna la tarea a alguien de Diseño."); return; }
     const title = taskCategoryTitle(cat);
     const detailsBlock = taskCategoryDetailsBlock(cat);
@@ -53,6 +56,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <TaskCategoryFields state={cat} onChange={setCat} />
 
+          {cat.category !== "videos" && (
           <div>
             <label style={labelStyle}>Descripción de la tarea</label>
             <SpecificNotice />
@@ -62,6 +66,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
               placeholder="Detalles de lo que necesitas: medidas, textos, colores, referencias..."
             />
           </div>
+          )}
 
           <div>
             <label style={labelStyle}>Mensaje adicional para el correo (opcional)</label>

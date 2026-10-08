@@ -296,7 +296,7 @@ export const GRAN_FORMATO_TYPES = [
 
 // Piezas Digitales reuses TODO_TASK_TYPES as-is — it's already exactly this list.
 
-export const VIDEO_APPS = ["Facebook", "Instagram", "Amazon", "Otro"] as const;
+export const VIDEO_APPS = ["Facebook", "Instagram", "Amazon", "WhatsApp", "TikTok", "YouTube", "Otro"] as const;
 export const VIDEO_FORMATS = ["Story", "Post", "No aplica"] as const;
 
 export type TodoStageKey = "proposal" | "review" | "adjustments" | "finalReview" | "finalAdjustments" | "approved";

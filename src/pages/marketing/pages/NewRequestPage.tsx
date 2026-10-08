@@ -48,8 +48,11 @@ export default function NewRequestPage() {
 
   const submit = async () => {
     if (!nombre.trim() || !apellido.trim()) { setError("Escribe tu nombre y apellido."); return; }
-    if (!taskCategoryIsComplete(cat)) { setError("Selecciona la categoría y el tipo de pieza."); return; }
-    if (!description.trim()) { setError("Explica qué necesitas."); return; }
+    if (!taskCategoryIsComplete(cat)) {
+      setError(cat.category === "videos" ? "Completa el propósito y la descripción detallada del video (y la plataforma si elegiste Otro)." : "Selecciona la categoría y el tipo de pieza.");
+      return;
+    }
+    if (cat.category !== "videos" && !description.trim()) { setError("Explica qué necesitas."); return; }
     if (!assignedDisenoEmail) { setError("Selecciona a quién se le hace la solicitud."); return; }
     setBusy(true); setError("");
     try {
@@ -128,9 +131,13 @@ export default function NewRequestPage() {
             <TaskCategoryFields state={cat} onChange={setCat} />
           </div>
 
+          {cat.category !== "videos" && (
+            <>
           <label style={labelStyle}>Descripción del pedido</label>
           <SpecificNotice />
           <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas: medidas, textos, colores, referencias..." />
+            </>
+          )}
 
           <label style={labelStyle}>¿Para cuándo necesitas esto? (fecha límite)</label>
           <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={deadline} onChange={e => setDeadline(e.target.value)} />

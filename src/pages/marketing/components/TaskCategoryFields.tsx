@@ -26,17 +26,24 @@ export interface TaskCategoryState {
   // Free text, only used when idioma is "Otro".
   idiomaOtro: string;
   videoApp: string;
+  videoAppOtro: string; // free text, only when videoApp is "Otro"
   videoFormato: string;
   videoOrientacion: string;
   videoSonido: string;
   videoSubtitulos: string;
+  videoVozEnOff: string;
+  // Video brief template — these replace the generic description box for the Video category.
+  videoProposito: string;
+  videoScript: string;
+  videoDescripcion: string;
 }
 
 export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   category: null, selectedType: null, customType: "",
   tipoMedio: "", area: "",
   customMeasurements: false, ancho: "", alto: "", unidad: "cm", ubicacion: "", ambiente: "", idioma: "", idiomaOtro: "",
-  videoApp: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "",
+  videoApp: "", videoAppOtro: "", videoFormato: "", videoOrientacion: "", videoSonido: "", videoSubtitulos: "", videoVozEnOff: "",
+  videoProposito: "", videoScript: "", videoDescripcion: "",
 };
 
 function typesForCategory(category: TaskCategory | null): readonly string[] {
@@ -51,7 +58,10 @@ function typesForCategory(category: TaskCategory | null): readonly string[] {
 export function taskCategoryIsComplete(s: TaskCategoryState): boolean {
   if (!s.category) return false;
   if (s.idioma === "Otro" && !s.idiomaOtro.trim()) return false;
-  if (s.category === "videos") return true;
+  if (s.category === "videos") {
+    if (s.videoApp === "Otro" && !s.videoAppOtro.trim()) return false;
+    return s.videoProposito.trim().length > 0 && s.videoDescripcion.trim().length > 0;
+  }
   if (!s.selectedType) return false;
   if (s.selectedType === "Otro") return s.customType.trim().length > 0;
   return true;
@@ -59,7 +69,8 @@ export function taskCategoryIsComplete(s: TaskCategoryState): boolean {
 
 export function taskCategoryTitle(s: TaskCategoryState): string {
   if (s.category === "videos") {
-    return ["Video", s.videoApp, s.videoFormato].filter(Boolean).join(" — ");
+    const app = s.videoApp === "Otro" && s.videoAppOtro.trim() ? s.videoAppOtro.trim() : s.videoApp;
+    return ["Video", app, s.videoFormato].filter(Boolean).join(" — ");
   }
   if (!s.selectedType) return "";
   return s.selectedType === "Otro" ? s.customType.trim() : s.selectedType;
@@ -84,13 +95,19 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
     lines.push(`Medidas personalizadas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
   }
   if (s.category === "videos") {
-    if (s.videoApp) lines.push(`App: ${s.videoApp}`);
+    if (s.videoApp) lines.push(`App: ${s.videoApp === "Otro" && s.videoAppOtro.trim() ? s.videoAppOtro.trim() : s.videoApp}`);
     if (s.videoFormato) lines.push(`Formato: ${s.videoFormato}`);
     if (s.videoOrientacion) lines.push(`Orientación: ${s.videoOrientacion}`);
     if (s.videoSonido) lines.push(`Sonido: ${s.videoSonido}`);
     if (s.videoSubtitulos) lines.push(`Subtítulos: ${s.videoSubtitulos}`);
+    if (s.videoVozEnOff) lines.push(`Voz en off (locutor): ${s.videoVozEnOff}`);
   }
   if (s.idioma) lines.push(`Idioma: ${s.idioma === "Otro" && s.idiomaOtro.trim() ? s.idiomaOtro.trim() : s.idioma}`);
+  if (s.category === "videos") {
+    if (s.videoProposito.trim()) lines.push(`\nPropósito del video:\n${s.videoProposito.trim()}`);
+    lines.push(`\nScript del video:\n${s.videoScript.trim() || "Por definir"}`);
+    if (s.videoDescripcion.trim()) lines.push(`\nDescripción detallada del video:\n${s.videoDescripcion.trim()}`);
+  }
   return lines.join("\n");
 }
 
@@ -264,6 +281,10 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
           <div>
             <label style={labelStyle}>App</label>
             <SegButtons options={VIDEO_APPS} value={state.videoApp} onChange={v => set({ videoApp: v })} />
+            {state.videoApp === "Otro" && (
+              <input style={{ ...fieldStyle, marginTop: 8 }} value={state.videoAppOtro} placeholder="¿Cuál app o plataforma?"
+                onChange={e => set({ videoAppOtro: e.target.value })} autoFocus />
+            )}
           </div>
           <div>
             <label style={labelStyle}>Formato</label>
@@ -273,7 +294,7 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
             <label style={labelStyle}>Orientación</label>
             <SegButtons options={["Vertical", "Horizontal"]} value={state.videoOrientacion} onChange={v => set({ videoOrientacion: v })} />
           </div>
-          <div style={{ display: "flex", gap: 20 }}>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             <div>
               <label style={labelStyle}>¿Lleva sonido?</label>
               <SegButtons options={["Sí", "No"]} value={state.videoSonido} onChange={v => set({ videoSonido: v })} />
@@ -281,6 +302,35 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
             <div>
               <label style={labelStyle}>¿Lleva subtítulos?</label>
               <SegButtons options={["Sí", "No"]} value={state.videoSubtitulos} onChange={v => set({ videoSubtitulos: v })} />
+            </div>
+            <div>
+              <label style={labelStyle}>¿Lleva voz en off (locutor)?</label>
+              <SegButtons options={["Sí", "No"]} value={state.videoVozEnOff} onChange={v => set({ videoVozEnOff: v })} />
+            </div>
+          </div>
+
+          {/* Video brief template — a video can't be made from a one-line request */}
+          <div style={{ background: MT.surfaceAlt, borderRadius: 10, padding: "0.85rem 0.9rem", display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              ⚠ Importante: ser específico
+            </p>
+            <div>
+              <label style={labelStyle}>Propósito del video</label>
+              <textarea style={{ ...fieldStyle, resize: "vertical", minHeight: 56 }} value={state.videoProposito}
+                onChange={e => set({ videoProposito: e.target.value })}
+                placeholder="¿Para qué es el video? Ej. lanzar la faja X, mostrar cómo se usa, promoción de temporada…" />
+            </div>
+            <div>
+              <label style={labelStyle}>Script del video</label>
+              <textarea style={{ ...fieldStyle, resize: "vertical", minHeight: 90 }} value={state.videoScript}
+                onChange={e => set({ videoScript: e.target.value })}
+                placeholder="El texto o guion que se dice / aparece en el video. Si todavía no lo tienes, escribe «Por definir»." />
+            </div>
+            <div>
+              <label style={labelStyle}>Descripción detallada del video</label>
+              <textarea style={{ ...fieldStyle, resize: "vertical", minHeight: 90 }} value={state.videoDescripcion}
+                onChange={e => set({ videoDescripcion: e.target.value })}
+                placeholder="Escena por escena: qué se ve, tomas, música, colores, duración, referencias…" />
             </div>
           </div>
         </>
