@@ -81,6 +81,113 @@ export default function RequestDetailPage() {
     );
   }
 
+  // The file Diseño delivered lives on the delivery stage (the review stage that follows has no link).
+  const deliveryStage = request.stages.find(st => st.key === "delivery");
+  const deliveredLink = deliveryStage?.link ?? null;
+  const isImageLink = !!deliveredLink && /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(deliveredLink);
+
+  // ── Friendly view for someone using the public link (no Marketing role): just their own
+  // request — what's happening, the delivery when it's ready, and the two review buttons.
+  if (!myRole) {
+    const designer = request.assignedDisenoEmail ? disenoDisplayName(request.assignedDisenoEmail) : null;
+    const inReview = request.status === "in_progress" && request.currentStage === "review";
+    const inDelivery = request.status === "in_progress" && request.currentStage === "delivery";
+    const steps = [
+      { label: "Solicitud recibida", done: true },
+      { label: "Diseño trabaja en ella", done: inReview || request.status === "completed", current: inDelivery },
+      { label: "Tu revisión", done: request.status === "completed", current: inReview },
+      { label: "Lista", done: request.status === "completed" },
+    ];
+    const banner = request.status === "completed"
+      ? { bg: MT.primarySoft, color: MT.primary, title: "¡Tu solicitud está lista!", text: "Gracias por revisarla. Puedes volver a ver la entrega final cuando quieras." }
+      : inReview
+        ? { bg: MT.violetSoft, color: MT.violet, title: "Tu entrega está lista para revisar", text: "Míralo con calma y dinos si todo está bien o qué quieres cambiar." }
+        : { bg: MT.claySoft, color: MT.clay, title: designer ? `${designer} está trabajando en tu solicitud` : "Recibimos tu solicitud", text: designer ? "Te avisaremos por correo en cuanto tu entrega esté lista para revisar." : "Muy pronto la asignaremos a alguien de Diseño. Te avisaremos por correo." };
+
+    return (
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "1.25rem 1.25rem 3rem", fontFamily: MT.font }}>
+        {header}
+
+        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: MT.text1 }}>{request.title}</h1>
+        <p style={{ margin: "0 0 1.25rem", fontSize: 12.5, color: MT.text3 }}>
+          Pedida el {formatDateHuman(request.createdAt.slice(0, 10))}
+          {request.revisionRounds > 0 && <> · {request.revisionRounds} ronda{request.revisionRounds !== 1 ? "s" : ""} de cambios</>}
+        </p>
+
+        <div style={{ background: banner.bg, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem" }}>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: banner.color }}>{banner.title}</p>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: MT.text2 }}>{banner.text}</p>
+          {inDelivery && currentStage?.deadline && <div style={{ marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
+        </div>
+
+        {/* Progress */}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 6, marginBottom: "1.5rem" }}>
+          {steps.map((st, i) => (
+            <div key={st.label} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{
+                height: 4, borderRadius: 999, marginBottom: 8,
+                background: st.done ? MT.primary : st.current ? MT.clay : MT.border,
+              }} />
+              <div style={{ fontSize: 11.5, fontWeight: st.current ? 800 : 600, color: st.done || st.current ? MT.text1 : MT.text3 }}>
+                {st.done ? "✓ " : `${i + 1}. `}{st.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* The delivery — what the person actually came here for */}
+        {deliveredLink && (inReview || request.status === "completed") && (
+          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem", boxShadow: MT.shadow }}>
+            <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: MT.text1 }}>{request.status === "completed" ? "Entrega final" : "Entrega de Diseño"}</p>
+            {isImageLink && <img src={deliveredLink} alt="Entrega" style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 10, display: "block", marginBottom: 12 }} />}
+            <a href={normalizeUrl(deliveredLink)} target="_blank" rel="noreferrer" style={{
+              display: "inline-block", fontFamily: MT.font, fontSize: 14, fontWeight: 700, textDecoration: "none",
+              background: MT.primary, color: "#fff", borderRadius: 10, padding: "11px 20px",
+            }}>Ver entrega →</a>
+          </div>
+        )}
+
+        {canReview && (
+          <div style={{ background: MT.surface, border: `2px solid ${MT.violet}`, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem" }}>
+            <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 800, color: MT.text1 }}>¿Qué te parece?</p>
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: MT.text2 }}>Si quieres cambios, cuéntanos qué ajustar para que Diseño lo tenga claro.</p>
+            <textarea style={{ ...fieldStyle, marginBottom: 12, resize: "vertical" }} rows={3} value={noteInput}
+              onChange={e => setNoteInput(e.target.value)} placeholder="Comentarios o cambios que necesitas…" />
+            {error && <p style={{ color: MT.danger, fontSize: 12.5, margin: "0 0 10px" }}>{error}</p>}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button disabled={busy} onClick={() => run(async () => { await requesterReview(request.id, "approve", { note: noteInput.trim() || undefined }); })} style={{
+                fontFamily: MT.font, fontSize: 14, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 10, padding: "11px 20px",
+              }}>✓ Todo bien, aprobar</button>
+              <button disabled={busy} onClick={() => {
+                if (!noteInput.trim()) { setError("Cuéntanos qué quieres cambiar para que Diseño pueda ajustarlo."); return; }
+                run(async () => { await requesterReview(request.id, "request_changes", { note: noteInput.trim() }); });
+              }} style={{
+                fontFamily: MT.font, fontSize: 14, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 10, padding: "11px 20px",
+              }}>Pedir cambios</button>
+            </div>
+          </div>
+        )}
+
+        {/* What was asked */}
+        <details style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.8rem 1.1rem" }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: MT.text2 }}>Ver lo que pediste</summary>
+          <p style={{ margin: "10px 0", fontSize: 13, color: MT.text2, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{request.description}</p>
+          {request.attachments.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {request.attachments.map((url, i) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer" style={{
+                  fontSize: 11.5, fontWeight: 700, color: MT.info, background: MT.infoSoft, borderRadius: 999, padding: "4px 10px", textDecoration: "none",
+                }}>📎 Archivo {i + 1}</a>
+              ))}
+            </div>
+          )}
+        </details>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 820, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       {header}
@@ -190,8 +297,8 @@ export default function RequestDetailPage() {
       {canReview && (
         <div style={{ background: MT.surface, border: `2px solid ${MT.violet}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Revisar entrega</p>
-          {currentStage?.link && (
-            <a href={currentStage.link} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 700, color: MT.info, display: "block", marginBottom: 12 }}>Ver entrega →</a>
+          {deliveredLink && (
+            <a href={normalizeUrl(deliveredLink)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 700, color: MT.info, display: "block", marginBottom: 12 }}>Ver entrega →</a>
           )}
           <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>Nota (opcional)</label>
           <textarea style={{ ...fieldStyle, marginBottom: 12, resize: "vertical" }} rows={2} value={noteInput} onChange={e => setNoteInput(e.target.value)} />
@@ -208,8 +315,8 @@ export default function RequestDetailPage() {
         </div>
       )}
 
-      {currentStage?.link && !canDeliver && !canReview && (
-        <p style={{ fontSize: 12.5, color: MT.text2 }}>Última entrega: <a href={currentStage.link} target="_blank" rel="noreferrer" style={{ color: MT.info, fontWeight: 700 }}>Ver →</a></p>
+      {deliveredLink && !canDeliver && !canReview && (
+        <p style={{ fontSize: 12.5, color: MT.text2 }}>Última entrega: <a href={normalizeUrl(deliveredLink)} target="_blank" rel="noreferrer" style={{ color: MT.info, fontWeight: 700 }}>Ver →</a></p>
       )}
 
       {currentStage?.deadline && request.status === "in_progress" && (

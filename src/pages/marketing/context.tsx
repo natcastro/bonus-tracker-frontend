@@ -186,7 +186,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     };
     const [n, rq, b, t, tt] = await Promise.all([
       safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
-      safe("requests", () => getMarketingRequests(), []),
+      safe("requests", () => getMarketingRequests(hasInternalRole ? undefined : myEmail), []),
       hasInternalRole ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
       hasInternalRole ? safe("private tasks", () => getPrivateTasks(myEmail), []) : Promise.resolve([]),
       hasInternalRole ? safe("todo tasks", () => getTodoTasks(), []) : Promise.resolve([]),

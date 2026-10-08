@@ -1789,8 +1789,16 @@ function mapMarketingRequest(r: any): MarketingRequest {
   };
 }
 
-export async function getMarketingRequests(): Promise<MarketingRequest[]> {
-  const { data, error } = await supabase.from("marketing_requests").select("*").order("created_at", { ascending: false });
+// With forEmail, only that person's own requests (or ones explicitly shared with them) come back —
+// someone using the public request link never receives anyone else's requests.
+export async function getMarketingRequests(forEmail?: string): Promise<MarketingRequest[]> {
+  let query = supabase.from("marketing_requests").select("*").order("created_at", { ascending: false });
+  if (forEmail) {
+    const e = forEmail.toLowerCase().replace(/[",()]/g, "");
+    const like = e.replace(/[\\_%]/g, m => `\\${m}`); // ilike wildcards in the address must match literally
+    query = query.or(`requester_email.ilike.${like},shared_with_emails.cs.{"${e}"}`);
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(mapMarketingRequest);
 }
