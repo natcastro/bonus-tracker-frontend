@@ -9,10 +9,11 @@ const EMPTY: Omit<Contractor, "id"> = {
 };
 
 // Only William can create people — the HR view is the only place these modals are opened from.
-export function NewContractorModal({ supervisors, onSave, onClose }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">) => void; onClose: () => void }) {
+export function NewContractorModal({ supervisors, onSave, onClose }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">, alsoSupervisor: boolean) => void; onClose: () => void }) {
   const [c, setC] = useState(EMPTY);
   const [err, setErr] = useState("");
   const [capText, setCapText] = useState("");
+  const [alsoSupervisor, setAlsoSupervisor] = useState(false);
   const set = (patch: Partial<Omit<Contractor, "id">>) => setC(prev => ({ ...prev, ...patch }));
   const setBank = (patch: Partial<Contractor["bank"]>) => setC(prev => ({ ...prev, bank: { ...prev.bank, ...patch } }));
   const cur = CURRENCIES[c.currency];
@@ -28,7 +29,7 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
     const cap = Number(capText);
     if (capText.trim() === "" || isNaN(cap) || cap < 0) { setErr("Escribe el máximo de bono por ciclo. Si esta persona no recibe bonos, escribe 0."); return; }
     if (overLimit(cap, c.currency)) { setErr(`Un máximo de bono de ${formatMoney(cap, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`); return; }
-    onSave({ ...c, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } });
+    onSave({ ...c, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } }, alsoSupervisor);
   };
 
   const field = (label: string, value: string, onChange: (v: string) => void, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -105,6 +106,11 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
           </select>
         </div>
 
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", margin: "0.5rem 0", cursor: "pointer" }}>
+          <input type="checkbox" checked={alsoSupervisor} onChange={e => setAlsoSupervisor(e.target.checked)} />
+          <span><strong>También es supervisor</strong> — aprueba los pagos de otras personas y además llena el suyo</span>
+        </label>
+
         <h4 style={{ margin: "1rem 0 0.5rem" }}>Información de pago <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>(en la versión real se guarda cifrada)</span></h4>
         <div className="form-row">
           {field("Banco", c.bank.bankName, v => setBank({ bankName: v }))}
@@ -133,8 +139,9 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
   );
 }
 
-export function NewSupervisorModal({ onSave, onClose }: { onSave: (s: Omit<Supervisor, "id">) => void; onClose: () => void }) {
-  const [s, setS] = useState({ firstName: "", lastName: "", position: "" });
+export function NewSupervisorModal({ contractors, supervisors, onSave, onClose }: { contractors: Contractor[]; supervisors: Supervisor[]; onSave: (s: Omit<Supervisor, "id">) => void; onClose: () => void }) {
+  const [s, setS] = useState<Omit<Supervisor, "id">>({ firstName: "", lastName: "", position: "", contractorId: null });
+  const linkable = contractors.filter(c => !supervisors.some(x => x.contractorId === c.id));
   return (
     <div className="modal-overlay active">
       <form className="modal" onSubmit={e => { e.preventDefault(); if (s.firstName.trim() && s.lastName.trim()) onSave(s); }}>
@@ -142,6 +149,14 @@ export function NewSupervisorModal({ onSave, onClose }: { onSave: (s: Omit<Super
         <div className="form-group"><label>Nombre</label><input className="form-control" required value={s.firstName} onChange={e => setS({ ...s, firstName: e.target.value })} /></div>
         <div className="form-group"><label>Apellido</label><input className="form-control" required value={s.lastName} onChange={e => setS({ ...s, lastName: e.target.value })} /></div>
         <div className="form-group"><label>Cargo</label><input className="form-control" value={s.position} onChange={e => setS({ ...s, position: e.target.value })} /></div>
+        <div className="form-group">
+          <label>¿También cobra como contratista? (opcional)</label>
+          <select className="form-control" value={s.contractorId ?? ""} onChange={e => setS({ ...s, contractorId: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">No, solo supervisa</option>
+            {linkable.map(c => <option key={c.id} value={c.id}>Sí — es {c.legalName}</option>)}
+          </select>
+          <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Primero crea a la persona como contratista; aquí solo la vinculas. (O marca "También es supervisor" al crear al contratista.)</span>
+        </div>
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn btn-primary">Crear supervisor</button>

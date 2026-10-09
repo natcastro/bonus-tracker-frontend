@@ -75,9 +75,9 @@ export default function HrHeadView({ store }: { store: HrStore }) {
           <div className="card" style={{ overflowX: "auto" }}>
             <h4 style={{ marginTop: 0 }}>Supervisores</h4>
             <table className="data-table">
-              <thead><tr><th>Nombre</th><th>Cargo</th><th>Personas a cargo</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Cargo</th><th>Personas a cargo</th><th>También cobra</th></tr></thead>
               <tbody>{store.supervisors.map(s => (
-                <tr key={s.id}><td><strong>{s.firstName} {s.lastName}</strong></td><td>{s.position}</td><td>{store.contractors.filter(c => c.supervisorId === s.id).length}</td></tr>
+                <tr key={s.id}><td><strong>{s.firstName} {s.lastName}</strong></td><td>{s.position}</td><td>{store.contractors.filter(c => c.supervisorId === s.id).length}</td><td>{s.contractorId ? "Sí" : "No"}</td></tr>
               ))}</tbody>
             </table>
           </div>
@@ -86,8 +86,8 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "historial" && <HistoryTable store={store} />}
 
-      {showNewC && <NewContractorModal supervisors={store.supervisors} onClose={() => setShowNewC(false)} onSave={c => { store.createContractor(c); setShowNewC(false); }} />}
-      {showNewS && <NewSupervisorModal onClose={() => setShowNewS(false)} onSave={s => { store.createSupervisor(s); setShowNewS(false); }} />}
+      {showNewC && <NewContractorModal supervisors={store.supervisors} onClose={() => setShowNewC(false)} onSave={(c, also) => { store.createContractor(c, also); setShowNewC(false); }} />}
+      {showNewS && <NewSupervisorModal contractors={store.contractors} supervisors={store.supervisors} onClose={() => setShowNewS(false)} onSave={s => { store.createSupervisor(s); setShowNewS(false); }} />}
     </div>
   );
 }

@@ -17,7 +17,8 @@ export interface BankInfo {
   holder: string; accountType: string; accountNumber: string;
 }
 
-export interface Supervisor { id: number; firstName: string; lastName: string; position: string }
+// contractorId: set when the supervisor is ALSO a paid contractor (approves others and fills their own cycle).
+export interface Supervisor { id: number; firstName: string; lastName: string; position: string; contractorId?: number | null }
 
 export interface Contractor {
   id: number;
@@ -184,7 +185,7 @@ const bank = (n: string): BankInfo => ({
 });
 
 export const SEED_SUPERVISORS: Supervisor[] = [
-  { id: 1, firstName: "Héctor", lastName: "Ramírez", position: "Operations Manager" },
+  { id: 1, firstName: "Héctor", lastName: "Ramírez", position: "Operations Manager", contractorId: 5 },
   { id: 2, firstName: "Daniela", lastName: "Ortiz", position: "Marketing Lead" },
 ];
 
@@ -197,6 +198,9 @@ export const SEED_CONTRACTORS: Contractor[] = [
     payType: "fixed", hourlyRate: 0, baseAmount: 4200000, currency: "COP", bonusCap: 1000000, supervisorId: 1, bank: bank("Carlos Rodríguez") },
   { id: 4, legalName: "Laura Martínez", position: "Support Agent", email: "laura.prueba@example.com", phone: "+1 305 000 0004", address: "123 Test St, Miami, FL", country: "USA", taxId: "SSN/EIN 00-0000000",
     payType: "hourly", hourlyRate: 15, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: null, bank: bank("Laura Martínez") },
+  // A supervisor who is also paid: has no supervisor of his own, so William approves his cycle.
+  { id: 5, legalName: "Héctor Ramírez", position: "Operations Manager", email: "hector.prueba@example.com", phone: "+57 315 000 0005", address: "Calle 93 # 11-20, Bogotá DC", country: "Colombia", taxId: "CC 55667788",
+    payType: "fixed", hourlyRate: 0, baseAmount: 3000, currency: "USD", bonusCap: 500, supervisorId: null, bank: bank("Héctor Ramírez") },
 ];
 
 const NOTES = ["Answered customer chats and tracked orders.", "Handled returns and follow-up emails.", "Updated the order spreadsheet and replied to tickets.", "Prepared the weekly report and helped the team."];

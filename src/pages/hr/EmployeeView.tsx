@@ -9,7 +9,7 @@ import { Banner, Stat, Tabs } from "./ui";
 import SignaturePad from "./SignaturePad";
 import InvoicePreview from "./InvoicePreview";
 
-export default function EmployeeView({ store, c }: { store: HrStore; c: Contractor }) {
+export default function EmployeeView({ store, c, embedded }: { store: HrStore; c: Contractor; embedded?: boolean }) {
   const [tab, setTab] = useState<"ciclo" | "historial" | "perfil">("ciclo");
   const [viewId, setViewId] = useState<number | null>(null);
   const supervisor = store.supervisors.find(s => s.id === c.supervisorId);
@@ -18,7 +18,7 @@ export default function EmployeeView({ store, c }: { store: HrStore; c: Contract
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Hola, {c.legalName.split(" ")[0]}</h2>
+      {!embedded && <h2 style={{ marginTop: 0 }}>Hola, {c.legalName.split(" ")[0]}</h2>}
       <Tabs tabs={[["ciclo", "Mi ciclo actual"], ["historial", "Historial de pagos"], ["perfil", "Mi perfil"]]} value={tab} onChange={t => { setTab(t); setViewId(null); }} />
 
       {tab === "ciclo" && <CurrentCycle store={store} c={c} />}

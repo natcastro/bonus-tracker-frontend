@@ -20,7 +20,7 @@ export default function HrDashboard() {
   const label = (p: Persona): string => {
     if (p.kind === "hr") return `${HR_HEAD} — HR`;
     if (p.kind === "accounting") return `${ACCOUNTANT} — Contabilidad`;
-    if (p.kind === "supervisor") { const s = store.supervisors.find(x => x.id === p.id)!; return `${s.firstName} ${s.lastName} — Supervisor`; }
+    if (p.kind === "supervisor") { const s = store.supervisors.find(x => x.id === p.id)!; return `${s.firstName} ${s.lastName} — Supervisor${s.contractorId ? " y contratista" : ""}`; }
     return `${store.contractor(p.id).legalName} — Empleado`;
   };
 
@@ -75,8 +75,8 @@ export default function HrDashboard() {
             <p style={{ color: "var(--text-muted)", marginTop: 0 }}>Elige un usuario para ver la página como la vería esa persona.</p>
             {group("HR", card({ kind: "hr" }, HR_HEAD, "Jefe de HR — aprueba, crea contratistas", "hr"))}
             {group("Contabilidad", card({ kind: "accounting" }, ACCOUNTANT, "Contadora — historial de pagos", "acc"))}
-            {group("Supervisores", store.supervisors.map(s => card({ kind: "supervisor", id: s.id }, `${s.firstName} ${s.lastName}`, s.position, `s${s.id}`)))}
-            {group("Empleados / contratistas", store.contractors.map(c => card({ kind: "employee", id: c.id }, c.legalName, `${c.position} · ${c.payType === "hourly" ? "por horas" : "monto fijo"} · ${c.currency}`, `e${c.id}`)))}
+            {group("Supervisores", store.supervisors.map(s => card({ kind: "supervisor", id: s.id }, `${s.firstName} ${s.lastName}`, `${s.position}${s.contractorId ? " · también cobra como contratista" : ""}`, `s${s.id}`)))}
+            {group("Empleados / contratistas", store.contractors.filter(c => !store.supervisors.some(s => s.contractorId === c.id)).map(c => card({ kind: "employee", id: c.id }, c.legalName, `${c.position} · ${c.payType === "hourly" ? "por horas" : "monto fijo"} · ${c.currency}`, `e${c.id}`)))}
           </section>
         )}
 

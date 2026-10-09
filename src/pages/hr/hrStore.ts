@@ -76,18 +76,22 @@ export function useHrStore() {
       setCycles(cycles.map(x => (x.id === id ? { ...x, status: "abierto", closed: false, signature: null, hrNote: note || "Revisa tu ciclo y vuelve a firmarlo." } : x)));
       setNotice("Devuelta al equipo con tu comentario. Conserva su avance.");
     },
-    createContractor: (data: Omit<Contractor, "id">) => {
+    createContractor: (data: Omit<Contractor, "id">, alsoSupervisor = false) => {
       const id = Math.max(0, ...contractors.map(c => c.id)) + 1;
+      if (alsoSupervisor) {
+        const [first, ...rest] = data.legalName.trim().split(/\s+/);
+        setSupervisors([...supervisors, { id: Math.max(0, ...supervisors.map(s => s.id)) + 1, firstName: first, lastName: rest.join(" "), position: data.position, contractorId: id }]);
+      }
       setContractors([...contractors, { ...data, id }]);
       setCycles([...cycles, {
         id: Math.max(0, ...cycles.map(c => c.id)) + 1, contractorId: id, year, month, days: [], summary: "", summaryApproved: false,
         bonus: null, closed: false, signature: null, status: "abierto", number: null,
       }]);
-      setNotice(`Contratista creado: ${data.legalName}. Su primera cuenta de cobro será la 0001.`);
+      setNotice(`Contratista creado: ${data.legalName}${alsoSupervisor ? " (también supervisor)" : ""}. Su primera cuenta de cobro será la 0001.`);
     },
     createSupervisor: (data: Omit<Supervisor, "id">) => {
       setSupervisors([...supervisors, { ...data, id: Math.max(0, ...supervisors.map(s => s.id)) + 1 }]);
-      setNotice(`Supervisor creado: ${data.firstName} ${data.lastName}.`);
+      setNotice(`Supervisor creado: ${data.firstName} ${data.lastName}${data.contractorId ? " (también cobra como contratista)" : ""}.`);
     },
   };
 }
