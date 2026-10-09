@@ -1,14 +1,14 @@
 import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor } from "./hrData";
-import { STATUS_LABEL, approvalsComplete, cycleTotals, formatMoney, monthInfo } from "./hrData";
+import { STATUS_LABEL, approvalsComplete, cycleTotals, formatMoney, cycleInfo } from "./hrData";
 import { Banner } from "./ui";
 import CycleReview from "./CycleReview";
 
 // A supervisor's people for the current cycle (also used by William for contractors without a supervisor).
 export default function TeamList({ store, team, who }: { store: HrStore; team: Contractor[]; who: string }) {
   const [openId, setOpenId] = useState<number | null>(null);
-  const info = monthInfo(store.year, store.month);
+  const info = cycleInfo(store.year, store.month);
   const open = openId !== null ? store.currentCycle(openId) : null;
 
   if (open) return <CycleReview store={store} c={store.contractor(open.contractorId)} cy={open} mode="supervisor" onBack={() => setOpenId(null)} />;
@@ -18,11 +18,14 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
 
   return (
     <div>
-      {store.closingDay && pending.length > 0 && (
-        <Banner tone="warn">⏰ Hoy cierra el ciclo de {info.name}. Tienes {pending.length} persona(s) sin enviar a William: {pending.map(r => r.c.legalName).join(", ")}. Aprueba lo pendiente y confirma el bono de cada una (aunque sea 0).</Banner>
+      {store.isUploadDay && pending.length > 0 && (
+        <Banner tone="warn">⏰ Hoy es el día de subir el ciclo de {info.name}. Tienes {pending.length} persona(s) sin enviar a William: {pending.map(r => r.c.legalName).join(", ")}. Aprueba lo pendiente y confirma el bono de cada una (aunque sea 0): William aprueba mañana, 25.</Banner>
       )}
-      {store.closingDay && pending.length === 0 && team.length > 0 && <Banner tone="ok">✓ Todo tu equipo ya está enviado a William.</Banner>}
-      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 0 }}>Ciclo actual: <strong>{info.name} {store.year}</strong> · {who}</p>
+      {store.isApprovalDay && pending.length > 0 && (
+        <Banner tone="bad">⚠ Hoy William aprueba y aún faltan: {pending.map(r => r.c.legalName).join(", ")}. Lo que no se envíe hoy se paga el mes siguiente.</Banner>
+      )}
+      {(store.isUploadDay || store.isApprovalDay) && pending.length === 0 && team.length > 0 && <Banner tone="ok">✓ Todo tu equipo ya está enviado a William.</Banner>}
+      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 0 }}>Ciclo actual: <strong>{info.name} {store.year}</strong> ({info.rangeEs}) · {who}</p>
       <div className="card" style={{ overflowX: "auto" }}>
         {team.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>No tienes personas a cargo todavía.</p> : (
           <table className="data-table">

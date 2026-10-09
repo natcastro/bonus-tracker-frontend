@@ -1,7 +1,7 @@
 // Prototype data + helpers for the HR contractor-invoice module. Everything here is FAKE and lives
 // only in memory — nothing is saved anywhere.
 
-export type Currency = "USD" | "COP" | "EUR" | "MXN";
+export type Currency = "USD" | "COP";
 export type PayType = "hourly" | "fixed";
 export type CycleStatus = "abierto" | "con_hr" | "aprobada";
 
@@ -10,8 +10,6 @@ export type CycleStatus = "abierto" | "con_hr" | "aprobada";
 export const CURRENCIES: Record<Currency, { label: string; symbol: string; unitWords: string; limit: number }> = {
   USD: { label: "USD (dólares)", symbol: "$", unitWords: "US dollars", limit: 10_000 },
   COP: { label: "COP (pesos colombianos)", symbol: "$", unitWords: "Colombian pesos", limit: 10_000_000 },
-  EUR: { label: "EUR (euros)", symbol: "€", unitWords: "euros", limit: 10_000 },
-  MXN: { label: "MXN (pesos mexicanos)", symbol: "$", unitWords: "Mexican pesos", limit: 200_000 },
 };
 
 export interface BankInfo {
@@ -58,19 +56,34 @@ export const BILL_TO = {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const two = (n: number) => String(n).padStart(2, "0");
 
-export function monthInfo(year: number, month: number) {
-  const last = new Date(year, month, 0).getDate(); // day 0 of next month = last day of this one
-  const name = MONTHS[month - 1];
+const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const addDaysIso = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+// A pay cycle runs from the 24th of the previous month to the 23rd; (year, month) is the month it ENDS in.
+// The 24th is the day to submit, the 25th the day William approves.
+export function cycleInfo(year: number, month: number) {
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
+  const name = MONTHS[month - 1];
   return {
-    lastDay: last, name,
-    closing: `${name} ${last}, ${year}`,
-    period: `From ${name} 01, ${year}, to ${name} ${two(last)}, ${year}`,
+    name,
+    startIso: `${prevYear}-${two(prevMonth)}-24`, endIso: `${year}-${two(month)}-23`,
+    uploadIso: `${year}-${two(month)}-24`, approveIso: `${year}-${two(month)}-25`,
+    closing: `${name} 23, ${year}`,
+    period: `From ${MONTHS[prevMonth - 1]} 24, ${prevYear}, to ${name} 23, ${year}`,
+    rangeEs: `24 de ${MONTHS_ES[prevMonth - 1]} al 23 de ${MONTHS_ES[month - 1]}`,
     dueDate: `${MONTHS[nextMonth - 1]} 5, ${nextYear}`,
-    submitBy: `${name === "December" ? "January" : MONTHS[nextMonth - 1]} 25`,
-    firstIso: `${year}-${two(month)}-01`, lastIso: `${year}-${two(month)}-${two(last)}`,
   };
+}
+
+// The cycle open right now: through the 25th it is the one ending this month (24th–25th = submit/approve
+// window); from the 26th on, the next one.
+export function currentCycleKey(now: Date) {
+  let year = now.getFullYear(), month = now.getMonth() + 1;
+  if (now.getDate() > 25) { month += 1; if (month > 12) { month = 1; year += 1; } }
+  return { year, month };
 }
 
 export const pad4 = (n: number) => String(n).padStart(4, "0");
@@ -127,9 +140,11 @@ export const STATUS_LABEL: Record<CycleStatus, string> = { abierto: "En curso", 
 
 export const overLimit = (amount: number, currency: Currency) => amount > CURRENCIES[currency].limit;
 
-export function daysOfMonth(year: number, month: number): string[] {
-  const last = new Date(year, month, 0).getDate();
-  return Array.from({ length: last }, (_, i) => `${year}-${two(month)}-${two(i + 1)}`);
+export function daysOfCycle(year: number, month: number): string[] {
+  const { startIso, endIso } = cycleInfo(year, month);
+  const out: string[] = [];
+  for (let d = startIso; d <= endIso; d = addDaysIso(d, 1)) out.push(d);
+  return out;
 }
 export const weekdayLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 export const isWeekend = (iso: string) => [0, 6].includes(new Date(`${iso}T12:00:00`).getDay());
@@ -159,7 +174,7 @@ export const nextCycleNumber = (cycles: Cycle[], contractorId: number) =>
   cycles.filter(x => x.contractorId === contractorId && x.status === "aprobada").reduce((m, x) => Math.max(m, x.number ?? 0), 0) + 1;
 
 export const cycleFileName = (c: Contractor, number: number | null, year: number, month: number) =>
-  `${c.legalName}- Invoice ${number ? pad4(number) : "(pendiente)"}-${monthInfo(year, month).name.toLowerCase()} ${year}.pdf`;
+  `${c.legalName}- Invoice ${number ? pad4(number) : "(pendiente)"}-${cycleInfo(year, month).name.toLowerCase()} ${year}.pdf`;
 
 // ── Fake data ───────────────────────────────────────────────────────────────
 const bank = (n: string): BankInfo => ({
@@ -187,16 +202,16 @@ const NOTES = ["Answered customer chats and tracked orders.", "Handled returns a
 
 function hourlyDays(year: number, month: number, upTo: string, approveUntil: number): DayEntry[] {
   const out: DayEntry[] = [];
-  daysOfMonth(year, month).filter(d => d < upTo && !isWeekend(d)).forEach((d, i) => {
+  daysOfCycle(year, month).filter(d => d < upTo && !isWeekend(d)).forEach((d, i) => {
     out.push({ date: d, hours: 4 + (i % 5), note: NOTES[i % NOTES.length], approved: i < approveUntil });
   });
   return out;
 }
 
 export function buildSeedCycles(now: Date, contractors: Contractor[]): Cycle[] {
-  const cy = now.getFullYear(), m = now.getMonth() + 1;
-  const prev = (back: number) => { const d = new Date(cy, m - 1 - back, 1); return { year: d.getFullYear(), month: d.getMonth() + 1 }; };
-  const todayIso = `${cy}-${two(m)}-${two(now.getDate())}`;
+  const cur = currentCycleKey(now);
+  const prev = (back: number) => { const d = new Date(cur.year, cur.month - 1 - back, 1); return { year: d.getFullYear(), month: d.getMonth() + 1 }; };
+  const todayIso = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
   const cycles: Cycle[] = [];
   let id = 1;
   const base = (c: Contractor, year: number, month: number): Cycle => ({
@@ -208,16 +223,16 @@ export function buildSeedCycles(now: Date, contractors: Contractor[]): Cycle[] {
   contractors.forEach(c => [2, 1].forEach((back, idx) => {
     const { year, month } = prev(back);
     const x = base(c, year, month);
-    const lastIso = monthInfo(year, month).lastIso;
-    x.status = "aprobada"; x.closed = true; x.signature = null; x.number = idx + 1; x.bonus = c.id === 2 ? 120 : 0;
-    if (c.payType === "hourly") x.days = hourlyDays(year, month, lastIso, 99); else { x.summary = "Monthly design work: social posts, banners and product images."; x.summaryApproved = true; }
+    x.status = "aprobada"; x.closed = true; x.number = idx + 1; x.bonus = c.id === 2 ? 120 : 0;
+    if (c.payType === "hourly") x.days = hourlyDays(year, month, "9999-12-31", 99);
+    else { x.summary = "Monthly design work: social posts, banners and product images."; x.summaryApproved = true; }
     cycles.push(x);
   }));
   // current cycles
   contractors.forEach(c => {
-    const x = base(c, cy, m);
-    if (c.id === 1) x.days = hourlyDays(cy, m, todayIso, 3);
-    if (c.id === 4) x.days = hourlyDays(cy, m, todayIso, 0);
+    const x = base(c, cur.year, cur.month);
+    if (c.id === 1) x.days = hourlyDays(cur.year, cur.month, todayIso, 3);
+    if (c.id === 4) x.days = hourlyDays(cur.year, cur.month, todayIso, 0);
     if (c.id === 2) x.summary = "Designed the October campaign banners and updated";
     cycles.push(x);
   });

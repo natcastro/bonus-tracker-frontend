@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { HrStore } from "./hrStore";
-import { cycleFileName, cycleTotals, formatMoney, monthInfo, pad4 } from "./hrData";
+import { cycleFileName, cycleTotals, formatMoney, cycleInfo, pad4 } from "./hrData";
 import InvoicePreview from "./InvoicePreview";
 
 // Every approved cycle, per person and month — what accounting works from.
@@ -37,7 +37,7 @@ export default function HistoryTable({ store }: { store: HrStore }) {
             <tbody>{rows.map(r => {
               const c = store.contractor(r.contractorId); const t = cycleTotals(c, r);
               return (
-                <tr key={r.id}><td><strong>{c.legalName}</strong></td><td>{monthInfo(r.year, r.month).name} {r.year}</td><td>{pad4(r.number ?? 0)}</td>
+                <tr key={r.id}><td><strong>{c.legalName}</strong></td><td>{cycleInfo(r.year, r.month).name} {r.year}</td><td>{pad4(r.number ?? 0)}</td>
                   <td>{formatMoney(t.base, c.currency)}</td><td>{formatMoney(t.bonus, c.currency)}</td><td><strong>{formatMoney(t.total, c.currency)}</strong></td>
                   <td><button className="btn btn-secondary btn-sm" onClick={() => setOpenId(r.id)}>Ver cuenta de cobro</button></td></tr>
               );

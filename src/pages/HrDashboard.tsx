@@ -54,10 +54,15 @@ export default function HrDashboard() {
 
       <main className="content-area">
         <Banner tone="warn">🧪 Página de prueba — todos los datos son falsos y no se guardan. Al recargar vuelve al inicio.</Banner>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.85rem", marginBottom: "1rem", cursor: "pointer" }}>
-          <input type="checkbox" checked={store.simClose} onChange={e => store.setSimClose(e.target.checked)} />
-          Simular que hoy es el <strong>día de cierre del ciclo</strong> (para ver los recordatorios y habilitar todos los días)
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+          <span>Fecha simulada:</span>
+          <select className="form-control" style={{ width: "auto" }} value={store.simDay} onChange={e => store.setSimDay(e.target.value as "real" | "upload" | "approve")}>
+            <option value="real">Hoy (real)</option>
+            <option value="upload">Día 24 — subir las cuentas de cobro</option>
+            <option value="approve">Día 25 — William aprueba</option>
+          </select>
+          <span style={{ color: "var(--text-muted)" }}>Ciclo actual: {store.info.rangeEs}. Sirve para ver los recordatorios y habilitar todos los días.</span>
+        </div>
         {store.notice && (
           <div style={{ background: "#dcfce7", color: "#166534", borderRadius: 8, padding: "0.6rem 1rem", fontSize: "0.85rem", marginBottom: "1rem", display: "flex", justifyContent: "space-between", gap: 10 }}>
             <span>{store.notice}</span><button onClick={() => store.setNotice("")} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>×</button>

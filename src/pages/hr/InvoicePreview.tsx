@@ -1,11 +1,11 @@
 import type { Contractor, Cycle } from "./hrData";
-import { BILL_TO, amountInWords, cycleDescription, cycleTotals, formatMoney, maskAccount, monthInfo, pad4 } from "./hrData";
+import { BILL_TO, amountInWords, cycleDescription, cycleTotals, formatMoney, maskAccount, cycleInfo, pad4 } from "./hrData";
 
 const label: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" };
 
 // On-screen version of HR's invoice template (the real version will be a PDF with the same layout).
 export default function InvoicePreview({ c, cycle, number }: { c: Contractor; cycle: Cycle; number: number | null }) {
-  const info = monthInfo(cycle.year, cycle.month);
+  const info = cycleInfo(cycle.year, cycle.month);
   const t = cycleTotals(c, cycle);
   const hourly = c.payType === "hourly";
   const rows = cycle.days.filter(r => Number(r.hours) > 0);
@@ -97,7 +97,7 @@ export default function InvoicePreview({ c, cycle, number }: { c: Contractor; cy
 
       {hourly && (
         <div style={{ marginTop: 24, borderTop: "2px dashed #cbd5e1", paddingTop: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Page 2 — Hours report ({info.name} {inv.year})</div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Page 2 — Hours report ({info.period})</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr style={{ background: "#f1f5f9" }}><th style={{ textAlign: "left", padding: "4px 8px" }}>Date</th><th style={{ padding: "4px 8px", width: 70 }}>Hours</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Task</th></tr></thead>
             <tbody>

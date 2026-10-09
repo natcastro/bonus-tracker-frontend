@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor, Cycle } from "./hrData";
 import {
-  CURRENCIES, STATUS_LABEL, amountInWords, cycleTotals, daysOfMonth, formatMoney, isWeekend, looksEnglish, maskAccount, monthInfo,
+  CURRENCIES, STATUS_LABEL, amountInWords, cycleTotals, daysOfCycle, formatMoney, isWeekend, looksEnglish, maskAccount, cycleInfo,
   overLimit, weekdayLabel, HR_HEAD,
 } from "./hrData";
 import { Banner, Stat, Tabs } from "./ui";
@@ -34,7 +34,7 @@ export default function EmployeeView({ store, c }: { store: HrStore; c: Contract
             <table className="data-table">
               <thead><tr><th>#</th><th>Mes</th><th>Total</th><th>Estado</th><th /></tr></thead>
               <tbody>{history.map(h => (
-                <tr key={h.id}><td>{String(h.number).padStart(4, "0")}</td><td>{monthInfo(h.year, h.month).name} {h.year}</td>
+                <tr key={h.id}><td>{String(h.number).padStart(4, "0")}</td><td>{cycleInfo(h.year, h.month).name} {h.year}</td>
                   <td>{formatMoney(cycleTotals(c, h).total, c.currency)}</td><td><span className="badge badge-success">{STATUS_LABEL[h.status]}</span></td>
                   <td><button className="btn btn-secondary btn-sm" onClick={() => setViewId(h.id)}>Ver cuenta de cobro</button></td></tr>
               ))}</tbody>
@@ -70,7 +70,7 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
   const cy = store.currentCycle(c.id) as Cycle;
   const [signature, setSignature] = useState<string | null>(cy.signature);
   const [showPreview, setShowPreview] = useState(false);
-  const info = monthInfo(cy.year, cy.month);
+  const info = cycleInfo(cy.year, cy.month);
   const t = cycleTotals(c, cy);
   const hourly = c.payType === "hourly";
   const locked = cy.closed || cy.status !== "abierto";
@@ -89,8 +89,9 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
   return (
     <div>
       {cy.hrNote && cy.status === "abierto" && !cy.closed && <Banner tone="warn">William devolvió tu ciclo: {cy.hrNote} Corrígelo y vuelve a firmar.</Banner>}
-      {store.closingDay && !locked && <Banner tone="warn">⏰ Hoy cierra tu ciclo de {info.name}. Completa tus {hourly ? "horas y notas" : "entregables"}, firma y ciérralo.</Banner>}
-      {!store.closingDay && !locked && <Banner tone="info">Tu ciclo de <strong>{info.name} {cy.year}</strong> va del 1 al {info.lastDay} de {info.name}. Cierra el {info.closing}.</Banner>}
+      {store.isUploadDay && !locked && <Banner tone="warn">⏰ Hoy {store.info.uploadIso.slice(8)} es el día de subir tu cuenta de cobro (ciclo del {info.rangeEs}). Completa tus {hourly ? "horas y notas" : "entregables"}, firma y ciérralo. Mañana William la aprueba.</Banner>}
+      {store.isApprovalDay && !locked && <Banner tone="bad">⚠ Hoy es el día en que William aprueba y tu ciclo sigue abierto. Ciérralo ya con tu firma; si no, se pagará el mes siguiente.</Banner>}
+      {!store.isUploadDay && !store.isApprovalDay && !locked && <Banner tone="info">Tu ciclo de <strong>{info.name} {cy.year}</strong> va del {info.rangeEs}. El 24 subes tu cuenta de cobro y el 25 William la aprueba.</Banner>}
       {cy.status === "con_hr" && <Banner tone="ok">✓ Tu ciclo ya pasó por tu supervisor y está con William para la aprobación final.</Banner>}
       {cy.status === "aprobada" && <Banner tone="ok">✓ Ciclo aprobado y registrado.</Banner>}
       {cy.closed && cy.status === "abierto" && <Banner tone="info">Firmaste tu ciclo. Falta que {store.supervisors.find(s => s.id === c.supervisorId)?.firstName ?? HR_HEAD} apruebe y confirme el bono.</Banner>}
@@ -110,7 +111,7 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
             <table className="data-table">
               <thead><tr><th>Día</th><th style={{ width: 90 }}>Horas</th><th>Qué hice (en inglés)</th><th /></tr></thead>
               <tbody>
-                {daysOfMonth(cy.year, cy.month).map(d => {
+                {daysOfCycle(cy.year, cy.month).map(d => {
                   const e = cy.days.find(x => x.date === d);
                   const future = d > store.todayIso;
                   const off = locked || future || !!e?.approved;

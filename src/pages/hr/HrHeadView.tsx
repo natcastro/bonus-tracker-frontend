@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { HrStore } from "./hrStore";
-import { HR_HEAD, STATUS_LABEL, cycleTotals, formatMoney, monthInfo } from "./hrData";
-import { Tabs } from "./ui";
+import { HR_HEAD, STATUS_LABEL, cycleTotals, formatMoney, cycleInfo } from "./hrData";
+import { Banner, Tabs } from "./ui";
 import CycleReview from "./CycleReview";
 import TeamList from "./TeamList";
 import HistoryTable from "./HistoryTable";
@@ -20,6 +20,8 @@ export default function HrHeadView({ store }: { store: HrStore }) {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Hola, {HR_HEAD}</h2>
+      {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
+      {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
       <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Contratistas y supervisores"], ["historial", "Historial"]]}
         value={tab} onChange={t => { setTab(t); setOpenId(null); }} />
 
@@ -34,7 +36,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
                 const c = store.contractor(cy.contractorId);
                 const sup = store.supervisors.find(s => s.id === c.supervisorId);
                 return (
-                  <tr key={cy.id}><td><strong>{c.legalName}</strong></td><td>{monthInfo(cy.year, cy.month).name} {cy.year}</td>
+                  <tr key={cy.id}><td><strong>{c.legalName}</strong></td><td>{cycleInfo(cy.year, cy.month).name} {cy.year}</td>
                     <td>{formatMoney(cycleTotals(c, cy).total, c.currency)}</td><td>{sup ? `${sup.firstName} ${sup.lastName}` : HR_HEAD}</td>
                     <td><button className="btn btn-primary btn-sm" onClick={() => setOpenId(cy.id)}>Revisar</button></td></tr>
                 );

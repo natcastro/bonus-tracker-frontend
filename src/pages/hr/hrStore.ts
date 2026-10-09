@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { Contractor, Cycle, Supervisor } from "./hrData";
-import { HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, daysOfMonth, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
+import { HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
 
 const two = (n: number) => String(n).padStart(2, "0");
+export type SimDay = "real" | "upload" | "approve";
 
 // In-memory state shared by every "view as" persona, so what one role does shows up for the next.
 export function useHrStore() {
@@ -10,13 +11,13 @@ export function useHrStore() {
   const [supervisors, setSupervisors] = useState<Supervisor[]>(SEED_SUPERVISORS);
   const [cycles, setCycles] = useState<Cycle[]>(() => buildSeedCycles(new Date(), SEED_CONTRACTORS));
   const [notice, setNotice] = useState("");
-  const [simClose, setSimClose] = useState(false);
+  const [simDay, setSimDay] = useState<SimDay>("real");
 
   const real = new Date();
-  const year = real.getFullYear(), month = real.getMonth() + 1;
-  const monthDays = daysOfMonth(year, month);
-  const lastIso = monthDays[monthDays.length - 1];
-  const todayIso = simClose ? lastIso : `${year}-${two(month)}-${two(real.getDate())}`;
+  const { year, month } = currentCycleKey(real);
+  const info = cycleInfo(year, month);
+  const realIso = `${real.getFullYear()}-${two(real.getMonth() + 1)}-${two(real.getDate())}`;
+  const todayIso = simDay === "upload" ? info.uploadIso : simDay === "approve" ? info.approveIso : realIso;
 
   const currentCycle = (contractorId: number) => cycles.find(c => c.contractorId === contractorId && c.year === year && c.month === month) ?? null;
   const contractor = (id: number) => contractors.find(c => c.id === id)!;
@@ -36,8 +37,8 @@ export function useHrStore() {
   };
 
   return {
-    contractors, supervisors, cycles, notice, setNotice, simClose, setSimClose,
-    year, month, todayIso, lastIso, closingDay: todayIso === lastIso,
+    contractors, supervisors, cycles, notice, setNotice, simDay, setSimDay,
+    year, month, info, todayIso, isUploadDay: todayIso === info.uploadIso, isApprovalDay: todayIso === info.approveIso,
     currentCycle, contractor,
 
     // employee

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor, Cycle } from "./hrData";
 import {
-  CURRENCIES, STATUS_LABEL, amountInWords, approvalsComplete, cycleFileName, cycleTotals, formatMoney, monthInfo, weekdayLabel,
+  CURRENCIES, STATUS_LABEL, amountInWords, approvalsComplete, cycleFileName, cycleTotals, formatMoney, cycleInfo, weekdayLabel,
 } from "./hrData";
 import { Banner, Stat } from "./ui";
 import InvoicePreview from "./InvoicePreview";
@@ -13,7 +13,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
   const [bonusErr, setBonusErr] = useState("");
   const [returnNote, setReturnNote] = useState("");
   const [showPreview, setShowPreview] = useState(false);
-  const info = monthInfo(cy.year, cy.month);
+  const info = cycleInfo(cy.year, cy.month);
   const t = cycleTotals(c, cy);
   const hourly = c.payType === "hourly";
   const canAct = mode === "supervisor" && cy.status === "abierto";
@@ -32,7 +32,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" }}>
         <div>
           <h3 style={{ margin: 0 }}>{c.legalName} <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: "0.9rem" }}>— {c.position}</span></h3>
-          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Ciclo {info.name} {cy.year} · {STATUS_LABEL[cy.status]}</div>
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Ciclo {info.name} {cy.year} ({info.rangeEs}) · {STATUS_LABEL[cy.status]}</div>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={() => setShowPreview(v => !v)}>{showPreview ? "Ocultar cuenta de cobro" : "Ver cuenta de cobro"}</button>
       </div>
