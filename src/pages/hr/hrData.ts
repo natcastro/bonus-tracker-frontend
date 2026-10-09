@@ -23,6 +23,7 @@ export interface Contractor {
   id: number;
   legalName: string; position: string; email: string; phone: string; address: string; country: string; taxId: string;
   payType: PayType; hourlyRate: number; baseAmount: number; currency: Currency;
+  bonusCap: number;            // most this person can earn in bonuses per cycle (0 = no bonuses)
   supervisorId: number | null; // null → William approves
   bank: BankInfo;
 }
@@ -189,13 +190,13 @@ export const SEED_SUPERVISORS: Supervisor[] = [
 
 export const SEED_CONTRACTORS: Contractor[] = [
   { id: 1, legalName: "Pepito Pérez", position: "Customer Service Agent", email: "pepito.prueba@example.com", phone: "+57 321 000 0001", address: "Cra 52A # 128C-32, Bogotá DC", country: "Colombia", taxId: "CC 12345678",
-    payType: "hourly", hourlyRate: 12, baseAmount: 0, currency: "USD", supervisorId: 1, bank: bank("Pepito Pérez") },
+    payType: "hourly", hourlyRate: 12, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: 1, bank: bank("Pepito Pérez") },
   { id: 2, legalName: "María Gómez", position: "Graphic Designer", email: "maria.prueba@example.com", phone: "+57 300 000 0002", address: "Calle 10 # 5-20, Medellín", country: "Colombia", taxId: "CC 87654321",
-    payType: "fixed", hourlyRate: 0, baseAmount: 1000, currency: "USD", supervisorId: 2, bank: bank("María Gómez") },
+    payType: "fixed", hourlyRate: 0, baseAmount: 1000, currency: "USD", bonusCap: 300, supervisorId: 2, bank: bank("María Gómez") },
   { id: 3, legalName: "Carlos Rodríguez", position: "Community Manager", email: "carlos.prueba@example.com", phone: "+57 310 000 0003", address: "Av. 6N # 20-15, Cali", country: "Colombia", taxId: "CC 11223344",
-    payType: "fixed", hourlyRate: 0, baseAmount: 4200000, currency: "COP", supervisorId: 1, bank: bank("Carlos Rodríguez") },
+    payType: "fixed", hourlyRate: 0, baseAmount: 4200000, currency: "COP", bonusCap: 1000000, supervisorId: 1, bank: bank("Carlos Rodríguez") },
   { id: 4, legalName: "Laura Martínez", position: "Support Agent", email: "laura.prueba@example.com", phone: "+1 305 000 0004", address: "123 Test St, Miami, FL", country: "USA", taxId: "SSN/EIN 00-0000000",
-    payType: "hourly", hourlyRate: 15, baseAmount: 0, currency: "USD", supervisorId: null, bank: bank("Laura Martínez") },
+    payType: "hourly", hourlyRate: 15, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: null, bank: bank("Laura Martínez") },
 ];
 
 const NOTES = ["Answered customer chats and tracked orders.", "Handled returns and follow-up emails.", "Updated the order spreadsheet and replied to tickets.", "Prepared the weekly report and helped the team."];

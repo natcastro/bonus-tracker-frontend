@@ -56,6 +56,7 @@ export default function EmployeeView({ store, c }: { store: HrStore; c: Contract
             <div><strong>Tax ID:</strong> {c.taxId}</div>
             <div><strong>Pago:</strong> {c.payType === "hourly" ? `Por horas — ${formatMoney(c.hourlyRate, c.currency)}/h` : `Monto base — ${formatMoney(c.baseAmount, c.currency)}`}</div>
             <div><strong>Moneda:</strong> {c.currency}</div>
+            <div><strong>Bono máximo por ciclo:</strong> {formatMoney(c.bonusCap, c.currency)}</div>
             <div><strong>Banco:</strong> {c.bank.bankName} ({c.bank.bankCountry})</div>
             <div><strong>Cuenta:</strong> {c.bank.accountType} {maskAccount(c.bank.accountNumber)}</div>
           </div>

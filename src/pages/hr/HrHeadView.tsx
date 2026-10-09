@@ -19,10 +19,16 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Hola, {HR_HEAD}</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" }}>
+        <h2 style={{ margin: 0 }}>Hola, {HR_HEAD}</h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nuevo contratista</button>
+          <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
+        </div>
+      </div>
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
-      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Contratistas y supervisores"], ["historial", "Historial"]]}
+      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
         value={tab} onChange={t => { setTab(t); setOpenId(null); }} />
 
       {tab === "revisar" && (open ? (
@@ -50,20 +56,17 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "personas" && (
         <div>
-          <div style={{ display: "flex", gap: 8, marginBottom: "1rem", flexWrap: "wrap" }}>
-            <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nuevo contratista</button>
-            <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
-          </div>
           <div className="card" style={{ overflowX: "auto" }}>
             <h4 style={{ marginTop: 0 }}>Contratistas</h4>
             <table className="data-table">
-              <thead><tr><th>Nombre</th><th>Cargo</th><th>Pago</th><th>Supervisor</th><th>Ciclo actual</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Cargo</th><th>Pago</th><th>Bono máx.</th><th>Supervisor</th><th>Ciclo actual</th></tr></thead>
               <tbody>{store.contractors.map(c => {
                 const sup = store.supervisors.find(s => s.id === c.supervisorId);
                 const cy = store.currentCycle(c.id);
                 return (
                   <tr key={c.id}><td><strong>{c.legalName}</strong><div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{c.email}</div></td><td>{c.position}</td>
                     <td>{c.payType === "hourly" ? `${formatMoney(c.hourlyRate, c.currency)}/h` : `Fijo ${formatMoney(c.baseAmount, c.currency)}`}</td>
+                    <td>{formatMoney(c.bonusCap, c.currency)}</td>
                     <td>{sup ? `${sup.firstName} ${sup.lastName}` : `${HR_HEAD} (sin supervisor)`}</td><td>{cy ? STATUS_LABEL[cy.status] : "—"}</td></tr>
                 );
               })}</tbody>

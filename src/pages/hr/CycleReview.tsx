@@ -41,7 +41,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
 
       <div className="summary-cards">
         <Stat label={hourly ? `Horas × ${formatMoney(c.hourlyRate, c.currency)}` : "Monto base"} value={formatMoney(t.base, c.currency)} sub={hourly ? `${t.hours} horas` : undefined} />
-        <Stat label="Bono" value={cy.bonus === null ? "Pendiente" : formatMoney(t.bonus, c.currency)} grey={cy.bonus === null} />
+        <Stat label="Bono" value={cy.bonus === null ? "Pendiente" : formatMoney(t.bonus, c.currency)} sub={`Máximo: ${formatMoney(c.bonusCap, c.currency)}`} grey={cy.bonus === null} />
         <Stat label="Total del ciclo" value={formatMoney(t.total, c.currency)} sub={t.total > 0 ? amountInWords(t.total, c.currency) : undefined} />
       </div>
 
@@ -101,7 +101,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
             <p style={{ fontSize: "0.8rem", margin: "0.5rem 0 0", color: "#334155" }}>= {amountInWords(Number(bonusText), c.currency)} — revisa que sea el monto correcto.</p>
           )}
           {bonusErr && <p className="error-msg">{bonusErr}</p>}
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>Límite por ciclo: {formatMoney(CURRENCIES[c.currency].limit, c.currency)}.</p>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>Máximo de bono de {c.legalName}: <strong>{formatMoney(c.bonusCap, c.currency)}</strong> por ciclo (lo define William). Límite total del ciclo: {formatMoney(CURRENCIES[c.currency].limit, c.currency)}.</p>
         </div>
       )}
 

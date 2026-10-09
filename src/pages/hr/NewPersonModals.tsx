@@ -4,7 +4,7 @@ import { CURRENCIES, HR_HEAD, amountInWords, formatMoney, overLimit } from "./hr
 
 const EMPTY: Omit<Contractor, "id"> = {
   legalName: "", position: "", email: "", phone: "", address: "", country: "Colombia", taxId: "",
-  payType: "hourly", hourlyRate: 0, baseAmount: 0, currency: "USD", supervisorId: null,
+  payType: "hourly", hourlyRate: 0, baseAmount: 0, currency: "USD", bonusCap: 0, supervisorId: null,
   bank: { bankName: "", bankCountry: "", swift: "", routing: "", holder: "", accountType: "Savings", accountNumber: "" },
 };
 
@@ -12,6 +12,7 @@ const EMPTY: Omit<Contractor, "id"> = {
 export function NewContractorModal({ supervisors, onSave, onClose }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">) => void; onClose: () => void }) {
   const [c, setC] = useState(EMPTY);
   const [err, setErr] = useState("");
+  const [capText, setCapText] = useState("");
   const set = (patch: Partial<Omit<Contractor, "id">>) => setC(prev => ({ ...prev, ...patch }));
   const setBank = (patch: Partial<Contractor["bank"]>) => setC(prev => ({ ...prev, bank: { ...prev.bank, ...patch } }));
   const cur = CURRENCIES[c.currency];
@@ -24,7 +25,10 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
     if (c.payType === "fixed" && overLimit(c.baseAmount, c.currency)) {
       setErr(`${formatMoney(c.baseAmount, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`); return;
     }
-    onSave({ ...c, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } });
+    const cap = Number(capText);
+    if (capText.trim() === "" || isNaN(cap) || cap < 0) { setErr("Escribe el máximo de bono por ciclo. Si esta persona no recibe bonos, escribe 0."); return; }
+    if (overLimit(cap, c.currency)) { setErr(`Un máximo de bono de ${formatMoney(cap, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`); return; }
+    onSave({ ...c, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } });
   };
 
   const field = (label: string, value: string, onChange: (v: string) => void, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -56,7 +60,7 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
           {field("País de residencia", c.country, v => set({ country: v }))}
         </div>
 
-        <h4 style={{ margin: "1rem 0 0.5rem" }}>¿Cómo se le paga?</h4>
+        <h4 style={{ margin: "1rem 0 0.5rem" }}>¿Cómo se le paga? <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>(datos fijos que salen en todas sus cuentas de cobro)</span></h4>
         <div className="form-row">
           <div className="form-group">
             <label>Tipo de pago</label>
@@ -83,6 +87,16 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
           </p>
         )}
         <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.5rem" }}>Límite mensual por persona en {c.currency}: {formatMoney(cur.limit, c.currency)} (incluye el bono).</p>
+        <div className="form-group" style={{ maxWidth: 320 }}>
+          <label>Máximo de bono por ciclo ({c.currency})</label>
+          <input className="form-control" type="number" min="0" step="0.01" value={capText} placeholder="0 si no recibe bonos" required
+            style={Number(capText) > 0 && overLimit(Number(capText), c.currency) ? { borderColor: "#dc2626" } : undefined} onChange={e => setCapText(e.target.value)} />
+        </div>
+        {Number(capText) > 0 && (
+          <p style={{ fontSize: "0.85rem", margin: "0 0 0.5rem", color: overLimit(Number(capText), c.currency) ? "#b91c1c" : "#334155" }}>
+            {formatMoney(Number(capText), c.currency)} = <strong>{amountInWords(Number(capText), c.currency)}</strong> — el supervisor no podrá dar un bono mayor.
+          </p>
+        )}
         <div className="form-group">
           <label>Supervisor</label>
           <select className="form-control" value={c.supervisorId ?? ""} onChange={e => set({ supervisorId: e.target.value ? Number(e.target.value) : null })}>

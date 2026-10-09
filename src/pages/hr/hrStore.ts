@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Contractor, Cycle, Supervisor } from "./hrData";
-import { HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
+import { formatMoney, HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
 
 const two = (n: number) => String(n).padStart(2, "0");
 export type SimDay = "real" | "upload" | "approve";
@@ -59,6 +59,7 @@ export function useHrStore() {
     setBonus: (id: number, amount: number): string | null => {
       const cy = cycles.find(x => x.id === id)!; const c = contractor(cy.contractorId);
       if (amount < 0) return "El bono no puede ser negativo.";
+      if (amount > c.bonusCap) return `Ese bono supera el máximo de bono de ${c.legalName} (${formatMoney(c.bonusCap, c.currency)} por ciclo).`;
       if (overLimit(amount, c.currency)) return "Ese bono supera el límite permitido. ¿Escribiste un cero de más?";
       if (overLimit(cycleTotals(c, { days: cy.days, bonus: amount }).total, c.currency)) return "Con ese bono el total del ciclo supera el límite permitido.";
       mutate(id, x => ({ ...x, bonus: amount }));
