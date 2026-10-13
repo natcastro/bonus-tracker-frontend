@@ -75,7 +75,8 @@ const TABS: [string, string][] = [
 
 export default function OperationsDashboard() {
   const navigate = useNavigate();
-  const { access, email } = useHubAccess();
+  const { access, email, hasTeam } = useHubAccess();
+  const canExport = hasTeam("OPS"); // the Excel is for the Operations team only
   const isAdmin = OPS_ADMIN_EMAILS.includes(email.trim().toLowerCase());
   const isHubAdmin = !!access?.isAdmin; // only for the approval-settings gear (Natalie)
   const { instance: msal, accounts } = useMsal();
@@ -402,6 +403,7 @@ export default function OperationsDashboard() {
   // ── Excel export of everything entered for the selected cycle
   const [exporting, setExporting] = useState(false);
   const downloadExcel = async () => {
+    if (!canExport) return;
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
@@ -444,7 +446,7 @@ export default function OperationsDashboard() {
           <select className="month-selector" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
             {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <button className="btn btn-secondary btn-sm" onClick={downloadExcel} disabled={exporting} title="Descarga todo lo registrado en el ciclo seleccionado">{exporting ? "Generando…" : "⬇ Descargar Excel"}</button>
+          {canExport && <button className="btn btn-secondary btn-sm" onClick={downloadExcel} disabled={exporting} title="Descarga todo lo registrado en el ciclo seleccionado">{exporting ? "Generando…" : "⬇ Descargar Excel"}</button>}
           {isHubAdmin && <button className="btn btn-secondary btn-sm" onClick={openApprovalSettings} title="Approval settings (admin only)">⚙ Approval settings</button>}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
         </div>
