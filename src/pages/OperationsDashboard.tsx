@@ -20,6 +20,7 @@ import {
   FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime, mergeTikTokEntries,
 } from "../services/opsBonus";
 import { useHubAccess } from "../auth/HubAccessContext";
+import { buildOpsWorkbook, opsExportFileName } from "../services/opsExport";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
 // Only company mailboxes may receive the HR breakdown (also enforced server-side).
@@ -398,6 +399,35 @@ export default function OperationsDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approvalToken, approvalSent, loadedFor, agentTotals.length, year, cycleId]);
 
+  // ── Excel export of everything entered for the selected cycle
+  const [exporting, setExporting] = useState(false);
+  const downloadExcel = async () => {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const cycleName = getCyclesForYear(Number(year)).find((c) => c.id === cycleId)?.name ?? `Cycle ${cycleId}`;
+      const earnedFor = (score: number, duration: number) => {
+        const earned = isFullTimeCycle ? calcTikTokBonusFullTime([{ score, duration }], cycleDays) : calcTikTokBonus([{ score, duration }], cycleDays);
+        return { earned, tier: duration > 0 ? (earned * cycleDays) / duration : 0 };
+      };
+      const wb = buildOpsWorkbook(XLSX, {
+        cycleName, year, agents, appeals, handlingTimes, tiktokScores: tiktokScores.map((t) => ({ ...t, auto: t.id < 0 })), amazonPerformance,
+        totals: agentTotals.map((t) => ({
+          agentName: t.agent.name, appeals: t.appealCapped, appealsCap: t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP,
+          handling: t.handling, amazon: t.amazonPerf, tiktok: t.tiktok, total: t.total, totalCap: t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP,
+        })),
+        appealBonus: OPS_APPEALS_BONUS, outcomeLabels: OUTCOME_LABELS,
+        appealTypeLabel: (t) => APPEAL_TYPES.find((x) => x.value === t)?.label ?? "TikTok Appeals",
+        handlingBonus: (agentId, hours) => (agentId === THOMAS_AGENT_ID && isFullTimeCycle ? calcHandlingTimeBonusFullTime(hours) : calcHandlingTimeBonus(hours)),
+        amazonBonus: (rating) => AMAZON_PERFORMANCE_BONUS[rating] ?? 0,
+        tiktokEarned: earnedFor,
+      });
+      XLSX.writeFile(wb, opsExportFileName(cycleName, year));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <nav className="top-nav">
@@ -414,6 +444,7 @@ export default function OperationsDashboard() {
           <select className="month-selector" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
             {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <button className="btn btn-secondary btn-sm" onClick={downloadExcel} disabled={exporting} title="Descarga todo lo registrado en el ciclo seleccionado">{exporting ? "Generando…" : "⬇ Descargar Excel"}</button>
           {isHubAdmin && <button className="btn btn-secondary btn-sm" onClick={openApprovalSettings} title="Approval settings (admin only)">⚙ Approval settings</button>}
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
         </div>
