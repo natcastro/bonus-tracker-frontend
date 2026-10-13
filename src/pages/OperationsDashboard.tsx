@@ -623,45 +623,53 @@ export default function OperationsDashboard() {
                   </div>
                 </div>
               </div>
-              {/* Agent filter pills */}
-              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-                <button
-                  onClick={() => setFilterAgentId(0)}
-                  style={{ padding: "0.3rem 0.85rem", borderRadius: 9999, fontSize: "0.8rem", fontWeight: filterAgentId === 0 ? 700 : 500, cursor: "pointer", border: `2px solid ${filterAgentId === 0 ? "#7c3aed" : "#e2e8f0"}`, background: filterAgentId === 0 ? "#7c3aed15" : "white", color: filterAgentId === 0 ? "#7c3aed" : "#64748b" }}
-                >
-                  Todos
-                </button>
-                {visibleAgents.map((ag) => (
-                  <button
-                    key={ag.id}
-                    onClick={() => setFilterAgentId(filterAgentId === ag.id ? 0 : ag.id)}
-                    style={{ padding: "0.3rem 0.85rem", borderRadius: 9999, fontSize: "0.8rem", fontWeight: filterAgentId === ag.id ? 700 : 500, cursor: "pointer", border: `2px solid ${filterAgentId === ag.id ? "#7c3aed" : "#e2e8f0"}`, background: filterAgentId === ag.id ? "#7c3aed15" : "white", color: filterAgentId === ag.id ? "#7c3aed" : "#64748b" }}
-                  >
-                    {ag.name}
+              {/* Filters: agent, type and outcome as one tidy panel of pills (each with its count) */}
+              {(() => {
+                const PURPLE = "#7c3aed";
+                const byAgent = appeals.filter((a) => filterAgentId === 0 || a.agentId === filterAgentId);
+                const typeOf = (a: OpsAppeal) => a.appealType ?? "tiktok";
+                const outcomeKey = (a: OpsAppeal) => (a.status === "completed" ? a.outcome : "none");
+                const OUTCOME_DOT: Record<string, string> = { fullRefund: "#16a34a", partialRefund: "#f59e0b", fee: "#3b82f6", lost: "#dc2626", none: "#94a3b8" };
+                const pill = (key: string, active: boolean, onClick: () => void, label: string, count: number, dot?: string) => (
+                  <button key={key} onClick={onClick} style={{
+                    display: "inline-flex", alignItems: "center", gap: 6, padding: "0.3rem 0.8rem", borderRadius: 9999, fontSize: "0.8rem", cursor: "pointer",
+                    fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? PURPLE : "#e2e8f0"}`, background: active ? `${PURPLE}14` : "#fff", color: active ? PURPLE : "#475569",
+                    transition: "all 0.15s",
+                  }}>
+                    {dot && <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />}
+                    {label}
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0 6px", borderRadius: 9999, background: active ? PURPLE : "#f1f5f9", color: active ? "#fff" : "#64748b" }}>{count}</span>
                   </button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "0.75rem" }}>
-                <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
-                  <label>Type</label>
-                  <select className="form-control" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                    <option value="">All types</option>
-                    {APPEAL_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
-                  <label>Outcome</label>
-                  <select className="form-control" value={filterOutcome} onChange={(e) => setFilterOutcome(e.target.value)}>
-                    <option value="">All outcomes</option>
-                    {Object.entries(OUTCOME_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                    <option value="none">No outcome yet (pending / in progress)</option>
-                  </select>
-                </div>
-                {(filterType || filterOutcome) && (
-                  <button className="btn btn-secondary btn-sm" onClick={() => { setFilterType(""); setFilterOutcome(""); }}>Clear filters</button>
-                )}
-                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", paddingBottom: 8 }}>Showing {listedAppeals.length} of {appeals.length} appeals</span>
-              </div>
+                );
+                const row = (title: string, children: React.ReactNode) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+                    <span style={{ width: 70, fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>{title}</span>
+                    {children}
+                  </div>
+                );
+                const filtersOn = !!filterType || !!filterOutcome || filterAgentId !== 0;
+                return (
+                  <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1rem" }}>
+                    {row("Agent", <>
+                      {pill("a0", filterAgentId === 0, () => setFilterAgentId(0), "All", appeals.length)}
+                      {visibleAgents.map((ag) => pill(`a${ag.id}`, filterAgentId === ag.id, () => setFilterAgentId(filterAgentId === ag.id ? 0 : ag.id), ag.name, appeals.filter((x) => x.agentId === ag.id).length))}
+                    </>)}
+                    {row("Type", <>
+                      {pill("t0", !filterType, () => setFilterType(""), "All", byAgent.length)}
+                      {APPEAL_TYPES.map((t) => pill(`t${t.value}`, filterType === t.value, () => setFilterType(filterType === t.value ? "" : t.value), t.label, byAgent.filter((x) => typeOf(x) === t.value).length))}
+                    </>)}
+                    {row("Outcome", <>
+                      {pill("o0", !filterOutcome, () => setFilterOutcome(""), "All", byAgent.length)}
+                      {Object.entries(OUTCOME_LABELS).map(([k, l]) => pill(`o${k}`, filterOutcome === k, () => setFilterOutcome(filterOutcome === k ? "" : k), l, byAgent.filter((x) => outcomeKey(x) === k).length, OUTCOME_DOT[k]))}
+                      {pill("onone", filterOutcome === "none", () => setFilterOutcome(filterOutcome === "none" ? "" : "none"), "No outcome yet", byAgent.filter((x) => outcomeKey(x) === "none").length, OUTCOME_DOT.none)}
+                    </>)}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}>
+                      <span>Showing <strong style={{ color: "#0f172a" }}>{listedAppeals.length}</strong> of {appeals.length} appeals</span>
+                      {filtersOn && <button onClick={() => { setFilterAgentId(0); setFilterType(""); setFilterOutcome(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 700, cursor: "pointer", fontSize: "0.8rem" }}>✕ Clear filters</button>}
+                    </div>
+                  </div>
+                );
+              })()}
               <table className="data-table">
                 <thead><tr><th>Agent</th><th>Date</th><th>Order No.</th><th>Type</th><th>Status</th><th>Outcome</th><th>Bonus</th><th>Actions</th></tr></thead>
                 <tbody>
