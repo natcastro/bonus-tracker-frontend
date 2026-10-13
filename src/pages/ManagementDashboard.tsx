@@ -1,3 +1,4 @@
+import { isAgentActiveFor, monthStartIso } from "../services/agentActivity";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent } from "../types";
@@ -68,7 +69,7 @@ export default function ManagementDashboard() {
       getMexGoal(Number(year), month + 1),
       getMexAgentGoals(Number(year), month + 1),
     ]);
-    setMexAgents(ma); setMexSales(mb); setMexAttendance(mc); setMexGoal(md); setMexAgentGoals(me);
+    setMexAgents(ma.filter((x) => isAgentActiveFor(x, monthStartIso(year, month + 1)))); setMexSales(mb); setMexAttendance(mc); setMexGoal(md); setMexAgentGoals(me);
   }, [year, month]);
 
   useEffect(() => {

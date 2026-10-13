@@ -57,7 +57,7 @@ export async function getAgents(team: string): Promise<Agent[]> {
     .eq("team", team.toUpperCase())
     .order("id");
   if (error) throw error;
-  return data as Agent[];
+  return (data ?? []).map((r: any) => ({ ...r, activeUntil: r.active_until ?? null })) as Agent[];
 }
 
 export async function updateAgentName(id: number, name: string): Promise<Agent> {

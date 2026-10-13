@@ -3,6 +3,9 @@ export interface Agent {
   name: string;
   team: string;
   timezone?: string;
+  // Last day (YYYY-MM-DD) this person still counts. Months that start after it no longer list them;
+  // earlier months keep their data. null/undefined = still active.
+  activeUntil?: string | null;
 }
 
 // USA types

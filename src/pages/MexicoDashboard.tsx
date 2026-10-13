@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { isAgentActiveFor, monthStartIso } from "../services/agentActivity";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Agent, MexAgentGoal, MexAttendance, MexAttendanceDay, MexLiveSale, MexMonthlyGoal, MexScheduleEvent } from "../types";
 import {
@@ -165,7 +166,9 @@ export default function MexicoDashboard() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(new Date().getMonth() + 1);
 
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  // People who left (active_until) stop appearing from the month after their last day; earlier months are untouched.
+  const agents = useMemo(() => allAgents.filter((a) => isAgentActiveFor(a, monthStartIso(year, month))), [allAgents, year, month]);
   const [attendance, setAttendance] = useState<MexAttendance[]>([]);
   const [attendanceDays, setAttendanceDays] = useState<MexAttendanceDay[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<MexScheduleEvent[]>([]);
@@ -194,7 +197,7 @@ export default function MexicoDashboard() {
       getMexSales(Number(year), month),
       getMexGoal(Number(year), month),
     ]);
-    setAgents(ag);
+    setAllAgents(ag);
     setAttendance(att);
     setSales(sa);
     setGoal(go);
@@ -445,9 +448,9 @@ export default function MexicoDashboard() {
   const [agentNames, setAgentNames] = useState<Record<number, string>>({});
   useEffect(() => {
     const names: Record<number, string> = {};
-    agents.forEach((a) => { names[a.id] = a.name; });
+    allAgents.forEach((a) => { names[a.id] = a.name; });
     setAgentNames(names);
-  }, [agents]);
+  }, [allAgents]);
 
   const saveAgentName = async (id: number) => {
     await updateAgentName(id, agentNames[id]);
@@ -837,7 +840,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                   title={isAdmin ? "Doble clic para eliminar" : undefined}
                                   style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                                 >
-                                  <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
+                                  <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{allAgents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                   <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
                                   {ev.note && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{ev.note}</div>}
                                   {isAdmin && <div style={{ color, fontSize: "0.58rem", opacity: 0.7, lineHeight: 1.2 }}>doble clic para borrar</div>}
@@ -1099,7 +1102,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
           <section>
             <header className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ margin: 0 }}>Ventas en Live</h2>
-              <button className="btn btn-primary btn-sm" onClick={() => exportVentasXLSX(sales, agents, MONTHS[month - 1], year)}>⬇ Exportar Excel (.xlsx)</button>
+              <button className="btn btn-primary btn-sm" onClick={() => exportVentasXLSX(sales, allAgents, MONTHS[month - 1], year)}>⬇ Exportar Excel (.xlsx)</button>
             </header>
 
             {/* Cola de aprobaciones (solo admin) */}
@@ -1120,7 +1123,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   <tbody>
                     {pendingSales.map((s) => (
                       <tr key={s.id}>
-                        <td style={{ fontWeight: 600 }}>{agents.find((a) => a.id === s.agentId)?.name ?? "—"}</td>
+                        <td style={{ fontWeight: 600 }}>{allAgents.find((a) => a.id === s.agentId)?.name ?? "—"}</td>
                         <td>{s.date}</td>
                         <td>MXN ${s.salesAmount.toLocaleString("es-MX")}</td>
                         <td style={{ textAlign: "center" }}>{s.quantity}</td>
@@ -1409,10 +1412,10 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
             </div>
             <div className="card">
               <h3>Nombres de Agentes</h3>
-              {agents.map((ag) => (
+              {allAgents.map((ag) => (
                 <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}>
-                    <label>Agente {ag.id}</label>
+                    <label>Agente {ag.id}{ag.activeUntil ? <span style={{ marginLeft: 8, fontSize: "0.72rem", fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 8px", borderRadius: 9999 }}>Baja — hasta {ag.activeUntil}</span> : null}</label>
                     <input type="text" className="form-control" value={agentNames[ag.id] ?? ""} onChange={(e) => setAgentNames({ ...agentNames, [ag.id]: e.target.value })} />
                   </div>
                   <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar</button>
