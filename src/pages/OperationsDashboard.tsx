@@ -171,6 +171,13 @@ export default function OperationsDashboard() {
 
   // ── Appeal filter
   const [filterAgentId, setFilterAgentId] = useState(0);
+  const [filterType, setFilterType] = useState("");       // "" = all types
+  const [filterOutcome, setFilterOutcome] = useState(""); // "" = all, "none" = not completed yet, else an outcome key
+  // The agent, type and outcome filters combine; the table and its "no results" row share this list.
+  const listedAppeals = appeals
+    .filter((a) => filterAgentId === 0 || a.agentId === filterAgentId)
+    .filter((a) => !filterType || (a.appealType ?? "tiktok") === filterType)
+    .filter((a) => !filterOutcome || (filterOutcome === "none" ? a.status !== "completed" : a.status === "completed" && a.outcome === filterOutcome));
 
   // ── Appeal form
   const [appealForm, setAppealForm] = useState({
@@ -634,11 +641,31 @@ export default function OperationsDashboard() {
                   </button>
                 ))}
               </div>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "0.75rem" }}>
+                <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+                  <label>Type</label>
+                  <select className="form-control" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                    <option value="">All types</option>
+                    {APPEAL_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+                  <label>Outcome</label>
+                  <select className="form-control" value={filterOutcome} onChange={(e) => setFilterOutcome(e.target.value)}>
+                    <option value="">All outcomes</option>
+                    {Object.entries(OUTCOME_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    <option value="none">No outcome yet (pending / in progress)</option>
+                  </select>
+                </div>
+                {(filterType || filterOutcome) && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setFilterType(""); setFilterOutcome(""); }}>Clear filters</button>
+                )}
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", paddingBottom: 8 }}>Showing {listedAppeals.length} of {appeals.length} appeals</span>
+              </div>
               <table className="data-table">
                 <thead><tr><th>Agent</th><th>Date</th><th>Order No.</th><th>Type</th><th>Status</th><th>Outcome</th><th>Bonus</th><th>Actions</th></tr></thead>
                 <tbody>
-                  {[...appeals]
-                    .filter((a) => filterAgentId === 0 || a.agentId === filterAgentId)
+                  {[...listedAppeals]
                     .sort((a, b) => b.date.localeCompare(a.date))
                     .map((a) => (
                       <tr key={a.id} style={a.invalidated ? { opacity: 0.6 } : undefined}>
@@ -677,8 +704,8 @@ export default function OperationsDashboard() {
                         </td>
                       </tr>
                     ))}
-                  {appeals.filter((a) => filterAgentId === 0 || a.agentId === filterAgentId).length === 0 && (
-                    <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>No appeals for this cycle</td></tr>
+                  {listedAppeals.length === 0 && (
+                    <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>{appeals.length === 0 ? "No appeals for this cycle" : "No appeals match these filters"}</td></tr>
                   )}
                 </tbody>
               </table>
