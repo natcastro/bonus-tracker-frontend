@@ -67,8 +67,21 @@ export default function EmployeeView({ store, c, embedded }: { store: HrStore; c
   );
 }
 
+// People paid through ADP don't send a cuenta de cobro — they just see how they are paid.
 function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
-  const cy = store.currentCycle(c.id) as Cycle;
+  const cy = store.currentCycle(c.id);
+  if (!cy) {
+    return (
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Tu pago</h3>
+        <p style={{ margin: 0 }}>{c.paymentMethod === "adp" ? "Tu pago se procesa por ADP" : "No tienes un ciclo de pago abierto"}, el día {c.payDay} de cada mes. No necesitas enviar cuenta de cobro.</p>
+      </div>
+    );
+  }
+  return <CycleEditor store={store} c={c} cy={cy} />;
+}
+
+function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycle }) {
   const [signature, setSignature] = useState<string | null>(cy.signature);
   const [showPreview, setShowPreview] = useState(false);
   const info = cycleInfo(cy.year, cy.month);
@@ -84,6 +97,12 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
   if (hourly && notesBad > 0) problems.push(`Faltan notas en ${notesBad} día(s) con horas.`);
   if (!hourly && cy.summary.trim().length < 15) problems.push("Describe lo que entregaste este mes (mínimo una frase).");
   if (text.trim() && !looksEnglish(text)) problems.push("Escribe las notas en inglés.");
+  if (hourly && c.weeklyHoursCap) {
+    const weeks = new Map<string, number>();
+    cy.days.forEach(d => { const dt = new Date(`${d.date}T12:00:00`); dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); const k = dt.toISOString().slice(0, 10); weeks.set(k, (weeks.get(k) ?? 0) + d.hours); });
+    const bad = [...weeks.entries()].filter(([, h]) => h > c.weeklyHoursCap!);
+    if (bad.length) problems.push(`Superas el máximo de ${c.weeklyHoursCap} horas por semana (semana del ${bad[0][0]}: ${bad[0][1]} h).`);
+  }
   if (!signature) problems.push("Dibuja tu firma.");
   if (over) problems.push("El total supera el límite permitido; avisa a William.");
 
@@ -99,8 +118,10 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
 
       <div className="summary-cards">
         <Stat label={hourly ? "Horas registradas" : "Monto base"} value={hourly ? `${t.hours} h` : formatMoney(t.base, c.currency)} sub={hourly ? `${formatMoney(c.hourlyRate, c.currency)} por hora` : undefined} />
-        <Stat label={hourly ? "Pago por horas" : "Pago base"} value={formatMoney(t.base, c.currency)} />
-        <Stat label="Bono" value={cy.bonus === null ? "—" : formatMoney(t.bonus, c.currency)} sub="Lo define tu supervisor" grey />
+        <Stat label={hourly ? "Pago por horas" : c.payType === "variable" ? "Base garantizada" : "Pago base"} value={formatMoney(hourly ? t.base : c.baseAmount, c.currency)} />
+        {c.payType === "variable"
+          ? <Stat label="Monto variable" value={cy.variableAmount === null ? "—" : formatMoney(t.variable, c.currency)} sub="Lo define tu supervisor" grey />
+          : <Stat label="Bono" value={cy.bonus === null ? "—" : formatMoney(t.bonus, c.currency)} sub={c.bonusCap > 0 ? `Lo define tu supervisor · máx. ${formatMoney(c.bonusCap, c.currency)}` : "Lo define tu supervisor"} grey />}
         <Stat label="Total hasta ahora" value={formatMoney(t.total, c.currency)} sub={t.total > 0 ? amountInWords(t.total, c.currency) : undefined} />
       </div>
       {over && <Banner tone="bad">El total supera el límite de {formatMoney(CURRENCIES[c.currency].limit, c.currency)}. Revisa tus horas o avisa a William.</Banner>}
@@ -133,7 +154,7 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
         ) : (
           <>
             <h4 style={{ marginTop: 0 }}>¿Qué entregaste este mes?</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Tu pago es fijo, así que no registras horas. Escribe en inglés una descripción general: la gerencia quiere ver lo que se hizo.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Tu pago no depende de horas, así que no las registras. Escribe en inglés una descripción general: la gerencia quiere ver lo que se hizo.</p>
             <textarea className="form-control" rows={5} disabled={locked || cy.summaryApproved} value={cy.summary} onChange={e => store.setSummary(cy.id, e.target.value)} placeholder="Ex: Designed the monthly campaign banners and updated product images." />
             {cy.summaryApproved && <span className="badge badge-success" style={{ marginTop: 8 }}>✓ Aprobado</span>}
           </>

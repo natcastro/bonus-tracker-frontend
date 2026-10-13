@@ -1,138 +1,179 @@
 import { useState } from "react";
-import type { Contractor, Currency, PayType, Supervisor } from "./hrData";
+import type { Contractor, Currency, PayType, PaymentMethod, Supervisor } from "./hrData";
 import { CURRENCIES, HR_HEAD, amountInWords, formatMoney, overLimit } from "./hrData";
 
+const COUNTRIES = ["Colombia", "USA", "Bolivia", "Argentina", "España", "México", "Otro"];
+
 const EMPTY: Omit<Contractor, "id"> = {
-  legalName: "", position: "", email: "", phone: "", address: "", country: "Colombia", taxId: "",
-  payType: "hourly", hourlyRate: 0, baseAmount: 0, currency: "USD", bonusCap: 0, supervisorId: null,
+  legalName: "", position: "", email: "", phone: "", address: "", country: "Colombia", region: "", taxId: "",
+  payType: "fixed", hourlyRate: 0, baseAmount: 0, currency: "USD", bonusCap: 0, supervisorId: null,
   bank: { bankName: "", bankCountry: "", swift: "", routing: "", holder: "", accountType: "Savings", accountNumber: "" },
+  paymentMethod: "wired", sendsInvoice: true, payDay: 30, monthlyCap: null, weeklyHoursCap: null, notes: "", issues: [],
 };
 
-// Only William can create people — the HR view is the only place these modals are opened from.
+const Q: React.CSSProperties = { fontWeight: 700, fontSize: "0.9rem", margin: "0.9rem 0 0.35rem" };
+const Choice = ({ options, value, onChange }: { options: [string, string][]; value: string; onChange: (v: string) => void }) => (
+  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    {options.map(([k, l]) => (
+      <button key={k} type="button" onClick={() => onChange(k)} style={{
+        fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "7px 14px", borderRadius: 999,
+        border: `1.5px solid ${value === k ? "#0f766e" : "#e2e8f0"}`, background: value === k ? "#0f766e14" : "#fff", color: value === k ? "#0f766e" : "#475569",
+      }}>{l}</button>
+    ))}
+  </div>
+);
+
+// Guided questionnaire — only William can create people, so the HR view is the only place this opens from.
 export function NewContractorModal({ supervisors, onSave, onClose }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">, alsoSupervisor: boolean) => void; onClose: () => void }) {
+  const [step, setStep] = useState(1);
   const [c, setC] = useState(EMPTY);
   const [err, setErr] = useState("");
-  const [capText, setCapText] = useState("");
   const [alsoSupervisor, setAlsoSupervisor] = useState(false);
+  const [receivesBonus, setReceivesBonus] = useState<"yes" | "no">("no");
+  const [capText, setCapText] = useState("");
+  const [otherCountry, setOtherCountry] = useState("");
   const set = (patch: Partial<Omit<Contractor, "id">>) => setC(prev => ({ ...prev, ...patch }));
   const setBank = (patch: Partial<Contractor["bank"]>) => setC(prev => ({ ...prev, bank: { ...prev.bank, ...patch } }));
   const cur = CURRENCIES[c.currency];
-  const amount = c.payType === "fixed" ? c.baseAmount : c.hourlyRate;
+  const usesBank = c.paymentMethod === "wired";
+  const bigBase = c.payType !== "hourly" && overLimit(c.baseAmount, c.currency);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!c.legalName.trim() || !c.email.trim() || !c.taxId.trim()) { setErr("Nombre legal, correo personal y Tax ID son obligatorios."); return; }
-    if (amount <= 0) { setErr(c.payType === "fixed" ? "Escribe el monto fijo." : "Escribe la tarifa por hora."); return; }
-    if (c.payType === "fixed" && overLimit(c.baseAmount, c.currency)) {
-      setErr(`${formatMoney(c.baseAmount, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`); return;
-    }
-    const cap = Number(capText);
-    if (capText.trim() === "" || isNaN(cap) || cap < 0) { setErr("Escribe el máximo de bono por ciclo. Si esta persona no recibe bonos, escribe 0."); return; }
-    if (overLimit(cap, c.currency)) { setErr(`Un máximo de bono de ${formatMoney(cap, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`); return; }
-    onSave({ ...c, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } }, alsoSupervisor);
-  };
-
+  const money = (label: string, value: number, onChange: (n: number) => void, hint?: string) => (
+    <div className="form-group" style={{ maxWidth: 340 }}>
+      <label>{label}</label>
+      <input className="form-control" type="number" min="0" step="0.01" value={value || ""} onChange={e => onChange(Number(e.target.value))}
+        style={overLimit(value, c.currency) ? { borderColor: "#dc2626" } : undefined} />
+      {value > 0 && <div style={{ fontSize: "0.82rem", marginTop: 4, color: overLimit(value, c.currency) ? "#b91c1c" : "#334155" }}>
+        {formatMoney(value, c.currency)} = <strong>{amountInWords(value, c.currency)}</strong>{overLimit(value, c.currency) && <> — supera el límite de {formatMoney(cur.limit, c.currency)}. ¿Un cero de más?</>}
+      </div>}
+      {hint && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{hint}</div>}
+    </div>
+  );
   const field = (label: string, value: string, onChange: (v: string) => void, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <div className="form-group" style={{ flex: "1 1 200px" }}>
+    <div className="form-group" style={{ flex: "1 1 220px" }}>
       <label>{label}</label>
       <input className="form-control" value={value} onChange={e => onChange(e.target.value)} {...props} />
     </div>
   );
-  const tooBig = c.payType === "fixed" && overLimit(c.baseAmount, c.currency);
+
+  const next = () => {
+    setErr("");
+    if (step === 1) {
+      if (!c.legalName.trim()) return setErr("Escribe el nombre legal.");
+      if (c.country === "Otro" && !otherCountry.trim()) return setErr("Escribe el país.");
+    }
+    if (step === 2) {
+      if (c.payType === "hourly" && c.hourlyRate <= 0) return setErr("Escribe la tarifa por hora.");
+      if (c.payType === "fixed" && c.baseAmount <= 0) return setErr("Escribe el monto fijo mensual.");
+      if (bigBase) return setErr(`${formatMoney(c.baseAmount, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`);
+      if (receivesBonus === "yes") {
+        const cap = Number(capText);
+        if (capText.trim() === "" || isNaN(cap) || cap <= 0) return setErr("Escribe el máximo de bono por ciclo.");
+        if (overLimit(cap, c.currency)) return setErr(`Ese máximo de bono supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Un cero de más?`);
+      }
+      if (c.monthlyCap !== null && c.monthlyCap > 0 && overLimit(c.monthlyCap, c.currency)) return setErr("El máximo mensual supera el límite permitido.");
+    }
+    setStep(step + 1);
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (c.sendsInvoice && (!c.email.trim() || !c.taxId.trim())) { setErr("Para quien envía cuenta de cobro, el correo personal y el Tax ID son obligatorios."); return; }
+    const cap = receivesBonus === "yes" && c.payType !== "variable" ? Number(capText) : 0;
+    const country = c.country === "Otro" ? otherCountry.trim() : c.country;
+    onSave({ ...c, country, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } }, alsoSupervisor);
+  };
 
   return (
     <div className="modal-overlay active" style={{ overflowY: "auto" }}>
       <form className="modal" onSubmit={submit} style={{ maxWidth: 720, width: "94vw", maxHeight: "92vh", overflowY: "auto" }}>
-        <div className="modal-header"><h3>Nuevo contratista</h3></div>
-        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Solo {HR_HEAD} puede crear cuentas. Prueba: usa datos inventados; nada se guarda.</p>
+        <div className="modal-header"><h3>Nueva persona — paso {step} de 3</h3></div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          {[1, 2, 3].map(n => <div key={n} style={{ flex: 1, height: 4, borderRadius: 999, background: n <= step ? "#0f766e" : "#e2e8f0" }} />)}
+        </div>
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>Solo {HR_HEAD} puede crear cuentas. {step === 1 ? "¿Quién es y dónde está?" : step === 2 ? "¿Cómo se le paga?" : "Datos fijos que salen en su cuenta de cobro."}</p>
 
-        <h4 style={{ margin: "0.5rem 0" }}>Datos personales</h4>
-        <div className="form-row">
-          {field("Nombre legal", c.legalName, v => set({ legalName: v }), { required: true })}
-          {field("Cargo", c.position, v => set({ position: v }))}
-        </div>
-        <div className="form-row">
-          {field("Correo personal", c.email, v => set({ email: v }), { type: "email", required: true })}
-          {field("Tax ID / EIN / Foreign tax", c.taxId, v => set({ taxId: v }), { required: true, placeholder: "CC 12345678" })}
-        </div>
-        <div className="form-row">
-          {field("Teléfono", c.phone, v => set({ phone: v }))}
-          {field("Dirección", c.address, v => set({ address: v }))}
-          {field("País de residencia", c.country, v => set({ country: v }))}
-        </div>
-
-        <h4 style={{ margin: "1rem 0 0.5rem" }}>¿Cómo se le paga? <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>(datos fijos que salen en todas sus cuentas de cobro)</span></h4>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tipo de pago</label>
-            <select className="form-control" value={c.payType} onChange={e => set({ payType: e.target.value as PayType })}>
-              <option value="hourly">Por hora</option><option value="fixed">Monto fijo mensual</option>
-            </select>
+        {step === 1 && (<>
+          <div className="form-row">
+            {field("Nombre legal", c.legalName, v => set({ legalName: v }), { required: true, autoFocus: true })}
+            {field("Área o departamento", c.position, v => set({ position: v }), { placeholder: "Ej. TikTok - Moderadora" })}
           </div>
-          <div className="form-group">
-            <label>Moneda</label>
-            <select className="form-control" value={c.currency} onChange={e => set({ currency: e.target.value as Currency })}>
-              {(Object.keys(CURRENCIES) as Currency[]).map(k => <option key={k} value={k}>{CURRENCIES[k].label}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ flex: "1 1 220px" }}>
-            <label>{c.payType === "hourly" ? `Tarifa por hora (${c.currency})` : `Monto fijo mensual (${c.currency})`}</label>
-            <input className="form-control" type="number" min="0" step="0.01" value={amount || ""} style={tooBig ? { borderColor: "#dc2626" } : undefined}
-              onChange={e => set(c.payType === "hourly" ? { hourlyRate: Number(e.target.value) } : { baseAmount: Number(e.target.value) })} />
-          </div>
-        </div>
-        {amount > 0 && (
-          <p style={{ fontSize: "0.85rem", margin: "0 0 0.5rem", color: tooBig ? "#b91c1c" : "#334155" }}>
-            {formatMoney(amount, c.currency)} = <strong>{amountInWords(amount, c.currency)}</strong>{c.payType === "hourly" ? " por hora" : ""}
-            {tooBig && <> — supera el límite de {formatMoney(cur.limit, c.currency)}. ¿Un cero de más?</>}
-          </p>
-        )}
-        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.5rem" }}>Límite mensual por persona en {c.currency}: {formatMoney(cur.limit, c.currency)} (incluye el bono).</p>
-        <div className="form-group" style={{ maxWidth: 320 }}>
-          <label>Máximo de bono por ciclo ({c.currency})</label>
-          <input className="form-control" type="number" min="0" step="0.01" value={capText} placeholder="0 si no recibe bonos" required
-            style={Number(capText) > 0 && overLimit(Number(capText), c.currency) ? { borderColor: "#dc2626" } : undefined} onChange={e => setCapText(e.target.value)} />
-        </div>
-        {Number(capText) > 0 && (
-          <p style={{ fontSize: "0.85rem", margin: "0 0 0.5rem", color: overLimit(Number(capText), c.currency) ? "#b91c1c" : "#334155" }}>
-            {formatMoney(Number(capText), c.currency)} = <strong>{amountInWords(Number(capText), c.currency)}</strong> — el supervisor no podrá dar un bono mayor.
-          </p>
-        )}
-        <div className="form-group">
-          <label>Supervisor</label>
-          <select className="form-control" value={c.supervisorId ?? ""} onChange={e => set({ supervisorId: e.target.value ? Number(e.target.value) : null })}>
+          <div style={Q}>¿Dónde está ubicado?</div>
+          <Choice options={COUNTRIES.map(x => [x, x] as [string, string])} value={c.country} onChange={v => set({ country: v })} />
+          {c.country === "USA" && <div className="form-group" style={{ maxWidth: 280, marginTop: 8 }}><label>Estado o ciudad</label><input className="form-control" value={c.region} placeholder="TX, CA, Miami…" onChange={e => set({ region: e.target.value })} /></div>}
+          {c.country === "Otro" && <div className="form-group" style={{ maxWidth: 280, marginTop: 8 }}><label>País</label><input className="form-control" value={otherCountry} onChange={e => setOtherCountry(e.target.value)} /></div>}
+          <div style={Q}>¿Quién es su supervisor?</div>
+          <select className="form-control" style={{ maxWidth: 380 }} value={c.supervisorId ?? ""} onChange={e => set({ supervisorId: e.target.value ? Number(e.target.value) : null })}>
             <option value="">Sin supervisor (aprueba {HR_HEAD})</option>
-            {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} — {s.position}</option>)}
+            {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
           </select>
-        </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", margin: "0.9rem 0 0", cursor: "pointer" }}>
+            <input type="checkbox" checked={alsoSupervisor} onChange={e => setAlsoSupervisor(e.target.checked)} />
+            <span><strong>También es supervisor</strong> — aprueba los pagos de otras personas y además llena el suyo</span>
+          </label>
+        </>)}
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", margin: "0.5rem 0", cursor: "pointer" }}>
-          <input type="checkbox" checked={alsoSupervisor} onChange={e => setAlsoSupervisor(e.target.checked)} />
-          <span><strong>También es supervisor</strong> — aprueba los pagos de otras personas y además llena el suyo</span>
-        </label>
-
-        <h4 style={{ margin: "1rem 0 0.5rem" }}>Información de pago <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>(en la versión real se guarda cifrada)</span></h4>
-        <div className="form-row">
-          {field("Banco", c.bank.bankName, v => setBank({ bankName: v }))}
-          {field("País del banco", c.bank.bankCountry, v => setBank({ bankCountry: v }))}
-        </div>
-        <div className="form-row">
-          {field("SWIFT / BIC", c.bank.swift, v => setBank({ swift: v }))}
-          {field("Routing number", c.bank.routing, v => setBank({ routing: v }))}
-        </div>
-        <div className="form-row">
-          {field("Titular de la cuenta", c.bank.holder, v => setBank({ holder: v }), { placeholder: c.legalName || "Igual al nombre legal" })}
-          <div className="form-group" style={{ flex: "1 1 200px" }}>
-            <label>Tipo de cuenta</label>
-            <select className="form-control" value={c.bank.accountType} onChange={e => setBank({ accountType: e.target.value })}><option>Savings</option><option>Checking</option></select>
+        {step === 2 && (<>
+          <div style={Q}>¿Cómo se le paga?</div>
+          <Choice options={[["wired", "Contratista — transferencia internacional"], ["adp", "ADP (nómina local EE. UU.)"]]} value={c.paymentMethod}
+            onChange={v => set({ paymentMethod: v as PaymentMethod, sendsInvoice: v === "wired" })} />
+          {c.paymentMethod === "adp" && (<>
+            <div style={Q}>¿Esta persona envía cuenta de cobro cada mes?</div>
+            <Choice options={[["no", "No — se paga por ADP"], ["yes", "Sí, también envía cuenta de cobro"]]} value={c.sendsInvoice ? "yes" : "no"} onChange={v => set({ sendsInvoice: v === "yes" })} />
+          </>)}
+          <div style={Q}>Moneda</div>
+          <Choice options={(Object.keys(CURRENCIES) as Currency[]).map(k => [k, CURRENCIES[k].label] as [string, string])} value={c.currency} onChange={v => set({ currency: v as Currency })} />
+          <div style={Q}>¿Cómo se calcula su pago?</div>
+          <Choice options={[["fixed", "Monto fijo mensual"], ["hourly", "Por horas"], ["variable", "Variable (comisiones / monto del mes)"]]} value={c.payType} onChange={v => set({ payType: v as PayType })} />
+          <div style={{ marginTop: 10 }}>
+            {c.payType === "fixed" && money(`Monto fijo mensual (${c.currency})`, c.baseAmount, n => set({ baseAmount: n }))}
+            {c.payType === "hourly" && (<>
+              {money(`Tarifa por hora (${c.currency})`, c.hourlyRate, n => set({ hourlyRate: n }))}
+              <div className="form-group" style={{ maxWidth: 340 }}><label>Máximo de horas por semana (opcional)</label>
+                <input className="form-control" type="number" min="0" value={c.weeklyHoursCap ?? ""} onChange={e => set({ weeklyHoursCap: e.target.value ? Number(e.target.value) : null })} /></div>
+            </>)}
+            {c.payType === "variable" && money(`Base garantizada al mes (${c.currency}) — puede ser 0`, c.baseAmount, n => set({ baseAmount: n }), "Cada mes el supervisor suma el monto variable (comisiones, fletes…).")}
           </div>
-          {field("Número de cuenta", c.bank.accountNumber, v => setBank({ accountNumber: v }))}
-        </div>
+          {c.payType !== "variable" && (<>
+            <div style={Q}>¿Recibe bonos?</div>
+            <Choice options={[["no", "No"], ["yes", "Sí"]]} value={receivesBonus} onChange={v => setReceivesBonus(v as "yes" | "no")} />
+            {receivesBonus === "yes" && <div style={{ marginTop: 8 }}>{money(`Máximo de bono por ciclo (${c.currency})`, Number(capText) || 0, n => setCapText(String(n || "")), "El supervisor no podrá dar un bono mayor.")}</div>}
+          </>)}
+          <div className="form-row" style={{ marginTop: 10 }}>
+            <div className="form-group"><label>Máximo total al mes (opcional)</label>
+              <input className="form-control" type="number" min="0" value={c.monthlyCap ?? ""} placeholder="Ej. 740" onChange={e => set({ monthlyCap: e.target.value ? Number(e.target.value) : null })} /></div>
+            <div className="form-group"><label>Día de pago</label>
+              <input className="form-control" type="number" min="1" max="31" value={c.payDay} onChange={e => set({ payDay: Number(e.target.value) || 30 })} /></div>
+          </div>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: 0 }}>Límite del sistema por persona al mes en {c.currency}: {formatMoney(cur.limit, c.currency)}.</p>
+        </>)}
+
+        {step === 3 && (<>
+          <div className="form-row">
+            {field("Correo personal", c.email, v => set({ email: v }), { type: "email" })}
+            {field("Tax ID / EIN / Foreign tax", c.taxId, v => set({ taxId: v }), { placeholder: "CC 12345678" })}
+          </div>
+          <div className="form-row">
+            {field("Teléfono", c.phone, v => set({ phone: v }))}
+            {field("Dirección", c.address, v => set({ address: v }))}
+          </div>
+          {usesBank ? (<>
+            <h4 style={{ margin: "1rem 0 0.5rem" }}>Información de pago <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>(en la versión real se guarda cifrada)</span></h4>
+            <div className="form-row">{field("Banco", c.bank.bankName, v => setBank({ bankName: v }))}{field("País del banco", c.bank.bankCountry, v => setBank({ bankCountry: v }))}</div>
+            <div className="form-row">{field("SWIFT / BIC", c.bank.swift, v => setBank({ swift: v }))}{field("Routing number", c.bank.routing, v => setBank({ routing: v }))}</div>
+            <div className="form-row">
+              {field("Titular de la cuenta", c.bank.holder, v => setBank({ holder: v }), { placeholder: c.legalName || "Igual al nombre legal" })}
+              <div className="form-group" style={{ flex: "1 1 200px" }}><label>Tipo de cuenta</label>
+                <select className="form-control" value={c.bank.accountType} onChange={e => setBank({ accountType: e.target.value })}><option>Savings</option><option>Checking</option></select></div>
+              {field("Número de cuenta", c.bank.accountNumber, v => setBank({ accountNumber: v }))}
+            </div>
+          </>) : <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Esta persona cobra por ADP: no se piden datos bancarios aquí.</p>}
+        </>)}
 
         {err && <p className="error-msg">{err}</p>}
         <div className="modal-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn btn-primary">Crear contratista</button>
+          <button type="button" className="btn btn-secondary" onClick={step === 1 ? onClose : () => { setErr(""); setStep(step - 1); }}>{step === 1 ? "Cancelar" : "← Atrás"}</button>
+          {step < 3 ? <button type="button" className="btn btn-primary" onClick={next}>Siguiente →</button> : <button type="submit" className="btn btn-primary">Crear persona</button>}
         </div>
       </form>
     </div>

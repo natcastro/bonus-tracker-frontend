@@ -13,7 +13,8 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
 
   if (open) return <CycleReview store={store} c={store.contractor(open.contractorId)} cy={open} mode="supervisor" onBack={() => setOpenId(null)} />;
 
-  const rows = team.map(c => ({ c, cy: store.currentCycle(c.id)! }));
+  const noInvoice = team.filter(c => !store.currentCycle(c.id));
+  const rows = team.map(c => ({ c, cy: store.currentCycle(c.id)! })).filter(r => r.cy);
   const pending = rows.filter(r => r.cy.status === "abierto");
 
   return (
@@ -27,9 +28,9 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
       {(store.isUploadDay || store.isApprovalDay) && pending.length === 0 && team.length > 0 && <Banner tone="ok">✓ Todo tu equipo ya está enviado a William.</Banner>}
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 0 }}>Ciclo actual: <strong>{info.name} {store.year}</strong> ({info.rangeEs}) · {who}</p>
       <div className="card" style={{ overflowX: "auto" }}>
-        {team.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>No tienes personas a cargo todavía.</p> : (
+        {rows.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>No tienes personas a cargo todavía.</p> : (
           <table className="data-table">
-            <thead><tr><th>Persona</th><th>Pago</th><th>Pendiente por aprobar</th><th>Bono</th><th>Total</th><th>Estado</th><th /></tr></thead>
+            <thead><tr><th>Persona</th><th>Pago</th><th>Pendiente por aprobar</th><th>Bono / monto variable</th><th>Total</th><th>Estado</th><th /></tr></thead>
             <tbody>
               {rows.map(({ c, cy }) => {
                 const pendDays = c.payType === "hourly" ? cy.days.filter(d => d.hours > 0 && !d.approved).length : (cy.summaryApproved ? 0 : cy.summary.trim() ? 1 : 0);
@@ -38,7 +39,7 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
                     <td><strong>{c.legalName}</strong><div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{c.position}</div></td>
                     <td>{c.payType === "hourly" ? "Por horas" : "Fijo"} · {c.currency}</td>
                     <td>{approvalsComplete(c, cy) ? <span className="badge badge-success">Al día</span> : pendDays > 0 ? <span className="badge badge-warning">{pendDays} {c.payType === "hourly" ? "día(s)" : "entregable"}</span> : <span style={{ color: "var(--text-muted)" }}>Sin registros</span>}</td>
-                    <td>{cy.bonus === null ? <span className="badge badge-warning">Pendiente</span> : formatMoney(cy.bonus, c.currency)}</td>
+                    <td>{(c.payType === "variable" ? cy.variableAmount : cy.bonus) === null ? <span className="badge badge-warning">Pendiente</span> : formatMoney((c.payType === "variable" ? cy.variableAmount : cy.bonus) as number, c.currency)}</td>
                     <td>{formatMoney(cycleTotals(c, cy).total, c.currency)}</td>
                     <td>{STATUS_LABEL[cy.status]}{cy.status === "abierto" && cy.closed ? " · firmado" : ""}</td>
                     <td><button className="btn btn-primary btn-sm" onClick={() => setOpenId(c.id)}>Revisar</button></td>
@@ -49,6 +50,9 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
           </table>
         )}
       </div>
+      {noInvoice.length > 0 && (
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No envían cuenta de cobro (se pagan por ADP): {noInvoice.map(c => c.legalName).join(", ")}.</p>
+      )}
     </div>
   );
 }

@@ -9,7 +9,8 @@ import InvoicePreview from "./InvoicePreview";
 
 // What a supervisor (day-by-day approvals + bonus) or William (final review) sees for one contractor's cycle.
 export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrStore; c: Contractor; cy: Cycle; mode: "supervisor" | "hr"; onBack: () => void }) {
-  const [bonusText, setBonusText] = useState(cy.bonus === null ? "" : String(cy.bonus));
+  const variable = c.payType === "variable";
+  const [bonusText, setBonusText] = useState((variable ? cy.variableAmount : cy.bonus) === null ? "" : String(variable ? cy.variableAmount : cy.bonus));
   const [bonusErr, setBonusErr] = useState("");
   const [returnNote, setReturnNote] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -21,8 +22,8 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
 
   const saveBonus = () => {
     const n = Number(bonusText);
-    if (bonusText.trim() === "" || isNaN(n)) { setBonusErr("Escribe el bono (si no hay, escribe 0)."); return; }
-    const err = store.setBonus(cy.id, n);
+    if (bonusText.trim() === "" || isNaN(n)) { setBonusErr(variable ? "Escribe el monto del mes (si no hubo, escribe 0)." : "Escribe el bono (si no hay, escribe 0)."); return; }
+    const err = variable ? store.setVariable(cy.id, n) : store.setBonus(cy.id, n);
     setBonusErr(err ?? "");
   };
 
@@ -40,8 +41,10 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
       {cy.hrNote && cy.status === "abierto" && <Banner tone="warn">Devuelta por William: {cy.hrNote}</Banner>}
 
       <div className="summary-cards">
-        <Stat label={hourly ? `Horas × ${formatMoney(c.hourlyRate, c.currency)}` : "Monto base"} value={formatMoney(t.base, c.currency)} sub={hourly ? `${t.hours} horas` : undefined} />
-        <Stat label="Bono" value={cy.bonus === null ? "Pendiente" : formatMoney(t.bonus, c.currency)} sub={`Máximo: ${formatMoney(c.bonusCap, c.currency)}`} grey={cy.bonus === null} />
+        <Stat label={hourly ? `Horas × ${formatMoney(c.hourlyRate, c.currency)}` : variable ? "Base garantizada" : "Monto base"} value={formatMoney(hourly ? t.base : c.baseAmount, c.currency)} sub={hourly ? `${t.hours} horas` : undefined} />
+        {variable
+          ? <Stat label="Monto variable" value={cy.variableAmount === null ? "Pendiente" : formatMoney(t.variable, c.currency)} sub={c.monthlyCap ? `Máx. del mes: ${formatMoney(c.monthlyCap, c.currency)}` : undefined} grey={cy.variableAmount === null} />
+          : <Stat label="Bono" value={cy.bonus === null ? "Pendiente" : formatMoney(t.bonus, c.currency)} sub={`Máximo: ${formatMoney(c.bonusCap, c.currency)}`} grey={cy.bonus === null} />}
         <Stat label="Total del ciclo" value={formatMoney(t.total, c.currency)} sub={t.total > 0 ? amountInWords(t.total, c.currency) : undefined} />
       </div>
 
@@ -88,20 +91,24 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
 
       {mode === "supervisor" && (
         <div className="card">
-          <h4 style={{ marginTop: 0 }}>Bono del ciclo</h4>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Solo tú lo defines. Si no hubo bono, escribe <strong>0</strong>: el ciclo no avanza hasta que lo confirmes.</p>
+          <h4 style={{ marginTop: 0 }}>{variable ? "Monto variable del mes" : "Bono del ciclo"}</h4>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Solo tú lo defines. Si {variable ? "no hubo monto variable" : "no hubo bono"}, escribe <strong>0</strong>: el ciclo no avanza hasta que lo confirmes.{variable && c.notes ? <> Nota de HR: <em>{c.notes}</em></> : null}</p>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Bono ({c.currency})</label>
+              <label>{variable ? "Monto variable" : "Bono"} ({c.currency})</label>
               <input className="form-control" type="number" min="0" step="0.01" value={bonusText} disabled={!canAct} onChange={e => { setBonusText(e.target.value); setBonusErr(""); }} />
             </div>
-            <button className="btn btn-primary" disabled={!canAct} onClick={saveBonus}>Guardar bono</button>
+            <button className="btn btn-primary" disabled={!canAct} onClick={saveBonus}>{variable ? "Guardar monto" : "Guardar bono"}</button>
           </div>
           {bonusText.trim() !== "" && !isNaN(Number(bonusText)) && Number(bonusText) > 0 && (
             <p style={{ fontSize: "0.8rem", margin: "0.5rem 0 0", color: "#334155" }}>= {amountInWords(Number(bonusText), c.currency)} — revisa que sea el monto correcto.</p>
           )}
           {bonusErr && <p className="error-msg">{bonusErr}</p>}
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>Máximo de bono de {c.legalName}: <strong>{formatMoney(c.bonusCap, c.currency)}</strong> por ciclo (lo define William). Límite total del ciclo: {formatMoney(CURRENCIES[c.currency].limit, c.currency)}.</p>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>
+            {!variable && <>Máximo de bono de {c.legalName}: <strong>{formatMoney(c.bonusCap, c.currency)}</strong> por ciclo (lo define William). </>}
+            {c.monthlyCap ? <>Máximo total al mes: <strong>{formatMoney(c.monthlyCap, c.currency)}</strong>. </> : null}
+            Límite total del ciclo: {formatMoney(CURRENCIES[c.currency].limit, c.currency)}.
+          </p>
         </div>
       )}
 
@@ -111,7 +118,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
           <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
             {[
               [approvalsComplete(c, cy), hourly ? "Todos los días con horas están aprobados" : "Entregables aprobados"],
-              [cy.bonus !== null, "Bono confirmado (aunque sea 0)"],
+              [variable ? cy.variableAmount !== null : cy.bonus !== null, variable ? "Monto variable confirmado (aunque sea 0)" : "Bono confirmado (aunque sea 0)"],
               [cy.closed && !!cy.signature, `${c.legalName} firmó y cerró su ciclo`],
             ].map(([ok, text], i) => <li key={i} style={{ padding: "2px 0", color: ok ? "#166534" : "#991b1b" }}>{ok ? "✓" : "✗"} {text as string}</li>)}
           </ul>

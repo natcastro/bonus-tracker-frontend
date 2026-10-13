@@ -2,7 +2,10 @@
 // only in memory — nothing is saved anywhere.
 
 export type Currency = "USD" | "COP";
-export type PayType = "hourly" | "fixed";
+// hourly = hours × rate · fixed = base amount (+ optional bonus up to bonusCap) · variable = guaranteed base (can be 0)
+// plus an amount the supervisor reports each month (commissions, freight…).
+export type PayType = "hourly" | "fixed" | "variable";
+export type PaymentMethod = "wired" | "adp";
 export type CycleStatus = "abierto" | "con_hr" | "aprobada";
 
 // Max a single monthly total (base + bonus) or fixed amount may reach — catches the extra-zero typo.
@@ -27,6 +30,14 @@ export interface Contractor {
   bonusCap: number;            // most this person can earn in bonuses per cycle (0 = no bonuses)
   supervisorId: number | null; // null → William approves
   bank: BankInfo;
+  region: string;              // state / city for people in the USA (TX, CA, MIA…)
+  paymentMethod: PaymentMethod;
+  sendsInvoice: boolean;       // false for e.g. ADP payroll people who don't submit a cuenta de cobro
+  payDay: number;              // day of the month they are paid
+  monthlyCap: number | null;   // most the whole month may reach (e.g. "máximo $740 al mes")
+  weeklyHoursCap: number | null;
+  notes: string;
+  issues: string[];            // what still needs William's attention (missing data, doubtful amounts…)
 }
 
 export interface DayEntry { date: string; hours: number; note: string; approved: boolean }
@@ -38,6 +49,7 @@ export interface Cycle {
   summary: string;            // fixed-pay contractors: what they delivered this month
   summaryApproved: boolean;
   bonus: number | null;       // only the supervisor sets it; null = not decided yet (0 is a valid answer)
+  variableAmount: number | null; // 'variable' pay types: the amount the supervisor reports for the month
   closed: boolean; signature: string | null;
   status: CycleStatus; number: number | null; hrNote?: string;
 }
@@ -151,26 +163,32 @@ export function daysOfCycle(year: number, month: number): string[] {
 export const weekdayLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 export const isWeekend = (iso: string) => [0, 6].includes(new Date(`${iso}T12:00:00`).getDay());
 
-export function cycleTotals(c: Contractor, cy: Pick<Cycle, "days" | "bonus">) {
+export function cycleTotals(c: Contractor, cy: Pick<Cycle, "days" | "bonus"> & { variableAmount?: number | null }) {
   const hours = cy.days.reduce((s, d) => s + (Number(d.hours) || 0), 0);
-  const base = c.payType === "hourly" ? Math.round(hours * c.hourlyRate * 100) / 100 : c.baseAmount;
-  const bonus = cy.bonus ?? 0;
-  return { hours, base, bonus, total: Math.round((base + bonus) * 100) / 100 };
+  const variable = c.payType === "variable" ? (cy.variableAmount ?? 0) : 0;
+  const base = c.payType === "hourly" ? Math.round(hours * c.hourlyRate * 100) / 100 : c.baseAmount + variable;
+  const bonus = c.payType === "variable" ? 0 : (cy.bonus ?? 0);
+  return { hours, base, bonus, variable, total: Math.round((base + bonus) * 100) / 100 };
 }
 
+export const PAY_TYPE_LABEL: Record<PayType, string> = { hourly: "Por horas", fixed: "Monto fijo", variable: "Variable (comisiones / monto del mes)" };
+
+// The supervisor's closing number: the bonus for hourly/fixed people, the month's amount for variable ones.
+export const monthlyDecisionDone = (c: Contractor, cy: Cycle) => (c.payType === "variable" ? cy.variableAmount !== null : cy.bonus !== null);
+
 export function cycleDescription(c: Contractor, cy: Cycle): string {
-  if (c.payType === "fixed") return cy.summary;
+  if (c.payType !== "hourly") return cy.summary;
   return "Hourly professional services — detailed hour-by-hour in the attached report.";
 }
 
 export function approvalsComplete(c: Contractor, cy: Cycle): boolean {
-  if (c.payType === "fixed") return cy.summaryApproved;
+  if (c.payType !== "hourly") return cy.summaryApproved;
   const used = cy.days.filter(d => d.hours > 0);
   return used.length > 0 && used.every(d => d.approved);
 }
 
 export const isReadyForHr = (c: Contractor, cy: Cycle) =>
-  cy.status === "abierto" && cy.closed && !!cy.signature && cy.bonus !== null && approvalsComplete(c, cy);
+  cy.status === "abierto" && cy.closed && !!cy.signature && monthlyDecisionDone(c, cy) && approvalsComplete(c, cy);
 
 export const nextCycleNumber = (cycles: Cycle[], contractorId: number) =>
   cycles.filter(x => x.contractorId === contractorId && x.status === "aprobada").reduce((m, x) => Math.max(m, x.number ?? 0), 0) + 1;
@@ -179,6 +197,12 @@ export const cycleFileName = (c: Contractor, number: number | null, year: number
   `${c.legalName}- Invoice ${number ? pad4(number) : "(pendiente)"}-${cycleInfo(year, month).name.toLowerCase()} ${year}.pdf`;
 
 // ── Fake data ───────────────────────────────────────────────────────────────
+// Defaults for the fields every contractor needs (used by the demo people, the import and the new-person form).
+export const EXTRA_DEFAULTS = {
+  region: "", paymentMethod: "wired" as PaymentMethod, sendsInvoice: true, payDay: 30,
+  monthlyCap: null as number | null, weeklyHoursCap: null as number | null, notes: "", issues: [] as string[],
+};
+
 const bank = (n: string): BankInfo => ({
   bankName: "Banco de Prueba", bankCountry: "Colombia", swift: "TESTCOBB", routing: "000000000",
   holder: n, accountType: "Savings", accountNumber: "0012345678",
@@ -191,16 +215,16 @@ export const SEED_SUPERVISORS: Supervisor[] = [
 
 export const SEED_CONTRACTORS: Contractor[] = [
   { id: 1, legalName: "Pepito Pérez", position: "Customer Service Agent", email: "pepito.prueba@example.com", phone: "+57 321 000 0001", address: "Cra 52A # 128C-32, Bogotá DC", country: "Colombia", taxId: "CC 12345678",
-    payType: "hourly", hourlyRate: 12, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: 1, bank: bank("Pepito Pérez") },
+    payType: "hourly", hourlyRate: 12, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: 1, bank: bank("Pepito Pérez"), ...EXTRA_DEFAULTS },
   { id: 2, legalName: "María Gómez", position: "Graphic Designer", email: "maria.prueba@example.com", phone: "+57 300 000 0002", address: "Calle 10 # 5-20, Medellín", country: "Colombia", taxId: "CC 87654321",
-    payType: "fixed", hourlyRate: 0, baseAmount: 1000, currency: "USD", bonusCap: 300, supervisorId: 2, bank: bank("María Gómez") },
+    payType: "fixed", hourlyRate: 0, baseAmount: 1000, currency: "USD", bonusCap: 300, supervisorId: 2, bank: bank("María Gómez"), ...EXTRA_DEFAULTS },
   { id: 3, legalName: "Carlos Rodríguez", position: "Community Manager", email: "carlos.prueba@example.com", phone: "+57 310 000 0003", address: "Av. 6N # 20-15, Cali", country: "Colombia", taxId: "CC 11223344",
-    payType: "fixed", hourlyRate: 0, baseAmount: 4200000, currency: "COP", bonusCap: 1000000, supervisorId: 1, bank: bank("Carlos Rodríguez") },
+    payType: "fixed", hourlyRate: 0, baseAmount: 4200000, currency: "COP", bonusCap: 1000000, supervisorId: 1, bank: bank("Carlos Rodríguez"), ...EXTRA_DEFAULTS },
   { id: 4, legalName: "Laura Martínez", position: "Support Agent", email: "laura.prueba@example.com", phone: "+1 305 000 0004", address: "123 Test St, Miami, FL", country: "USA", taxId: "SSN/EIN 00-0000000",
-    payType: "hourly", hourlyRate: 15, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: null, bank: bank("Laura Martínez") },
+    payType: "hourly", hourlyRate: 15, baseAmount: 0, currency: "USD", bonusCap: 100, supervisorId: null, bank: bank("Laura Martínez"), ...EXTRA_DEFAULTS },
   // A supervisor who is also paid: has no supervisor of his own, so William approves his cycle.
   { id: 5, legalName: "Héctor Ramírez", position: "Operations Manager", email: "hector.prueba@example.com", phone: "+57 315 000 0005", address: "Calle 93 # 11-20, Bogotá DC", country: "Colombia", taxId: "CC 55667788",
-    payType: "fixed", hourlyRate: 0, baseAmount: 3000, currency: "USD", bonusCap: 500, supervisorId: null, bank: bank("Héctor Ramírez") },
+    payType: "fixed", hourlyRate: 0, baseAmount: 3000, currency: "USD", bonusCap: 500, supervisorId: null, bank: bank("Héctor Ramírez"), ...EXTRA_DEFAULTS },
 ];
 
 const NOTES = ["Answered customer chats and tracked orders.", "Handled returns and follow-up emails.", "Updated the order spreadsheet and replied to tickets.", "Prepared the weekly report and helped the team."];
@@ -213,7 +237,8 @@ function hourlyDays(year: number, month: number, upTo: string, approveUntil: num
   return out;
 }
 
-export function buildSeedCycles(now: Date, contractors: Contractor[]): Cycle[] {
+export function buildSeedCycles(now: Date, allContractors: Contractor[], demo = true): Cycle[] {
+  const contractors = allContractors.filter((c) => c.sendsInvoice);
   const cur = currentCycleKey(now);
   const prev = (back: number) => { const d = new Date(cur.year, cur.month - 1 - back, 1); return { year: d.getFullYear(), month: d.getMonth() + 1 }; };
   const todayIso = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
@@ -221,11 +246,11 @@ export function buildSeedCycles(now: Date, contractors: Contractor[]): Cycle[] {
   let id = 1;
   const base = (c: Contractor, year: number, month: number): Cycle => ({
     id: id++, contractorId: c.id, year, month, days: [], summary: "", summaryApproved: false,
-    bonus: null, closed: false, signature: null, status: "abierto", number: null,
+    bonus: null, variableAmount: null, closed: false, signature: null, status: "abierto", number: null,
   });
 
   // past, approved cycles (history)
-  contractors.forEach(c => [2, 1].forEach((back, idx) => {
+  if (demo) contractors.forEach(c => [2, 1].forEach((back, idx) => {
     const { year, month } = prev(back);
     const x = base(c, year, month);
     x.status = "aprobada"; x.closed = true; x.number = idx + 1; x.bonus = c.id === 2 ? 120 : 0;
@@ -236,9 +261,9 @@ export function buildSeedCycles(now: Date, contractors: Contractor[]): Cycle[] {
   // current cycles
   contractors.forEach(c => {
     const x = base(c, cur.year, cur.month);
-    if (c.id === 1) x.days = hourlyDays(cur.year, cur.month, todayIso, 3);
-    if (c.id === 4) x.days = hourlyDays(cur.year, cur.month, todayIso, 0);
-    if (c.id === 2) x.summary = "Designed the October campaign banners and updated";
+    if (demo && c.id === 1) x.days = hourlyDays(cur.year, cur.month, todayIso, 3);
+    if (demo && c.id === 4) x.days = hourlyDays(cur.year, cur.month, todayIso, 0);
+    if (demo && c.id === 2) x.summary = "Designed the October campaign banners and updated";
     cycles.push(x);
   });
   return cycles;
