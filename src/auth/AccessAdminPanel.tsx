@@ -23,6 +23,7 @@ const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: 
   { key: "MEX",       label: "FTC México", adminLabel: "Administrador", staffLabel: "Staff" },
   { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRoles: [
     { value: "carol", label: "Karol (coordinación)" },
+    { value: "video", label: "Video" },
   ] },
   { key: "HR", label: "HR (Recursos Humanos)", adminLabel: "William (jefe de HR)", staffLabel: "Contratista", extraRoles: [
     { value: "supervisor", label: "Supervisor" },
@@ -30,7 +31,7 @@ const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: 
   ] },
 ];
 
-type RoleValue = "admin" | "staff" | "carol" | "supervisor" | "accounting" | "";
+type RoleValue = "admin" | "staff" | "carol" | "supervisor" | "accounting" | "video" | "";
 
 function parseTeams(teams: string[]) {
   const plain = teams.filter((t) => t !== "ALL" && !ROLE_TEAMS.some((rt) => t.startsWith(`${rt.key}:`)));
@@ -229,7 +230,7 @@ const SHORT: Record<string, string> = {
 };
 const ROLE_SHORT: Record<string, string> = { admin: "Admin", staff: "Staff", carol: "Karol", supervisor: "Supervisor", accounting: "Contabilidad" };
 const HR_ROLE_SHORT: Record<string, string> = { admin: "Jefe de HR", staff: "Contratista", supervisor: "Supervisor", accounting: "Contabilidad" };
-const MKT_ROLE_SHORT: Record<string, string> = { admin: "Laura", staff: "Diseño", carol: "Karol" };
+const MKT_ROLE_SHORT: Record<string, string> = { admin: "Laura", staff: "Diseño", carol: "Karol", video: "Video" };
 const TEAM_COLOR: Record<string, string> = {
   OPS: "#2563eb", APT: "#7c3aed", TKLIVES: "#db2777", CSQUALITY: "#0891b2", MGMT: "#475569",
   LOGISTICS: "#b45309", DEVOLUCIONES: "#b45309", MEX: "#15803d", MARKETING: "#3E6B45", HR: "#0f766e", ALL: "#111827",

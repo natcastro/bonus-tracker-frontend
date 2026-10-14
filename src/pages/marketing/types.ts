@@ -1,4 +1,4 @@
-export type MarketingRole = "laura" | "diseno" | "carol";
+export type MarketingRole = "laura" | "diseno" | "carol" | "video";
 
 export const PRODUCT_LINES = [
   "Línea Oro",

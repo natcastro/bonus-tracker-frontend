@@ -47,6 +47,7 @@ export const ROLE_CFG: Record<string, { label: string; color: string; soft: stri
   laura: { label: "Laura", color: MT.primary, soft: MT.primarySoft },
   diseno: { label: "Diseño", color: MT.clay, soft: MT.claySoft },
   carol: { label: "Karol", color: MT.info, soft: MT.infoSoft },
+  video: { label: "Video", color: MT.violet, soft: MT.violetSoft },
   requester: { label: "Solicitante", color: MT.violet, soft: MT.violetSoft },
 };
 

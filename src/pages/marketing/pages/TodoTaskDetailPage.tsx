@@ -31,7 +31,10 @@ export default function TodoTaskDetailPage() {
 
   const currentStage = task.stages.find(s => s.key === task.currentStage);
   const myRole = authedUser?.role;
-  const canAct = task.status === "in_progress" && currentStage?.role === myRole;
+  // A Video person works their own task like a Diseño person would (the Video role only ever sees tasks assigned to them).
+  const workRole = myRole === "video" ? "diseno" : myRole;
+  const canAct = task.status === "in_progress" && currentStage?.role === workRole
+    && (myRole !== "video" || task.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase());
   const needsLink = currentStage?.role === "diseno";
   const canApproveNow = !!currentStage && myRole === "carol" && TODO_APPROVABLE_STAGES.includes(currentStage.key);
   const isReview = canApproveNow; // Karol's review stages use the same panel as a brief review

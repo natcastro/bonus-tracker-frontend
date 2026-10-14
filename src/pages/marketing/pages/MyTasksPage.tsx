@@ -30,6 +30,8 @@ export default function MyTasksPage() {
   const [taskDue, setTaskDue] = useState("");
   const [taskSaving, setTaskSaving] = useState(false);
   const myRole = authedUser?.role;
+  // Video people work the To Do pipeline exactly like a Diseño person (the tasks are already limited to theirs).
+  const workRole = myRole === "video" ? "diseno" : myRole;
 
   const pendingPrivateTasks = useMemo(
     () => privateTasks.filter(t => !t.completed).sort((a, b) => a.dueAt.localeCompare(b.dueAt)),
@@ -109,8 +111,8 @@ export default function MyTasksPage() {
       .filter(t => t.status === "in_progress")
       .filter(t => {
         const stage = t.stages.find(s => s.key === t.currentStage);
-        if (stage?.role !== myRole) return false;
-        if (myRole === "diseno") return t.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
+        if (stage?.role !== workRole) return false;
+        if (workRole === "diseno") return t.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
         return true;
       })
       .sort((a, b) => {
@@ -118,7 +120,7 @@ export default function MyTasksPage() {
         const sb = b.stages.find(s => s.key === b.currentStage)!;
         return (sa.deadline ?? "").localeCompare(sb.deadline ?? "");
       });
-  }, [todoTasks, myRole, authedUser?.email]);
+  }, [todoTasks, workRole, authedUser?.email]);
 
   // Solicitudes assigned to you work exactly like To Do tasks — they belong in the same "mis
   // tareas" list, not off in a separate corner only Solicitudes/To Do shows.

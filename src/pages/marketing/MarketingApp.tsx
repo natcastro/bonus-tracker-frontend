@@ -6,6 +6,7 @@ import MyTasksPage from "./pages/MyTasksPage";
 import DashboardPage from "./pages/DashboardPage";
 import TodoPage from "./pages/TodoPage";
 import TeamDashboardPage from "./pages/TeamDashboardPage";
+import VideoDashboardPage from "./pages/VideoDashboardPage";
 import BriefDetailPage from "./pages/BriefDetailPage";
 import TodoTaskDetailPage from "./pages/TodoTaskDetailPage";
 import RequestsPage from "./pages/RequestsPage";
@@ -22,7 +23,7 @@ function InternalShell() {
       <div style={{ minHeight: "100vh", background: MT.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center", fontFamily: MT.font }}>
         <h1 style={{ fontSize: "1.3rem", fontWeight: 800, color: MT.text1, marginBottom: "0.5rem" }}>Sin rol asignado en Marketing</h1>
         <p style={{ color: MT.text2, maxWidth: 380 }}>
-          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura, Diseño o Karol) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
+          Tu correo tiene acceso a Marketing pero no tiene un rol (Laura, Diseño, Karol o Video) asignado todavía. Pide a un administrador que te lo asigne desde el panel de accesos.
         </p>
       </div>
     );
@@ -54,14 +55,15 @@ function InternalShell() {
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MyTasksPage />} />
           <Route path="todo" element={<TodoPage />} />
-          <Route path="home" element={<DashboardPage />} />
-          <Route path="dashboard" element={<TeamDashboardPage />} />
-          <Route path="brief/:id" element={<BriefDetailPage />} />
+          <Route path="dashboard" element={authedUser.role === "video" ? <VideoDashboardPage /> : <TeamDashboardPage />} />
           <Route path="todo/:id" element={<TodoTaskDetailPage />} />
+          {/* Briefs and Solicitudes are closed to the Video role (anything else falls through to "tasks" below). */}
+          {authedUser.role !== "video" && <Route path="home" element={<DashboardPage />} />}
+          {authedUser.role !== "video" && <Route path="brief/:id" element={<BriefDetailPage />} />}
           {/* Everyone reaches Solicitudes, but RequestsPage itself only shows the full
               list/assign/reassign/delete tools to Laura/Karol — Diseño just gets the
               "copiar enlace" box so they can hand it out too. */}
-          <Route path="requests" element={<RequestsPage />} />
+          {authedUser.role !== "video" && <Route path="requests" element={<RequestsPage />} />}
           <Route path="*" element={<Navigate to="tasks" replace />} />
         </Routes>
       </div>

@@ -7,9 +7,11 @@ import type { TaskCategoryState } from "./TaskCategoryFields";
 import DisenoAssigneePicker from "./DisenoAssigneePicker";
 
 export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
-  const { createTodoTask, disenoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
-  const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
+  const { createTodoTask, disenoEmailList, videoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
+  const [cat, setCatState] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [description, setDescription] = useState("");
+  // Switching between Video and the other categories changes who can receive the task, so the pick is cleared.
+  const setCat = (next: TaskCategoryState) => { if ((next.category === "videos") !== (cat.category === "videos")) setAssignedEmail(""); setCatState(next); };
   const [emailNote, setEmailNote] = useState("");
   const [assignedEmail, setAssignedEmail] = useState("");
   const [saving, setSaving] = useState(false);
@@ -21,7 +23,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
       setError(cat.category === "videos" ? "Completa el propósito y la descripción detallada del video (y la plataforma si elegiste Otro)." : "Selecciona la categoría y el tipo de pieza.");
       return;
     }
-    if (!assignedEmail) { setError("Asigna la tarea a alguien de Diseño."); return; }
+    if (!assignedEmail) { setError(cat.category === "videos" ? "Asigna la tarea a alguien de Video." : "Asigna la tarea a alguien de Diseño."); return; }
     const title = taskCategoryTitle(cat);
     const detailsBlock = taskCategoryDetailsBlock(cat);
     const fullDescription = [detailsBlock, description.trim()].filter(Boolean).join("\n—\n");
@@ -78,11 +80,16 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label style={labelStyle}>Asignar a</label>
-            <DisenoAssigneePicker
-              value={assignedEmail} onChange={setAssignedEmail}
-              options={disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
-            />
+            <label style={labelStyle}>{cat.category === "videos" ? "Asignar a (equipo de Video)" : "Asignar a"}</label>
+            {cat.category === "videos" && videoEmailList.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Todavía no hay personas con el rol Video. Un administrador las agrega en Accesos (Marketing → Video).</p>
+            ) : (
+              <DisenoAssigneePicker
+                key={cat.category === "videos" ? "video" : "diseno"}
+                value={assignedEmail} onChange={setAssignedEmail}
+                options={cat.category === "videos" ? videoEmailList : disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
+              />
+            )}
           </div>
 
           {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}

@@ -4,7 +4,7 @@ import {
   getMarketingBriefs, createMarketingBrief, updateMarketingBrief, deleteMarketingBrief,
   getMarketingNotifications, createMarketingNotification, markMarketingNotificationsRead, markTargetNotificationRead, sendMarketingEmail,
   deleteMarketingNotification, deleteAllMarketingNotifications, getMarketingNotifyEmails, setMarketingNotifyEmail, setMarketingNotifyCountry,
-  getHubNicknames, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
+  getHubNicknames, getVideoUsers, getPrivateTasks, createPrivateTask as apiCreatePrivateTask,
   togglePrivateTaskCompleted as apiTogglePrivateTaskCompleted, deletePrivateTask as apiDeletePrivateTask,
   getTodoTasks, createTodoTask as apiCreateTodoTask, updateTodoTask, deleteTodoTask as apiDeleteTodoTask,
   getMarketingRequests, createMarketingRequest as apiCreateMarketingRequest, updateMarketingRequest, deleteMarketingRequest,
@@ -98,6 +98,7 @@ interface MarketingCtx {
 
   notifyEmails: MarketingNotifyEmails;
   disenoEmailList: string[];
+  videoEmailList: string[];
   updateNotifyEmail: (slot: MarketingNotifySlot, email: string) => Promise<void>;
   // Human-friendly label for a Diseño email — that person's Hub Access nickname if they have
   // one, otherwise the raw email, otherwise "Diseño" when nobody is assigned.
@@ -139,6 +140,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // Keyed by lowercased email — sourced from each person's Hub Access nickname, so a name never
   // has to be typed twice (once for login access, once for Marketing notifications).
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
+  const [videoUsers, setVideoUsers] = useState<{ email: string; nickname: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Every Diseño person shares the same "staff" role — the Microsoft login email is the only
@@ -148,6 +150,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (role === "admin") return { role: "laura", name: nicknames[myEmail.toLowerCase()] || "Laura", email: myEmail };
     if (role === "carol") return { role: "carol", name: nicknames[myEmail.toLowerCase()] || "Karol", email: myEmail };
     if (role === "staff") return { role: "diseno", name: nicknames[myEmail.toLowerCase()] || "Diseño", email: myEmail };
+    if (role === "video") return { role: "video", name: nicknames[myEmail.toLowerCase()] || "Video", email: myEmail };
     return null;
   }, [getRole, myEmail, nicknames]);
 
@@ -156,9 +159,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     [notifyEmails],
   );
 
+  const videoEmailList = useMemo(() => videoUsers.map(u => u.email), [videoUsers]);
+
   const disenoDisplayName = (email: string | null): string => {
     if (!email) return "Diseño";
-    return nicknames[email.toLowerCase()] || email;
+    return nicknames[email.toLowerCase()] || videoUsers.find(u => u.email === email.toLowerCase())?.nickname || email;
   };
 
   const disenoCountryByEmail = useMemo(() => {
@@ -185,16 +190,21 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       try { return await fn(); }
       catch (err) { console.error(`Failed to load ${label}:`, err); return fallback; }
     };
-    const [n, rq, b, t, tt] = await Promise.all([
-      safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
-      safe("requests", () => getMarketingRequests(hasInternalRole ? undefined : myEmail), []),
-      hasInternalRole ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
+    // Video people only work with To Do: no briefs, no requests, no shared notification inbox are even fetched.
+    const isVideo = myRoleForLoad === "video";
+    const [n, rq, b, t, tt, vu] = await Promise.all([
+      isVideo ? Promise.resolve([]) : safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
+      isVideo ? Promise.resolve([]) : safe("requests", () => getMarketingRequests(hasInternalRole ? undefined : myEmail), []),
+      hasInternalRole && !isVideo ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
       hasInternalRole ? safe("private tasks", () => getPrivateTasks(myEmail), []) : Promise.resolve([]),
       hasInternalRole ? safe("todo tasks", () => getTodoTasks(), []) : Promise.resolve([]),
+      hasInternalRole ? safe("video users", () => getVideoUsers(), []) : Promise.resolve([]),
     ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
-    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt);
+    // A Video person only ever sees the To Do tasks assigned to them.
+    const mine = isVideo ? tt.filter(x => x.assignedDisenoEmail.toLowerCase() === myEmail.toLowerCase()) : tt;
+    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(mine); setVideoUsers(vu);
   }, [myEmail, myRoleForLoad]);
 
   const createPrivateTask = async (title: string, dueAt: string) => {
@@ -218,6 +228,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }));
 
   const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => {
+    // Video tasks go only to people with the Video role (and nobody from Video gets the other kinds).
+    const toVideo = videoEmailList.includes(assignedDisenoEmail.toLowerCase());
+    if (taskType === "Video" && !toVideo) throw new Error("Las tareas de Video solo se pueden asignar a personas con el rol Video.");
+    if (taskType !== "Video" && toVideo) throw new Error("Esa persona es de Video: solo recibe tareas de la categoría Video.");
     const today = todayIso();
     const stages = buildTodoStages(today);
     const created = await apiCreateTodoTask({
@@ -1040,7 +1054,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
-  const readField = (role: "laura" | "diseno" | "carol") => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
+  const readField = (role: "laura" | "diseno" | "carol" | "video") => role === "laura" ? "readLaura" as const : role === "carol" ? "readCarol" as const : "readDiseno" as const;
 
   // Someone with no Marketing role (tracking their own request via the public link) has their
   // own personal notifications (target_email) instead of a shared laura/diseno/carol inbox.
@@ -1086,7 +1100,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, approveTodoTask, deleteTodoTask,
-      notifyEmails, disenoEmailList, updateNotifyEmail, updateNotifyCountry, disenoDisplayName, disenoCountry,
+      notifyEmails, disenoEmailList, videoEmailList, updateNotifyEmail, updateNotifyCountry, disenoDisplayName, disenoCountry,
       requests, createRequest, assignRequest, editRequest, deleteRequest, submitRequestDelivery, requesterReview,
     }}>
       {children}

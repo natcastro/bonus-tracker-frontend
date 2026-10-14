@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatDateHuman } from "../theme";
 import StatusPill from "../components/StatusPill";
 import { useMarketing } from "../context";
+import { getPrivateTasks } from "../../../services/api";
+import type { PrivateTask } from "../types";
 import { stageLabel, todoStageLabel, daysBetweenIso, todayIsoBogota, stageLate } from "../types";
 import type { StageKey } from "../types";
 
@@ -27,7 +29,7 @@ interface DisenoStats {
 
 // Converts a fractional day count (e.g. 2.35) into a human "2d 8h" / "3h 24m" label —
 // legitimate since it's a real average across entries, not fake sub-day precision.
-function formatAht(days: number): string {
+export function formatAht(days: number): string {
   if (days >= 1) {
     const wholeDays = Math.floor(days);
     const hours = Math.round((days - wholeDays) * 24);
@@ -43,7 +45,7 @@ function formatAht(days: number): string {
 // getters/setters — never touches the viewer's own machine timezone, so it can't drift a day
 // depending on where the browser happens to be (the previous version used toISOString() on a
 // locally-constructed Date, which reinterprets in UTC and can shift the date by up to a day).
-function isoWeekStart(iso: string): string {
+export function isoWeekStart(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const day = date.getUTCDay();
@@ -54,7 +56,7 @@ function isoWeekStart(iso: string): string {
 
 // Same pure-calendar approach as isoWeekStart — subtracts calendar days from a yyyy-mm-dd
 // string without ever touching the viewer's local timezone.
-function subtractDaysIso(iso: string, days: number): string {
+export function subtractDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() - days);
@@ -62,7 +64,14 @@ function subtractDaysIso(iso: string, days: number): string {
 }
 
 export default function TeamDashboardPage() {
-  const { briefs, todoTasks, disenoEmailList, disenoDisplayName } = useMarketing();
+  const { briefs, todoTasks, disenoEmailList, videoEmailList, disenoDisplayName, authedUser } = useMarketing();
+  // Video people's private tasks are visible only to them and to the admin (Laura).
+  const [videoPrivate, setVideoPrivate] = useState<{ email: string; tasks: PrivateTask[] }[]>([]);
+  useEffect(() => {
+    if (authedUser?.role !== "laura" || videoEmailList.length === 0) { setVideoPrivate([]); return; }
+    Promise.all(videoEmailList.map(async email => ({ email, tasks: (await getPrivateTasks(email)).filter(t => !t.completed) })))
+      .then(setVideoPrivate).catch(() => setVideoPrivate([]));
+  }, [authedUser?.role, videoEmailList]);
   const navigate = useNavigate();
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
@@ -74,7 +83,7 @@ export default function TeamDashboardPage() {
   // (the previous stage's actual completion) to when they finished it, across briefs and
   // To Do tasks alike. Ranked shortest-first.
   const disenoStats: DisenoStats[] = useMemo(() => {
-    return disenoEmailList.map(email => {
+    return [...disenoEmailList, ...videoEmailList].map(email => {
       const entries: DeliveryEntry[] = [];
       for (const b of published) {
         if (!b.assignedDisenoEmail || b.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
@@ -119,7 +128,7 @@ export default function TeamDashboardPage() {
       }
       return diff;
     });
-  }, [published, todoTasks, disenoEmailList, disenoDisplayName]);
+  }, [published, todoTasks, disenoEmailList, videoEmailList, disenoDisplayName]);
 
   const selected = disenoStats.find(d => d.email === selectedEmail) ?? null;
   // The date range only scopes the selected person's own chart/list — the team-wide stats below
@@ -234,7 +243,7 @@ export default function TeamDashboardPage() {
       {/* Diseño AHT ranking — click a card for that person's stats */}
       <div style={{ marginBottom: "1.5rem" }}>
         <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
-          Diseño — tiempo promedio de entrega (AHT)
+          Diseño y Video — tiempo promedio de entrega (AHT)
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           {disenoStats.map((d, i) => (
@@ -254,13 +263,25 @@ export default function TeamDashboardPage() {
                 background: i === 0 ? MT.moss : MT.border, color: i === 0 ? "#fff" : MT.text2,
                 fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
               }}>{i + 1}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, marginTop: 6 }}>{d.name}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, marginTop: 6 }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
               <span style={{ fontSize: 24, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>AHT promedio</span>
               <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4 }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
             </button>
           ))}
         </div>
+
+        {videoPrivate.some(v => v.tasks.length > 0) && (
+          <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginTop: "1rem", boxShadow: MT.shadow }}>
+            <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.6rem" }}>Tareas privadas pendientes — equipo de Video</p>
+            {videoPrivate.filter(v => v.tasks.length > 0).map(v => (
+              <div key={v.email} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1 }}>{disenoDisplayName(v.email)}</div>
+                {v.tasks.map(t => <div key={t.id} style={{ fontSize: 12.5, color: MT.text2, padding: "2px 0" }}>• {t.title} — {formatDateHuman(t.dueAt.slice(0, 10))}</div>)}
+              </div>
+            ))}
+          </div>
+        )}
 
         {selected && (() => {
           const count = selectedEntries.length;

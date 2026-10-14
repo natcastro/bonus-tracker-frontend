@@ -1670,7 +1670,7 @@ export async function createMarketingNotification(
   if (error) throw error;
 }
 
-export async function markMarketingNotificationsRead(role: "laura"|"diseno"|"carol", ids: number[]): Promise<void> {
+export async function markMarketingNotificationsRead(role: "laura"|"diseno"|"carol"|"video", ids: number[]): Promise<void> {
   if (ids.length === 0) return;
   const field = role === "laura" ? "read_laura" : role === "carol" ? "read_carol" : "read_diseno";
   const { error } = await supabase.from("marketing_notifications").update({ [field]: true }).in("id", ids);
@@ -1943,6 +1943,16 @@ export async function getMarketingAccessDirectory(): Promise<MarketingAccessPers
     }
   });
   return out;
+}
+
+// Everyone whose Hub Access has the Marketing "Video" role — the only people video To Do tasks can go to. Adding a new
+// person with that role in Hub Access is all it takes: they show up here (and in the pickers) automatically.
+export async function getVideoUsers(): Promise<{ email: string; nickname: string }[]> {
+  const { data, error } = await supabase.from("hub_access").select("email,nickname,teams");
+  if (error) throw error;
+  return (data ?? [])
+    .filter((r: any) => (r.teams ?? []).includes("MARKETING:video"))
+    .map((r: any) => ({ email: String(r.email).toLowerCase(), nickname: r.nickname ?? "" }));
 }
 
 // Looks up display nicknames for a set of emails — used by modules (like Marketing) that want to
