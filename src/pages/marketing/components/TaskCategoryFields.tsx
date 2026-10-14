@@ -46,8 +46,8 @@ export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   videoProposito: "", videoScript: "", videoDescripcion: "",
 };
 
-// Digital pieces (and advertising for digital screens) are sized in pixels; only print jobs use cm / inch.
-export const usesPixels = (s: TaskCategoryState) => s.category === "piezas_digitales" || (s.category === "publicidad" && s.tipoMedio === "Digital Virtual");
+// Digital pieces (and advertising unless it is print) are sized in pixels; only print jobs use cm / inch.
+export const usesPixels = (s: TaskCategoryState) => s.category === "piezas_digitales" || (s.category === "publicidad" && s.tipoMedio !== "Impresión");
 const unitOf = (s: TaskCategoryState): string => (usesPixels(s) ? "px" : s.unidad);
 
 function typesForCategory(category: TaskCategory | null): readonly string[] {
