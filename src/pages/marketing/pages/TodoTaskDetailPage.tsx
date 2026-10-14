@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MT, formatDateHuman } from "../theme";
+import { MT, formatDateHuman, formatRelative } from "../theme";
 import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
@@ -67,6 +67,25 @@ export default function TodoTaskDetailPage() {
     }
   };
 
+  // Activity history — built from what each stage recorded (who, when, link, note, late), newest first.
+  const who = (email?: string, role?: string) => email ? disenoDisplayName(email) : role === "carol" ? "Karol" : role === "diseno" ? disenoDisplayName(task.assignedDisenoEmail) : "Alguien";
+  const events: { ts: string; text: React.ReactNode }[] = [
+    { ts: task.createdAt, text: <>Karol asignó la tarea a <strong>{disenoDisplayName(task.assignedDisenoEmail)}</strong>.</> },
+    ...task.stages.filter(s => s.status === "done").map(s => ({
+      ts: s.completedTs ?? `${s.completedAt}T12:00:00`,
+      text: (
+        <>
+          <strong>{s.role === "carol" ? "Karol" : who(s.by, s.role)}</strong>{" "}
+          {s.decision === "approved" ? <>aprobó sin cambios en <strong>{s.label}</strong></> : <>completó <strong>{s.label}</strong></>}
+          {s.late && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "1px 7px" }}>⚠ tarde</span>}
+          {s.link && <> — <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ color: MT.clay, fontWeight: 600, wordBreak: "break-all" }}>ver enlace</a></>}
+          {s.note && <div style={{ marginTop: 3, color: MT.text2 }}>Nota: {s.note}</div>}
+        </>
+      ),
+    })),
+    ...(task.status === "completed" && task.completedAt ? [{ ts: `${task.completedAt}T23:59:59`, text: <>✓ Tarea completada.</> }] : []),
+  ].sort((a, b) => b.ts.localeCompare(a.ts));
+
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", padding: "2rem 1.5rem", fontFamily: MT.font }}>
       <button onClick={() => navigate("/marketing/todo")} style={{
@@ -123,6 +142,19 @@ export default function TodoTaskDetailPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Activity history */}
+      <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
+        <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Historial de actividad</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {events.map((e, i) => (
+            <div key={i} style={{ fontSize: 12.5, color: MT.text1, lineHeight: 1.5, borderBottom: i < events.length - 1 ? `1px solid ${MT.border}` : "none", paddingBottom: i < events.length - 1 ? "0.5rem" : 0 }}>
+              <div>{e.text}</div>
+              <div style={{ fontSize: 11, color: MT.text3, marginTop: 2 }}>{e.ts.includes("T") && e.ts.length > 19 ? `${formatRelative(e.ts)} — ` : ""}{formatDateHuman(e.ts.slice(0, 10))}</div>
+            </div>
+          ))}
         </div>
       </div>
 

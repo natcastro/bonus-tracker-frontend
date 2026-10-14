@@ -246,7 +246,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const nextStage = task.stages[stageIdx + 1];
     const nextDeadline = nextStage ? addWorkDaysIso(today, nextStage.gapDays) : null;
     const newStages = task.stages.map((s, i) => {
-      if (i === stageIdx) return { ...s, link: link ?? s.link, completedAt: today, status: "done" as const, late: isLate };
+      if (i === stageIdx) return { ...s, link: link ?? s.link, completedAt: today, completedTs: new Date().toISOString(), by: myEmail || undefined, note: note || undefined, status: "done" as const, late: isLate };
       if (nextStage && i === stageIdx + 1) return { ...s, deadline: nextDeadline };
       return s;
     });
@@ -289,7 +289,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
     const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
     const newStages = task.stages.map((s, i) => {
-      if (i === stageIdx) return { ...s, completedAt: today, status: "done" as const, decision: "approved" as const, late: isLate };
+      if (i === stageIdx) return { ...s, completedAt: today, completedTs: new Date().toISOString(), by: myEmail || undefined, note: note || undefined, status: "done" as const, decision: "approved" as const, late: isLate };
       if (i > stageIdx) return { ...s, deadline: null, skipped: true };
       return s;
     });

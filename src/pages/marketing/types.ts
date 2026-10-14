@@ -314,6 +314,10 @@ export interface TodoStage {
   late?: boolean;
   // true on the stages that were never needed because Karol approved earlier.
   skipped?: boolean;
+  // Who finished the stage, when (full timestamp) and the note they left — feeds the task's activity history.
+  completedTs?: string;
+  by?: string;
+  note?: string;
   // Written by the check-deadline-reminders Netlify function — tracks which scheduled
   // deadline-alert emails have already gone out for this stage, so it never double-sends.
   remind24hAt?: string;
