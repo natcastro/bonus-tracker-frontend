@@ -67,6 +67,13 @@ export default function TodoTaskDetailPage() {
     }
   };
 
+  const isImg = (u: string) => /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(u);
+  const Attachment = ({ url }: { url: string }) => isImg(url)
+    ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Comentarios de ajuste" style={{ display: "block", maxWidth: "100%", maxHeight: 260, borderRadius: 8, marginTop: 6, border: `1px solid ${MT.border}` }} /></a>
+    : <a href={normalizeUrl(url)} target="_blank" rel="noreferrer" style={{ color: MT.clay, fontWeight: 600, wordBreak: "break-all" }}>{url}</a>;
+  // What Karol last asked for (her most recent finished review stage) — shown to Diseño right where they act.
+  const lastFeedback = [...task.stages].filter(s => s.role === "carol" && s.status === "done" && !s.skipped && (s.note || s.link)).pop();
+
   // Activity history — built from what each stage recorded (who, when, link, note, late), newest first.
   const who = (email?: string, role?: string) => email ? disenoDisplayName(email) : role === "carol" ? "Karol" : role === "diseno" ? disenoDisplayName(task.assignedDisenoEmail) : "Alguien";
   const events: { ts: string; text: React.ReactNode }[] = [
@@ -78,8 +85,8 @@ export default function TodoTaskDetailPage() {
           <strong>{s.role === "carol" ? "Karol" : who(s.by, s.role)}</strong>{" "}
           {s.decision === "approved" ? <>aprobó sin cambios en <strong>{s.label}</strong></> : <>completó <strong>{s.label}</strong></>}
           {s.late && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "1px 7px" }}>⚠ tarde</span>}
-          {s.link && <> — <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ color: MT.clay, fontWeight: 600, wordBreak: "break-all" }}>ver enlace</a></>}
-          {s.note && <div style={{ marginTop: 3, color: MT.text2 }}>Nota: {s.note}</div>}
+          {s.note && <div style={{ marginTop: 3, color: MT.text1, background: MT.surfaceAlt, borderRadius: 6, padding: "6px 9px", whiteSpace: "pre-wrap" }}>{s.note}</div>}
+          {s.link && <div style={{ marginTop: 4 }}><Attachment url={s.link} /></div>}
         </>
       ),
     })),
@@ -134,11 +141,13 @@ export default function TodoTaskDetailPage() {
                 {s.status === "done" && s.late && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "2px 7px" }}>⚠ tarde</span>
                 )}
-                {s.link && (
+                {s.link && (isImg(s.link) ? (
+                  <a href={s.link} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: MT.clay, fontWeight: 600, textDecoration: "none", flex: 1 }}>🖼 ver imagen con comentarios</a>
+                ) : (
                   <a href={normalizeUrl(s.link)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: MT.clay, fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                     {s.link}
                   </a>
-                )}
+                ))}
               </div>
             );
           })}
@@ -157,6 +166,14 @@ export default function TodoTaskDetailPage() {
           ))}
         </div>
       </div>
+
+      {task.status === "in_progress" && lastFeedback && (
+        <div style={{ background: MT.claySoft, border: `1px solid ${MT.clay}50`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
+          <p style={{ fontWeight: 800, fontSize: 12, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Comentarios de Karol — {lastFeedback.label}</p>
+          {lastFeedback.note && <div style={{ fontSize: 13, color: MT.text1, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{lastFeedback.note}</div>}
+          {lastFeedback.link && <div style={{ marginTop: 6, fontSize: 13 }}><Attachment url={lastFeedback.link} /></div>}
+        </div>
+      )}
 
       {task.status === "completed" ? (
         <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
@@ -192,7 +209,7 @@ export default function TodoTaskDetailPage() {
           {uploadError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{uploadError}</p>}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>Nota para el correo (opcional)</label>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>{isReview ? "Comentarios para Diseño (los verán en la tarea y en el correo)" : "Nota (la verá la otra persona en la tarea y en el correo)"}</label>
             <textarea
               value={note} onChange={e => setNote(e.target.value)} rows={2}
               placeholder="Algo que quieras que la otra persona vea en el correo..."
