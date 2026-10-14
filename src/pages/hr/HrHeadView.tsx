@@ -21,10 +21,12 @@ export default function HrHeadView({ store }: { store: HrStore }) {
   const toReview = store.cycles.filter(c => c.status === "con_hr");
   const open = openId !== null ? store.cycles.find(c => c.id === openId) : null;
   const noSupervisor = store.contractors.filter(c => c.supervisorId === null);
+  // William is also a supervisor: his own people's cycles need his approvals first, then his final sign-off (same screen).
+  const ownPending = noSupervisor.filter(c => { const cy = store.currentCycle(c.id); return cy && cy.status !== "aprobada"; }).length;
 
   return (
     <div>
-      <PageHeader role="hr" name={HR_HEAD} title={`Hola, ${HR_HEAD}`} chip="HR" subtitle="Aprueba los ciclos, crea personas y revisa el historial."
+      <PageHeader role="hr" name={HR_HEAD} title={`Hola, ${HR_HEAD}`} chip="HR" subtitle="Supervisas a tu equipo, das la aprobación final de todos los ciclos, creas personas y revisas el historial."
         right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nueva persona</button>
@@ -33,7 +35,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         </div>} />
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
-      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
+      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", `Mi equipo${ownPending ? ` (${ownPending})` : ""}`], ["personas", "Personas registradas"], ["historial", "Historial"]]}
         value={tab} onChange={t => { setTab(t); setOpenId(null); }} />
 
       {tab === "revisar" && (open ? (
@@ -57,7 +59,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         </div>
       ))}
 
-      {tab === "equipo" && <TeamList store={store} team={noSupervisor} who={`las personas que supervisas tú, ${HR_HEAD}`} />}
+      {tab === "equipo" && <TeamList store={store} team={noSupervisor} mode="both" who={`las personas que supervisas tú, ${HR_HEAD}`} />}
 
       {tab === "personas" && (
         <div>

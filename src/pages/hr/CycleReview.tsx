@@ -10,7 +10,7 @@ import MoneyInput from "./MoneyInput";
 import CycleStepper from "./CycleStepper";
 
 // What a supervisor (day-by-day approvals + bonus) or William (final review) sees for one contractor's cycle.
-export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrStore; c: Contractor; cy: Cycle; mode: "supervisor" | "hr"; onBack: () => void }) {
+export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrStore; c: Contractor; cy: Cycle; mode: "supervisor" | "hr" | "both"; onBack: () => void }) {
   const variable = c.payType === "variable";
   const [bonusVal, setBonusVal] = useState<number | null>(variable ? cy.variableAmount : cy.bonus);
   const [bonusErr, setBonusErr] = useState("");
@@ -18,7 +18,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
   const info = cycleInfo(cy.year, cy.month);
   const t = cycleTotals(c, cy);
   const hourly = c.payType === "hourly";
-  const canAct = mode === "supervisor" && cy.status === "abierto";
+  const canAct = mode !== "hr" && cy.status === "abierto";
   const pendingDays = cy.days.filter(d => d.hours > 0 && !d.approved).length;
 
   const saveBonus = (amount: number | null = bonusVal) => {
@@ -93,7 +93,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
           )}
         </div>
   
-        {mode === "supervisor" && (
+        {mode !== "hr" && (
           <div className="card">
             <h4 style={{ marginTop: 0 }}>{variable ? "Monto variable del mes" : "Bono del ciclo"}</h4>
             <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Solo tú lo defines. Si {variable ? "no hubo monto variable" : "no hubo bono"}, escribe <strong>0</strong>: el ciclo no avanza hasta que lo confirmes.{variable && c.notes ? <> Nota de HR: <em>{c.notes}</em></> : null}</p>
@@ -127,7 +127,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
           </div>
         )}
   
-        {mode === "supervisor" && cy.status === "abierto" && (
+        {mode !== "hr" && cy.status === "abierto" && (
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Para enviarse a {"William"}</h4>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
@@ -137,11 +137,11 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
                 [cy.closed && !!cy.signature, `${c.legalName} firmó y cerró su ciclo`],
               ].map(([ok, text], i) => <li key={i} style={{ padding: "2px 0", color: ok ? "#166534" : "#991b1b" }}>{ok ? "✓" : "✗"} {text as string}</li>)}
             </ul>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0.5rem 0 0" }}>Cuando las tres estén ✓, el ciclo se envía solo a William.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0.5rem 0 0" }}>Cuando las tres estén ✓, el ciclo pasa solo a la revisión final.</p>
           </div>
         )}
   
-        {mode === "hr" && cy.status === "con_hr" && (
+        {mode !== "supervisor" && cy.status === "con_hr" && (
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Tu decisión</h4>
             <p style={{ fontSize: "0.85rem", margin: "0 0 8px" }}>Archivo: <code>{cycleFileName(c, null, cy.year, cy.month)}</code> (el número se asigna al aprobar).</p>

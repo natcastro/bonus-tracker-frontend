@@ -52,7 +52,9 @@ export function useHrStore() {
     let next = fn(cy);
     if (isReadyForHr(c, next)) {
       next = { ...next, status: "con_hr", hrNote: undefined };
-      setNotice(`Todo listo: el ciclo de ${c.legalName} se envió automáticamente a ${HR_HEAD}.`);
+      setNotice(c.supervisorId === null
+        ? `Todo listo con ${c.legalName}: ya puedes dar tu aprobación final en esta misma pantalla.`
+        : `Todo listo: el ciclo de ${c.legalName} se envió automáticamente a ${HR_HEAD}.`);
     }
     setCycles(cycles.map(x => (x.id === id ? next : x)));
   };

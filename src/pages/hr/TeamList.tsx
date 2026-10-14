@@ -6,12 +6,12 @@ import { Banner, Empty } from "./ui";
 import CycleReview from "./CycleReview";
 
 // A supervisor's people for the current cycle (also used by William for contractors without a supervisor).
-export default function TeamList({ store, team, who }: { store: HrStore; team: Contractor[]; who: string }) {
+export default function TeamList({ store, team, who, mode = "supervisor" }: { store: HrStore; team: Contractor[]; who: string; mode?: "supervisor" | "both" }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const info = cycleInfo(store.year, store.month);
   const open = openId !== null ? store.currentCycle(openId) : null;
 
-  if (open) return <CycleReview store={store} c={store.contractor(open.contractorId)} cy={open} mode="supervisor" onBack={() => setOpenId(null)} />;
+  if (open) return <CycleReview store={store} c={store.contractor(open.contractorId)} cy={open} mode={mode} onBack={() => setOpenId(null)} />;
 
   const noInvoice = team.filter(c => !store.currentCycle(c.id));
   const rows = team.map(c => ({ c, cy: store.currentCycle(c.id)! })).filter(r => r.cy);
@@ -25,7 +25,7 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
       {store.isApprovalDay && pending.length > 0 && (
         <Banner tone="bad">⚠ Hoy William aprueba y aún faltan: {pending.map(r => r.c.legalName).join(", ")}. Lo que no se envíe hoy se paga el mes siguiente.</Banner>
       )}
-      {(store.isUploadDay || store.isApprovalDay) && pending.length === 0 && team.length > 0 && <Banner tone="ok">✓ Todo tu equipo ya está enviado a William.</Banner>}
+      {(store.isUploadDay || store.isApprovalDay) && pending.length === 0 && team.length > 0 && <Banner tone="ok">{mode === "both" ? "✓ Todo tu equipo ya está listo para tu aprobación final." : "✓ Todo tu equipo ya está enviado a William."}</Banner>}
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 0 }}>Ciclo actual: <strong>{info.name} {store.year}</strong> ({info.rangeEs}) · {who}</p>
       <div className="card" style={{ overflowX: "auto" }}>
         {rows.length === 0 ? <Empty icon="–" title="Sin personas a cargo" hint="Cuando William te asigne personas, las verás aquí." /> : (
