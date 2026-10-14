@@ -57,7 +57,7 @@ export default function InvoicePreview({ c, cycle, number, provisional }: { c: C
           <tbody>
             <tr style={{ borderBottom: "1px solid #ececE6" }}>
               <td style={{ padding: "8px", verticalAlign: "top" }}>
-                <div style={{ fontWeight: 700 }}>Professional services: {description.trim() || <span style={{ color: "#a3a7ae", fontWeight: 400 }}>(describe the work of the month)</span>}</div>
+                <div style={{ fontWeight: 700, whiteSpace: "pre-wrap" }}>Professional services: {description.trim() || <span style={{ color: "#a3a7ae", fontWeight: 400 }}>(describe the work of the month)</span>}</div>
                 <div style={{ color: "#6b6f76" }}>{info.period}</div>
                 {hourly && <div style={{ color: "#6b6f76" }}>{t.hours} hours × {formatMoney(c.hourlyRate, c.currency)} / hour</div>}
               </td>
