@@ -190,6 +190,17 @@ export function approvalsComplete(c: Contractor, cy: Cycle): boolean {
 export const isReadyForHr = (c: Contractor, cy: Cycle) =>
   cy.status === "abierto" && cy.closed && !!cy.signature && monthlyDecisionDone(c, cy) && approvalsComplete(c, cy);
 
+// Where a cycle is right now, in words a person understands.
+export function cycleStatusText(c: Contractor, cy: Cycle, supervisorName: string): string {
+  if (cy.status === "aprobada") return "Aprobada y registrada";
+  if (cy.status === "con_hr") return `Con ${HR_HEAD} — revisión final`;
+  if (!cy.closed) return "En curso — sin firmar";
+  const missing: string[] = [];
+  if (!approvalsComplete(c, cy)) missing.push(c.payType === "hourly" ? "aprobar los días" : "aprobar los entregables");
+  if (!monthlyDecisionDone(c, cy)) missing.push(c.payType === "variable" ? "confirmar el monto variable" : "confirmar el bono");
+  return `Firmado — ${supervisorName} debe ${missing.join(" y ") || "terminar"}`;
+}
+
 export const nextCycleNumber = (cycles: Cycle[], contractorId: number) =>
   cycles.filter(x => x.contractorId === contractorId && x.status === "aprobada").reduce((m, x) => Math.max(m, x.number ?? 0), 0) + 1;
 

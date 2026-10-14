@@ -17,6 +17,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const [showNewC, setShowNewC] = useState(false);
   const [showNewS, setShowNewS] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
   const toReview = store.cycles.filter(c => c.status === "con_hr");
   const open = openId !== null ? store.cycles.find(c => c.id === openId) : null;
   const noSupervisor = store.contractors.filter(c => c.supervisorId === null);
@@ -33,7 +34,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         </div>} />
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
-      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
+      <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
         value={tab} onChange={t => { setTab(t); setOpenId(null); }} />
 
       {tab === "revisar" && (open ? (
@@ -57,7 +58,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         </div>
       ))}
 
-      {tab === "equipo" && <TeamList store={store} team={noSupervisor} who="personas sin supervisor — apruebas tú" />}
+      {tab === "equipo" && <TeamList store={store} team={noSupervisor} who={`las personas que supervisas tú, ${HR_HEAD}`} />}
 
       {tab === "personas" && (
         <div>
@@ -74,7 +75,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
           <div className="card" style={{ overflowX: "auto" }}>
             <h4 style={{ marginTop: 0 }}>Personas ({store.contractors.length})</h4>
             <table className="data-table">
-              <thead><tr><th>Nombre</th><th>Área</th><th>Ubicación</th><th>Método</th><th>Pago</th><th>Bono máx.</th><th>Supervisor</th><th>Ciclo actual</th><th>Revisar</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Área</th><th>Ubicación</th><th>Método</th><th>Pago</th><th>Bono máx.</th><th>Supervisor</th><th>Ciclo actual</th><th>Revisar</th><th /></tr></thead>
               <tbody>{store.contractors.map(c => {
                 const sup = store.supervisors.find(s => s.id === c.supervisorId);
                 const cy = store.currentCycle(c.id);
@@ -90,6 +91,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
                     <td>{sup ? `${sup.firstName} ${sup.lastName}` : `${HR_HEAD} (sin supervisor)`}</td>
                     <td>{cy ? STATUS_LABEL[cy.status] : "—"}</td>
                     <td>{issues.length > 0 ? <span className="badge badge-danger" title={issues.join("\n")}>{issues.length} punto(s)</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                    <td><button className="btn btn-secondary btn-sm" onClick={() => setEditId(c.id)}>Editar</button></td>
                   </tr>
                 );
               })}</tbody>
@@ -121,6 +123,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "historial" && <HistoryTable store={store} />}
 
+      {editId !== null && <NewContractorModal initial={store.contractor(editId)} supervisors={store.supervisors} onClose={() => setEditId(null)} onSave={(c) => { store.updateContractor(editId, c); setEditId(null); }} />}
       {showNewC && <NewContractorModal supervisors={store.supervisors} onClose={() => setShowNewC(false)} onSave={(c, also) => { store.createContractor(c, also); setShowNewC(false); }} />}
       {showNewS && <NewSupervisorModal contractors={store.contractors} supervisors={store.supervisors} onClose={() => setShowNewS(false)} onSave={s => { store.createSupervisor(s); setShowNewS(false); }} />}
     </div>

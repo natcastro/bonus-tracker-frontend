@@ -3,7 +3,7 @@ import { BILL_TO, amountInWords, cycleDescription, cycleTotals, formatMoney, mas
 
 // On-screen version of HR's invoice template (the real version will be a PDF with the same layout).
 // It is always rendered from the live cycle, so it fills itself in as the person types.
-export default function InvoicePreview({ c, cycle, number }: { c: Contractor; cycle: Cycle; number: number | null }) {
+export default function InvoicePreview({ c, cycle, number, provisional }: { c: Contractor; cycle: Cycle; number: number | null; provisional?: boolean }) {
   const info = cycleInfo(cycle.year, cycle.month);
   const t = cycleTotals(c, cycle);
   const hourly = c.payType === "hourly";
@@ -22,6 +22,7 @@ export default function InvoicePreview({ c, cycle, number }: { c: Contractor; cy
           <div style={{ textAlign: "right" }}>
             <div className="hr-k">Invoice #</div>
             <div className="hr-num">{number ? pad4(number) : <span style={{ fontSize: "0.72rem", color: "#a3a7ae", fontFamily: "var(--font-body)", fontWeight: 600 }}>se asigna al aprobar</span>}</div>
+            {number && provisional && <div style={{ fontSize: "0.64rem", color: "#a3a7ae", fontWeight: 600 }}>número que le toca (se confirma al aprobar)</div>}
             <div style={{ fontSize: "0.74rem", color: "#5b6068", marginTop: 2 }}>{info.closing}</div>
           </div>
         </div>

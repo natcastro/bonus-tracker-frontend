@@ -85,6 +85,20 @@ export function useHrStore() {
       return null;
     },
 
+    // HR — William completes or corrects a person (missing bank data, bonus cap, hourly rate…)
+    updateContractor: (id: number, data: Omit<Contractor, "id">) => {
+      const before = contractors.find(c => c.id === id);
+      const updated = contractors.map(c => (c.id === id ? { ...data, id, issues: [] } : c));
+      setContractors(updated);
+      try { if (imported) sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors: updated, supervisors })); } catch { /* keep in memory */ }
+      // someone who now sends invoices needs a cycle to fill in
+      if (data.sendsInvoice && !cycles.some(x => x.contractorId === id && x.year === year && x.month === month)) {
+        setCycles([...cycles, { id: Math.max(0, ...cycles.map(c => c.id)) + 1, contractorId: id, year, month, days: [], summary: "", summaryApproved: false, bonus: null, variableAmount: null, closed: false, signature: null, status: "abierto", number: null }]);
+      }
+      setNotice(`Guardado: ${data.legalName}.${before && before.legalName !== data.legalName ? " (nombre actualizado)" : ""}`);
+    },
+    nextNumber: (contractorId: number) => nextCycleNumber(cycles, contractorId),
+
     // HR
     loadPeople: (list: Contractor[], sups: Supervisor[], rep?: ImportReport) => {
       try { sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors: list, supervisors: sups })); } catch { /* too big or blocked: keep in memory only */ }

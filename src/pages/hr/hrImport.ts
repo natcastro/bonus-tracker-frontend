@@ -22,6 +22,7 @@ function distance(a: string, b: string): number {
 // Names HR asked to change: every spelling of Natalie Peña becomes just "Katalina" (no surname for now).
 const RENAMES: { test: RegExp; to: string }[] = [{ test: /^nat[a-z]*lie pena$/, to: "Katalina" }];
 // Correct spellings of people we know: a name within one typo of these is written this way.
+const HR_HEAD_NAME = "William Calle"; // the HR head: people he supervises sit directly in his own team
 const KNOWN_NAMES = ["William Calle", "Héctor Peña"]; // only the ones the sheet misspells most often
 
 function money(v: unknown): number {
@@ -80,11 +81,13 @@ export function parseContractorsSheet(XLSX: typeof XLSXType, wb: XLSXType.WorkBo
   });
   const supName = (sp: string) => (sp ? canonical.get(clusterOf.get(strip(sp))!) ?? titleCase(sp) : "");
 
-  const supervisors: Supervisor[] = [...new Set(raw.map((x) => supName(String(x.sup))).filter(Boolean))].map((full, i) => {
+  const supervisors: Supervisor[] = [...new Set(raw.map((x) => supName(String(x.sup))).filter((n) => n && n !== HR_HEAD_NAME))].map((full, i) => {
     const parts = full.split(" "); const last = parts.length > 1 ? parts.pop()! : ""; // a single name stays as a first name
     return { id: i + 1, firstName: parts.join(" "), lastName: last, position: "Supervisor", contractorId: null };
   });
   const supId = (name: string) => supervisors.find((s) => `${s.firstName} ${s.lastName}`.trim() === name)?.id ?? null;
+
+  if (raw.some((x) => supName(String(x.sup)) === HR_HEAD_NAME)) fixes.push(`${HR_HEAD_NAME} es el jefe de HR: las personas que supervisa pasan directo a su equipo`);
 
   // ── contractors
   const contractors: Contractor[] = raw.map((x, i) => {

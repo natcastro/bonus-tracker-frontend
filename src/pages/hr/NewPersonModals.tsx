@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Contractor, Currency, PayType, PaymentMethod, Supervisor } from "./hrData";
 import { CURRENCIES, HR_HEAD, amountInWords, formatMoney, overLimit } from "./hrData";
+import MoneyInput from "./MoneyInput";
 
 const COUNTRIES = ["Colombia", "USA", "Bolivia", "Argentina", "España", "México", "Otro"];
 
@@ -21,14 +22,16 @@ const Choice = ({ options, value, onChange }: { options: [string, string][]; val
 );
 
 // Guided questionnaire — only William can create people, so the HR view is the only place this opens from.
-export function NewContractorModal({ supervisors, onSave, onClose }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">, alsoSupervisor: boolean) => void; onClose: () => void }) {
+export function NewContractorModal({ supervisors, onSave, onClose, initial }: { supervisors: Supervisor[]; onSave: (c: Omit<Contractor, "id">, alsoSupervisor: boolean) => void; onClose: () => void; initial?: Contractor }) {
+  const editing = !!initial;
   const [step, setStep] = useState(1);
-  const [c, setC] = useState(EMPTY);
+  const [c, setC] = useState<Omit<Contractor, "id">>(initial ? (({ id: _id, ...rest }) => rest)(initial) : EMPTY);
   const [err, setErr] = useState("");
   const [alsoSupervisor, setAlsoSupervisor] = useState(false);
-  const [receivesBonus, setReceivesBonus] = useState<"yes" | "no">("no");
-  const [capText, setCapText] = useState("");
-  const [otherCountry, setOtherCountry] = useState("");
+  const [receivesBonus, setReceivesBonus] = useState<"yes" | "no">(initial && initial.bonusCap > 0 ? "yes" : "no");
+  const [cap, setCap] = useState<number | null>(initial && initial.bonusCap > 0 ? initial.bonusCap : null);
+  const [otherCountry, setOtherCountry] = useState(initial && !COUNTRIES.includes(initial.country) ? initial.country : "");
+  useEffect(() => { if (initial && !COUNTRIES.includes(initial.country)) setC(prev => ({ ...prev, country: "Otro" })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<Omit<Contractor, "id">>) => setC(prev => ({ ...prev, ...patch }));
   const setBank = (patch: Partial<Contractor["bank"]>) => setC(prev => ({ ...prev, bank: { ...prev.bank, ...patch } }));
   const cur = CURRENCIES[c.currency];
@@ -38,10 +41,9 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
   const money = (label: string, value: number, onChange: (n: number) => void, hint?: string) => (
     <div className="form-group" style={{ maxWidth: 340 }}>
       <label>{label}</label>
-      <input className="form-control" type="number" min="0" step="0.01" value={value || ""} onChange={e => onChange(Number(e.target.value))}
-        style={overLimit(value, c.currency) ? { borderColor: "#dc2626" } : undefined} />
+      <MoneyInput value={value || null} currency={c.currency} invalid={overLimit(value, c.currency)} onChange={n => onChange(n ?? 0)} />
       {value > 0 && <div style={{ fontSize: "0.82rem", marginTop: 4, color: overLimit(value, c.currency) ? "#b91c1c" : "#334155" }}>
-        {formatMoney(value, c.currency)} = <strong>{amountInWords(value, c.currency)}</strong>{overLimit(value, c.currency) && <> — supera el límite de {formatMoney(cur.limit, c.currency)}. ¿Un cero de más?</>}
+        = <strong>{amountInWords(value, c.currency)}</strong>{overLimit(value, c.currency) && <> — supera el límite de {formatMoney(cur.limit, c.currency)}. ¿Un cero de más?</>}
       </div>}
       {hint && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{hint}</div>}
     </div>
@@ -64,8 +66,7 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
       if (c.payType === "fixed" && c.baseAmount <= 0) return setErr("Escribe el monto fijo mensual.");
       if (bigBase) return setErr(`${formatMoney(c.baseAmount, c.currency)} supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Agregaste un cero de más?`);
       if (receivesBonus === "yes") {
-        const cap = Number(capText);
-        if (capText.trim() === "" || isNaN(cap) || cap <= 0) return setErr("Escribe el máximo de bono por ciclo.");
+        if (cap === null || cap <= 0) return setErr("Escribe el máximo de bono por ciclo.");
         if (overLimit(cap, c.currency)) return setErr(`Ese máximo de bono supera el límite de ${formatMoney(cur.limit, c.currency)}. ¿Un cero de más?`);
       }
       if (c.monthlyCap !== null && c.monthlyCap > 0 && overLimit(c.monthlyCap, c.currency)) return setErr("El máximo mensual supera el límite permitido.");
@@ -75,16 +76,16 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (c.sendsInvoice && (!c.email.trim() || !c.taxId.trim())) { setErr("Para quien envía cuenta de cobro, el correo personal y el Tax ID son obligatorios."); return; }
-    const cap = receivesBonus === "yes" && c.payType !== "variable" ? Number(capText) : 0;
+    if (!editing && c.sendsInvoice && (!c.email.trim() || !c.taxId.trim())) { setErr("Para quien envía cuenta de cobro, el correo personal y el Tax ID son obligatorios."); return; }
+    const bonusCap = receivesBonus === "yes" && c.payType !== "variable" ? (cap ?? 0) : 0;
     const country = c.country === "Otro" ? otherCountry.trim() : c.country;
-    onSave({ ...c, country, bonusCap: cap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } }, alsoSupervisor);
+    onSave({ ...c, country, bonusCap, legalName: c.legalName.trim(), email: c.email.trim(), bank: { ...c.bank, holder: c.bank.holder || c.legalName.trim() } }, alsoSupervisor);
   };
 
   return (
     <div className="modal-overlay active" style={{ overflowY: "auto" }}>
       <form className="modal" onSubmit={submit} style={{ maxWidth: 720, width: "94vw", maxHeight: "92vh", overflowY: "auto" }}>
-        <div className="modal-header"><h3>Nueva persona — paso {step} de 3</h3></div>
+        <div className="modal-header"><h3>{editing ? `Editar — ${initial!.legalName.split(" ")[0]}` : "Nueva persona"} — paso {step} de 3</h3></div>
         <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
           {[1, 2, 3].map(n => <div key={n} style={{ flex: 1, height: 4, borderRadius: 999, background: n <= step ? "#0f766e" : "#e2e8f0" }} />)}
         </div>
@@ -104,10 +105,10 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
             <option value="">Sin supervisor (aprueba {HR_HEAD})</option>
             {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
           </select>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", margin: "0.9rem 0 0", cursor: "pointer" }}>
+          {!editing && <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", margin: "0.9rem 0 0", cursor: "pointer" }}>
             <input type="checkbox" checked={alsoSupervisor} onChange={e => setAlsoSupervisor(e.target.checked)} />
             <span><strong>También es supervisor</strong> — aprueba los pagos de otras personas y además llena el suyo</span>
-          </label>
+          </label>}
         </>)}
 
         {step === 2 && (<>
@@ -134,7 +135,7 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
           {c.payType !== "variable" && (<>
             <div style={Q}>¿Recibe bonos?</div>
             <Choice options={[["no", "No"], ["yes", "Sí"]]} value={receivesBonus} onChange={v => setReceivesBonus(v as "yes" | "no")} />
-            {receivesBonus === "yes" && <div style={{ marginTop: 8 }}>{money(`Máximo de bono por ciclo (${c.currency})`, Number(capText) || 0, n => setCapText(String(n || "")), "El supervisor no podrá dar un bono mayor.")}</div>}
+            {receivesBonus === "yes" && <div style={{ marginTop: 8 }}>{money(`Máximo de bono por ciclo (${c.currency})`, cap ?? 0, n => setCap(n || null), "El supervisor no podrá dar un bono mayor.")}</div>}
           </>)}
           <div className="form-row" style={{ marginTop: 10 }}>
             <div className="form-group"><label>Máximo total al mes (opcional)</label>
@@ -170,7 +171,7 @@ export function NewContractorModal({ supervisors, onSave, onClose }: { superviso
         {err && <p className="error-msg">{err}</p>}
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={step === 1 ? onClose : () => { setErr(""); setStep(step - 1); }}>{step === 1 ? "Cancelar" : "← Atrás"}</button>
-          {step < 3 ? <button type="button" className="btn btn-primary" onClick={next}>Siguiente →</button> : <button type="submit" className="btn btn-primary">Crear persona</button>}
+          {step < 3 ? <button type="button" className="btn btn-primary" onClick={next}>Siguiente →</button> : <button type="submit" className="btn btn-primary">{editing ? "Guardar cambios" : "Crear persona"}</button>}
         </div>
       </form>
     </div>

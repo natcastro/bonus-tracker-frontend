@@ -2,15 +2,17 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor, Cycle } from "./hrData";
 import {
-  CURRENCIES, STATUS_LABEL, amountInWords, approvalsComplete, cycleFileName, cycleTotals, formatMoney, cycleInfo, weekdayLabel,
+  CURRENCIES, HR_HEAD, STATUS_LABEL, amountInWords, approvalsComplete, cycleFileName, cycleTotals, formatMoney, cycleInfo, weekdayLabel,
 } from "./hrData";
 import { Banner, Stat } from "./ui";
 import InvoicePreview from "./InvoicePreview";
+import MoneyInput from "./MoneyInput";
+import CycleStepper from "./CycleStepper";
 
 // What a supervisor (day-by-day approvals + bonus) or William (final review) sees for one contractor's cycle.
 export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrStore; c: Contractor; cy: Cycle; mode: "supervisor" | "hr"; onBack: () => void }) {
   const variable = c.payType === "variable";
-  const [bonusText, setBonusText] = useState((variable ? cy.variableAmount : cy.bonus) === null ? "" : String(variable ? cy.variableAmount : cy.bonus));
+  const [bonusVal, setBonusVal] = useState<number | null>(variable ? cy.variableAmount : cy.bonus);
   const [bonusErr, setBonusErr] = useState("");
   const [returnNote, setReturnNote] = useState("");
   const info = cycleInfo(cy.year, cy.month);
@@ -19,12 +21,12 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
   const canAct = mode === "supervisor" && cy.status === "abierto";
   const pendingDays = cy.days.filter(d => d.hours > 0 && !d.approved).length;
 
-  const saveBonus = () => {
-    const n = Number(bonusText);
-    if (bonusText.trim() === "" || isNaN(n)) { setBonusErr(variable ? "Escribe el monto del mes (si no hubo, escribe 0)." : "Escribe el bono (si no hay, escribe 0)."); return; }
-    const err = variable ? store.setVariable(cy.id, n) : store.setBonus(cy.id, n);
+  const saveBonus = (amount: number | null = bonusVal) => {
+    if (amount === null) { setBonusErr(variable ? "Escribe el monto del mes (si no hubo, escribe 0)." : "Escribe el bono (si no hay, escribe 0)."); return; }
+    const err = variable ? store.setVariable(cy.id, amount) : store.setBonus(cy.id, amount);
     setBonusErr(err ?? "");
   };
+
 
   return (
     <div>
@@ -37,6 +39,8 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
       </div>
 
       {cy.hrNote && cy.status === "abierto" && <Banner tone="warn">Devuelta por William: {cy.hrNote}</Banner>}
+
+      <CycleStepper c={c} cy={cy} supervisorName={store.supervisors.find(x => x.id === c.supervisorId)?.firstName ?? HR_HEAD} />
 
       <div className="summary-cards">
         <Stat label={hourly ? `Horas × ${formatMoney(c.hourlyRate, c.currency)}` : variable ? "Base garantizada" : "Monto base"} value={formatMoney(hourly ? t.base : c.baseAmount, c.currency)} sub={hourly ? `${t.hours} horas` : undefined} />
@@ -93,15 +97,26 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
           <div className="card">
             <h4 style={{ marginTop: 0 }}>{variable ? "Monto variable del mes" : "Bono del ciclo"}</h4>
             <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Solo tú lo defines. Si {variable ? "no hubo monto variable" : "no hubo bono"}, escribe <strong>0</strong>: el ciclo no avanza hasta que lo confirmes.{variable && c.notes ? <> Nota de HR: <em>{c.notes}</em></> : null}</p>
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{variable ? "Monto variable" : "Bono"} ({c.currency})</label>
-                <input className="form-control" type="number" min="0" step="0.01" value={bonusText} disabled={!canAct} onChange={e => { setBonusText(e.target.value); setBonusErr(""); }} />
+            {!variable && c.bonusCap === 0 ? (
+              <div>
+                <p style={{ margin: "0 0 10px", fontSize: "0.88rem" }}><strong>{c.legalName}</strong> no tiene bono configurado (máximo {formatMoney(0, c.currency)}). Si no recibe bono este mes, confírmalo para poder enviar el ciclo.</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button className="btn btn-primary" disabled={!canAct || cy.bonus === 0} onClick={() => saveBonus(0)}>{cy.bonus === 0 ? "✓ Sin bono confirmado" : "Confirmar: sin bono"}</button>
+                  <span className="hr-note">¿Debería tener bono? Pídele a William que defina el tope en <em>Personas registradas → Editar</em>.</span>
+                </div>
               </div>
-              <button className="btn btn-primary" disabled={!canAct} onClick={saveBonus}>{variable ? "Guardar monto" : "Guardar bono"}</button>
-            </div>
-            {bonusText.trim() !== "" && !isNaN(Number(bonusText)) && Number(bonusText) > 0 && (
-              <p style={{ fontSize: "0.8rem", margin: "0.5rem 0 0", color: "#334155" }}>= {amountInWords(Number(bonusText), c.currency)} — revisa que sea el monto correcto.</p>
+            ) : (
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div className="form-group" style={{ marginBottom: 0, minWidth: 230 }}>
+                  <label>{variable ? "Monto variable" : "Bono"} ({c.currency})</label>
+                  <MoneyInput value={bonusVal} currency={c.currency} disabled={!canAct} onChange={(n) => { setBonusVal(n); setBonusErr(""); }} />
+                </div>
+                <button className="btn btn-primary" disabled={!canAct} onClick={() => saveBonus()}>{variable ? "Guardar monto" : "Guardar bono"}</button>
+                {!variable && <button className="btn btn-secondary" disabled={!canAct} onClick={() => { setBonusVal(0); saveBonus(0); }}>Sin bono (0)</button>}
+              </div>
+            )}
+            {bonusVal !== null && bonusVal > 0 && (
+              <p style={{ fontSize: "0.82rem", margin: "0.5rem 0 0", color: "#334155" }}>{formatMoney(bonusVal, c.currency)} = <strong>{amountInWords(bonusVal, c.currency)}</strong> — revisa que sea el monto correcto.</p>
             )}
             {bonusErr && <p className="error-msg">{bonusErr}</p>}
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>
@@ -143,7 +158,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
           </div>
         <aside className="hr-split__side" aria-label="Vista previa de la cuenta de cobro">
           <div className="hr-sidehead"><span>Cuenta de cobro</span><span className="hr-live">EN VIVO</span></div>
-          <InvoicePreview c={c} cycle={cy} number={cy.number} />
+          <InvoicePreview c={c} cycle={cy} number={cy.number ?? store.nextNumber(c.id)} provisional={cy.number === null} />
         </aside>
       </div>
     </div>

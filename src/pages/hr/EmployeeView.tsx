@@ -2,18 +2,19 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor, Cycle } from "./hrData";
 import {
-  CURRENCIES, STATUS_LABEL, amountInWords, cycleTotals, daysOfCycle, formatMoney, isWeekend, looksEnglish, maskAccount, cycleInfo,
+  CURRENCIES, PAY_TYPE_LABEL, amountInWords, cycleStatusText, cycleTotals, daysOfCycle, formatMoney, isWeekend, looksEnglish, maskAccount, cycleInfo,
   overLimit, weekdayLabel, HR_HEAD,
 } from "./hrData";
-import { Banner, PageHeader, Stat, Tabs } from "./ui";
+import { Banner, Empty, PageHeader, Stat, Tabs } from "./ui";
 import SignaturePad from "./SignaturePad";
 import InvoicePreview from "./InvoicePreview";
+import CycleStepper from "./CycleStepper";
 
 export default function EmployeeView({ store, c, embedded }: { store: HrStore; c: Contractor; embedded?: boolean }) {
   const [tab, setTab] = useState<"ciclo" | "historial" | "perfil">("ciclo");
   const [viewId, setViewId] = useState<number | null>(null);
   const supervisor = store.supervisors.find(s => s.id === c.supervisorId);
-  const history = store.cycles.filter(x => x.contractorId === c.id && x.status === "aprobada").sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month));
+  const history = store.cycles.filter(x => x.contractorId === c.id).sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month));
   const viewing = history.find(h => h.id === viewId);
 
   return (
@@ -26,17 +27,22 @@ export default function EmployeeView({ store, c, embedded }: { store: HrStore; c
       {tab === "historial" && (viewing ? (
         <div>
           <button className="btn btn-secondary btn-sm" onClick={() => setViewId(null)} style={{ marginBottom: 10 }}>← Volver</button>
-          <InvoicePreview c={c} cycle={viewing} number={viewing.number} />
+          <InvoicePreview c={c} cycle={viewing} number={viewing.number ?? store.nextNumber(c.id)} provisional={viewing.number === null} />
         </div>
       ) : (
         <div className="card" style={{ overflowX: "auto" }}>
-          {history.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>Todavía no tienes pagos registrados.</p> : (
+          <p className="hr-note" style={{ marginTop: 0 }}>Aquí aparece cada ciclo apenas lo empiezas, con el punto exacto en el que va. Cuando William lo aprueba queda como pago registrado.</p>
+          {history.length === 0 ? <Empty icon="–" title="Todavía no tienes ciclos" hint="Tu primer ciclo aparecerá aquí." /> : (
             <table className="data-table">
-              <thead><tr><th>#</th><th>Mes</th><th>Total</th><th>Estado</th><th /></tr></thead>
+              <thead><tr><th>#</th><th>Ciclo</th><th>Total</th><th>Dónde va</th><th /></tr></thead>
               <tbody>{history.map(h => (
-                <tr key={h.id}><td>{String(h.number).padStart(4, "0")}</td><td>{cycleInfo(h.year, h.month).name} {h.year}</td>
-                  <td>{formatMoney(cycleTotals(c, h).total, c.currency)}</td><td><span className="badge badge-success">{STATUS_LABEL[h.status]}</span></td>
-                  <td><button className="btn btn-secondary btn-sm" onClick={() => setViewId(h.id)}>Ver cuenta de cobro</button></td></tr>
+                <tr key={h.id}>
+                  <td>{h.number ? String(h.number).padStart(4, "0") : <span style={{ color: "var(--hr-faint)" }}>—</span>}</td>
+                  <td>{cycleInfo(h.year, h.month).name} {h.year}<div className="hr-note">{cycleInfo(h.year, h.month).rangeEs}</div></td>
+                  <td>{formatMoney(cycleTotals(c, h).total, c.currency)}</td>
+                  <td><span className={`badge ${h.status === "aprobada" ? "badge-success" : h.status === "con_hr" ? "badge-warning" : "badge-warning"}`}>{cycleStatusText(c, h, supervisor?.firstName ?? HR_HEAD)}</span></td>
+                  <td><button className="btn btn-secondary btn-sm" onClick={() => setViewId(h.id)}>Ver cuenta de cobro</button></td>
+                </tr>
               ))}</tbody>
             </table>
           )}
@@ -44,23 +50,39 @@ export default function EmployeeView({ store, c, embedded }: { store: HrStore; c
       ))}
 
       {tab === "perfil" && (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>{c.legalName}</h3>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Esta información es fija y aparece en todas tus cuentas de cobro. Si algo está mal, avisa a {HR_HEAD}: solo él puede cambiarla.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.4rem 1.5rem", fontSize: "0.9rem" }}>
-            <div><strong>Cargo:</strong> {c.position}</div>
-            <div><strong>Supervisor:</strong> {supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : `${HR_HEAD} (sin supervisor)`}</div>
-            <div><strong>Correo personal:</strong> {c.email}</div>
-            <div><strong>Teléfono:</strong> {c.phone}</div>
-            <div><strong>Dirección:</strong> {c.address}, {c.country}</div>
-            <div><strong>Tax ID:</strong> {c.taxId}</div>
-            <div><strong>Pago:</strong> {c.payType === "hourly" ? `Por horas — ${formatMoney(c.hourlyRate, c.currency)}/h` : `Monto base — ${formatMoney(c.baseAmount, c.currency)}`}</div>
-            <div><strong>Moneda:</strong> {c.currency}</div>
-            <div><strong>Bono máximo por ciclo:</strong> {formatMoney(c.bonusCap, c.currency)}</div>
-            <div><strong>Banco:</strong> {c.bank.bankName} ({c.bank.bankCountry})</div>
-            <div><strong>Cuenta:</strong> {c.bank.accountType} {maskAccount(c.bank.accountNumber)}</div>
+        <div className="hr-view">
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>{c.legalName}</h3>
+            <p className="hr-note" style={{ marginTop: 0 }}>Esta información es fija y aparece en todas tus cuentas de cobro. Si algo está mal o falta, avisa a {HR_HEAD}: solo él puede cambiarla.</p>
+            <div className="hr-kv">
+              <div><span>Cargo / área</span>{c.position}</div>
+              <div><span>Supervisor</span>{supervisor ? `${supervisor.firstName} ${supervisor.lastName}`.trim() : `${HR_HEAD} (sin supervisor)`}</div>
+              <div><span>Ubicación</span>{c.country}{c.region ? ` — ${c.region}` : ""}</div>
+              <div><span>Correo personal</span>{c.email || <em className="hr-pending">pendiente</em>}</div>
+              <div><span>Teléfono</span>{c.phone || <em className="hr-pending">pendiente</em>}</div>
+              <div><span>Dirección</span>{c.address || <em className="hr-pending">pendiente</em>}</div>
+              <div><span>Tax ID</span>{c.taxId || <em className="hr-pending">pendiente</em>}</div>
+              <div><span>Banco</span>{c.paymentMethod === "adp" ? "Paga ADP" : c.bank.bankName ? `${c.bank.bankName} (${c.bank.bankCountry})` : <em className="hr-pending">pendiente</em>}</div>
+              {c.paymentMethod === "wired" && <div><span>Cuenta</span>{c.bank.accountNumber ? `${c.bank.accountType} ${maskAccount(c.bank.accountNumber)}` : <em className="hr-pending">pendiente</em>}</div>}
+            </div>
           </div>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: 0 }}>🔒 En la versión real estos datos se guardan cifrados.</p>
+          <div className="card">
+            <h4 style={{ marginTop: 0 }}>Cómo se te paga</h4>
+            <div className="hr-kv">
+              <div><span>Modalidad</span>{PAY_TYPE_LABEL[c.payType]}</div>
+              <div><span>{c.payType === "hourly" ? "Tarifa por hora" : c.payType === "variable" ? "Base garantizada" : "Monto base mensual"}</span>
+                {c.payType === "hourly" ? (c.hourlyRate ? formatMoney(c.hourlyRate, c.currency) : <em className="hr-pending">pendiente</em>) : formatMoney(c.baseAmount, c.currency)}</div>
+              <div><span>Moneda</span>{c.currency}</div>
+              <div><span>Método y día de pago</span>{c.paymentMethod === "adp" ? "ADP" : "Transferencia internacional"} · día {c.payDay}</div>
+              <div><span>Bono</span>
+                {c.payType === "variable" ? "No aplica: el supervisor reporta un monto variable cada mes"
+                  : c.bonusCap > 0 ? <>Hasta <strong>{formatMoney(c.bonusCap, c.currency)}</strong> por ciclo — lo define tu supervisor</>
+                  : c.issues.some(i => i.includes("tope de bono")) ? <em className="hr-pending">pendiente: William debe definir el tope</em> : "Sin bono"}</div>
+              {c.monthlyCap && <div><span>Máximo total al mes</span>{formatMoney(c.monthlyCap, c.currency)}</div>}
+              {c.weeklyHoursCap && <div><span>Máximo de horas por semana</span>{c.weeklyHoursCap} h</div>}
+            </div>
+            <p className="hr-note" style={{ marginBottom: 0 }}>🔒 En la versión real los datos bancarios y de identificación se guardan cifrados.</p>
+          </div>
         </div>
       )}
     </div>
@@ -114,6 +136,8 @@ function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycl
       {cy.status === "con_hr" && <Banner tone="ok">✓ Tu ciclo ya pasó por tu supervisor y está con William para la aprobación final.</Banner>}
       {cy.status === "aprobada" && <Banner tone="ok">✓ Ciclo aprobado y registrado.</Banner>}
       {cy.closed && cy.status === "abierto" && <Banner tone="info">Firmaste tu ciclo. Falta que {store.supervisors.find(s => s.id === c.supervisorId)?.firstName ?? HR_HEAD} apruebe y confirme el bono.</Banner>}
+
+      <CycleStepper c={c} cy={cy} supervisorName={store.supervisors.find(x => x.id === c.supervisorId)?.firstName ?? HR_HEAD} />
 
       <div className="summary-cards">
         <Stat label={hourly ? "Horas registradas" : "Monto base"} value={hourly ? `${t.hours} h` : formatMoney(t.base, c.currency)} sub={hourly ? `${formatMoney(c.hourlyRate, c.currency)} por hora` : undefined} />
@@ -174,7 +198,7 @@ function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycl
           </div>
         <aside className="hr-split__side" aria-label="Vista previa de tu cuenta de cobro">
           <div className="hr-sidehead"><span>Tu cuenta de cobro</span><span className="hr-live">EN VIVO</span></div>
-          <InvoicePreview c={c} cycle={{ ...cy, signature }} number={cy.number} />
+          <InvoicePreview c={c} cycle={{ ...cy, signature }} number={cy.number ?? store.nextNumber(c.id)} provisional={cy.number === null} />
         </aside>
       </div>
     </div>
