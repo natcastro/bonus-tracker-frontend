@@ -5,7 +5,7 @@ import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
-import { todoStageLabel, requestStageLabel, isPastDeadline } from "../types";
+import { todoStageLabel, requestStageLabel, isPastDeadline, stageLate, todayIso } from "../types";
 import type { TodoTask, MarketingRequest } from "../types";
 import { moodBird } from "../../../components/moodBird";
 import { LinkIcon } from "../../../components/icons";
@@ -60,10 +60,14 @@ export default function TodoPage() {
   }, [todoTasks, requests]);
 
   const pending = items.filter(i => i.status === "in_progress");
-  const onTime = pending.filter(i => !i.overdue);
   const late = pending.filter(i => i.overdue);
   const completed = items.filter(i => i.status === "completed");
-  const onTimePct = pending.length > 0 ? Math.round((100 * onTime.length) / pending.length) : 100;
+  // Same idea as the Briefs "A tiempo": over what was finished this month plus what is in progress, the share with no
+  // Diseño delivery made late and nothing currently overdue.
+  const monthKey = todayIso().slice(0, 7);
+  const cohort = [...pending, ...completed.filter(i => (i.kind === "todo" ? i.task.completedAt : i.request.completedAt)?.slice(0, 7) === monthKey)];
+  const wasLate = (i: BoardItem) => i.kind === "todo" && i.task.stages.some(st => st.role === "diseno" && st.status === "done" && stageLate(st));
+  const onTimePct = cohort.length > 0 ? Math.round((100 * cohort.filter(i => !i.overdue && !wasLate(i)).length) / cohort.length) : 100;
   const bird = moodBird(onTimePct);
 
   const filtered = useMemo(() => items
@@ -112,7 +116,7 @@ export default function TodoPage() {
       }}>
         {kpi("Pendientes", pending.length, MT.text1)}
         {kpi("En proceso", pending.length, MT.info)}
-        {kpi("A tiempo", onTime.length, MT.moss)}
+        {kpi("A tiempo", `${onTimePct}%`, MT.moss)}
         {kpi("En retraso", late.length, late.length > 0 ? MT.danger : MT.text1)}
         {kpi("Completadas", completed.length, MT.primary, true)}
       </div>
