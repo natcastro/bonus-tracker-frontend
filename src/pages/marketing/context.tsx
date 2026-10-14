@@ -57,6 +57,7 @@ interface MarketingCtx {
   reload: () => Promise<void>;
 
   createBrief: (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => Promise<void>;
+  createBriefForReview: (reference: string, productLine: string, startDate: string, briefLink: string, variantKeys?: VariantKey[]) => Promise<void>;
   createDraftBrief: (reference: string, productLine: string, estimatedStartDate: string, briefLink: string) => Promise<void>;
   publishBrief: (briefId: number, assignedDisenoEmail?: string) => Promise<void>;
   submitDesignStage: (briefId: number, link: string, note?: string) => Promise<void>;
@@ -621,6 +622,30 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await reload();
   };
 
+  // Karol proposes a brief: it waits as a pending draft until Laura reviews it and publishes it (assigning Diseño),
+  // which is when the normal flow and its deadlines start.
+  const createBriefForReview = async (reference: string, productLine: string, startDate: string, briefLink: string, variantKeys?: VariantKey[]) => {
+    if ((variantKeys?.length ?? 0) > 1) throw new Error("Cada brief lleva una sola variante. Crea un brief aparte para cada una.");
+    const dup = (variantKeys ?? []).find(k => variantsTakenFor(briefs, reference).has(k));
+    if (dup) throw new Error(`${variantLabel(dup)} ya tiene un brief para ${reference}.`);
+    const stages = STAGE_DEFS.map(def => ({ ...def, deadline: null, link: def.key === "brief" ? (briefLink || null) : null, completedAt: null, status: "pending" as const, ...(def.key === "brief" ? { by: myEmail } : {}) }));
+    const created = await createMarketingBrief({
+      reference, productLine, startDate, estimatedStartDate: startDate, currentStage: "brief", status: "draft",
+      stages, shiftDays: 0, lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0,
+      completedAt: null, assignedDisenoEmail: null, carolNotifiedAt: null,
+      publicationLinks: {}, linksApprovedByKarol: false, variants: buildVariants(startDate, variantKeys ?? []),
+    });
+    await notify(created.id, `Karol creó el brief ${reference} y espera tu revisión.`);
+    if (notifyEmails.laura) {
+      await sendMarketingEmail(
+        notifyEmails.laura,
+        `Brief para revisar — ${reference}`,
+        emailHtml({ intro: "Karol creó un brief y necesita que lo revises. Cuando lo publiques empieza el flujo con Diseño.", reference, nextTask: "Revisar y publicar", deadline: null, link: appUrl(`/marketing/brief/${created.id}`) }),
+      );
+    }
+    await reload();
+  };
+
   const publishBrief = async (briefId: number, assignedDisenoEmail?: string) => {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || brief.status !== "draft") return;
@@ -628,8 +653,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const stages = buildStages(today, brief.stages.find(s => s.key === "brief")?.link ?? "");
     const nextDeadline = addWorkDaysIso(today, STAGE_DEFS[1].gapDays);
     const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
+    const link = brief.stages.find(s => s.key === "brief")?.link ?? "";
     await updateMarketingBrief(briefId, {
       startDate: today, estimatedStartDate: null, currentStage: "proposal", status: "in_progress", stages,
+      // a brief that carries a variant (sent by Karol) gets that variant's own stages and deadlines from today
+      ...(brief.variants ? { variants: brief.variants.map(v => (v.applicable ? { ...v, stages: buildStages(today, link) } : v)) } : {}),
       assignedDisenoEmail: assignedDisenoEmail ?? null, carolNotifiedAt,
     });
     await notifyBriefLive(briefId, brief.reference, assignedDisenoEmail ?? null, nextDeadline);
@@ -1053,7 +1081,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
-      createBrief, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
+      createBrief, createBriefForReview, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
       submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,

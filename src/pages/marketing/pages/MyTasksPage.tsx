@@ -24,6 +24,7 @@ export default function MyTasksPage() {
   const navigate = useNavigate();
   const [showNew, setShowNew] = useState(false);
   const [showNewTodo, setShowNewTodo] = useState(false);
+  const [showNewForLaura, setShowNewForLaura] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDue, setTaskDue] = useState("");
@@ -64,6 +65,12 @@ export default function MyTasksPage() {
     return briefs
       .filter(b => b.status === "draft")
       .sort((a, b) => (a.estimatedStartDate ?? "").localeCompare(b.estimatedStartDate ?? ""));
+  }, [briefs, myRole]);
+
+  // Briefs Karol sent that Laura hasn't published yet.
+  const sentToLaura = useMemo(() => {
+    if (myRole !== "carol") return [];
+    return briefs.filter(b => b.status === "draft" && !!b.stages.find(s => s.key === "brief")?.by);
   }, [briefs, myRole]);
 
   const myLinkReviews = useMemo(() => {
@@ -145,10 +152,16 @@ export default function MyTasksPage() {
           }}>+ Nuevo</button>
         )}
         {myRole === "carol" && (
-          <button onClick={() => setShowNewTodo(true)} style={{
-            fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-          }}>+ Nueva tarea</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setShowNewForLaura(true)} style={{
+              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            }}>+ Brief para Laura</button>
+            <button onClick={() => setShowNewTodo(true)} style={{
+              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            }}>+ Nueva tarea</button>
+          </div>
         )}
       </div>
 
@@ -244,6 +257,17 @@ export default function MyTasksPage() {
       </div>
       )}
 
+      {sentToLaura.length > 0 && (
+        <div style={{ marginBottom: "1.75rem" }}>
+          <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Enviados a Laura — esperando su revisión</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {sentToLaura.map(b => (
+              <button key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.info}`, borderRadius: 8, padding: "9px 14px", color: MT.text1 }}>{b.reference}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {myDrafts.length > 0 && (
         <div style={{ marginBottom: "1.75rem" }}>
           <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
@@ -277,6 +301,7 @@ export default function MyTasksPage() {
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                  {b.stages.find(s => s.key === "brief")?.by && <div style={{ fontSize: 11.5, fontWeight: 700, color: MT.clay, marginTop: 4 }}>De Karol — por revisar</div>}
                 </div>
                 {b.estimatedStartDate && <DeadlineBadge deadline={b.estimatedStartDate} />}
               </button>
@@ -490,6 +515,7 @@ export default function MyTasksPage() {
       )}
 
       {showNew && <NewBriefModal onClose={() => setShowNew(false)} />}
+      {showNewForLaura && <NewBriefModal forReview onClose={() => setShowNewForLaura(false)} />}
       {showNewTodo && <NewTodoTaskModal onClose={() => setShowNewTodo(false)} />}
     </div>
   );

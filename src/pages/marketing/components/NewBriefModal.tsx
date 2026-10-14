@@ -4,8 +4,9 @@ import { useMarketing } from "../context";
 import { PRODUCT_LINES, todayIso, VARIANT_DEFS, normalizeSku, variantsTakenFor } from "../types";
 import type { VariantKey } from "../types";
 
-export default function NewBriefModal({ onClose }: { onClose: () => void }) {
-  const { createBrief, createDraftBrief, disenoEmailList, disenoDisplayName, briefs } = useMarketing();
+// forReview = Karol proposing a brief: it goes to Laura as a pending draft; Laura reviews, assigns Diseño and publishes it.
+export default function NewBriefModal({ onClose, forReview = false }: { onClose: () => void; forReview?: boolean }) {
+  const { createBrief, createBriefForReview, createDraftBrief, disenoEmailList, disenoDisplayName, briefs } = useMarketing();
   const [mode, setMode] = useState<"public" | "draft">("public");
   const [reference, setReference] = useState("");
   const [productLine, setProductLine] = useState("");
@@ -38,7 +39,9 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
     if (!productLine) { setError("La línea de producto es obligatoria."); return; }
     setSaving(true);
     try {
-      if (mode === "draft") {
+      if (forReview) {
+        await createBriefForReview(reference.trim(), productLine, startDate, briefLink.trim(), variantKeys);
+      } else if (mode === "draft") {
         await createDraftBrief(reference.trim(), productLine, startDate, briefLink.trim());
       } else {
         await createBrief(reference.trim(), productLine, startDate, briefLink.trim(), assignedDisenoEmail || undefined, variantKeys);
@@ -65,9 +68,9 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
           Nuevo brief
         </div>
-        <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>Crear brief de producto</h3>
+        <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>{forReview ? "Enviar brief a Laura" : "Crear brief de producto"}</h3>
 
-        <div style={{ display: "flex", gap: 6, marginBottom: 18, background: MT.surfaceAlt, borderRadius: 8, padding: 3 }}>
+        {!forReview && <div style={{ display: "flex", gap: 6, marginBottom: 18, background: MT.surfaceAlt, borderRadius: 8, padding: 3 }}>
           {([["public", "Tarea pública"], ["draft", "Tarea pendiente (privada)"]] as const).map(([m, label]) => (
             <button key={m} type="button" onClick={() => setMode(m)} style={{
               flex: 1, fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
@@ -77,7 +80,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
               boxShadow: mode === m ? MT.shadow : "none",
             }}>{label}</button>
           ))}
-        </div>
+        </div>}
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
@@ -132,13 +135,14 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
           </div>
           {mode === "public" ? (
             <>
-              <div>
+              {!forReview && <div>
                 <label style={labelStyle}>Asignar a Diseño (opcional)</label>
                 <select style={inputStyle} value={assignedDisenoEmail} onChange={e => setAssignedDisenoEmail(e.target.value)}>
                   <option value="">Sin asignar — avisar a Karol</option>
                   {disenoEmailList.map(email => <option key={email} value={email}>{disenoDisplayName(email)}</option>)}
                 </select>
-              </div>
+              </div>}
+              {forReview && <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>Laura recibe un aviso, revisa el brief y lo publica asignándolo a Diseño. Hasta entonces no corre ningún plazo.</p>}
               <div>
                 <label style={labelStyle}>Variante (opcional — una por brief; déjala vacía si el producto no tiene variantes)</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.45rem" }}>
@@ -188,7 +192,7 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
             <button type="submit" disabled={saving} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
               background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>{saving ? "Creando..." : mode === "draft" ? "Crear tarea pendiente" : "Crear brief"}</button>
+            }}>{saving ? "Creando..." : forReview ? "Enviar a Laura" : mode === "draft" ? "Crear tarea pendiente" : "Crear brief"}</button>
           </div>
         </form>
       </div>

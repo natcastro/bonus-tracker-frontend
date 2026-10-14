@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantStatusLabel } from "../types";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantLabels, variantStatusLabel } from "../types";
 import type { PublicationPlatform, StageKey, VariantKey, BriefVariant } from "../types";
 import { lateExplanation } from "../lateInfo";
 import { uploadMarketingReviewImage, getBriefNotificationTimes } from "../../../services/api";
@@ -648,10 +648,24 @@ export default function BriefDetailPage() {
 
       {brief.status === "draft" ? (
         <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
-          <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
-            Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
-          </p>
+          {brief.stages.find(s => s.key === "brief")?.by ? (
+            <>
+              <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Brief de Karol — por revisar</p>
+              <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
+                {myRole === "laura"
+                  ? "Revisa el brief y publícalo: al publicarlo empieza el flujo normal y puedes asignarlo a Diseño."
+                  : "Laura lo revisará y lo publicará. Hasta entonces no corre ningún plazo."}
+                {brief.variants?.some(v => v.applicable) && <> Variante: <strong>{variantLabels(brief.variants.filter(v => v.applicable).map(v => v.key))}</strong>.</>}
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
+              <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
+                Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
+              </p>
+            </>
+          )}
           {myRole === "laura" ? (
             <>
               <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>Link de SharePoint del brief (opcional)</label>

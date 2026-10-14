@@ -22,6 +22,8 @@ export interface MarketingStage {
   completedAt: string | null; // yyyy-mm-dd
   // Exact moment (ISO) the stage was completed — stamped by updateMarketingBrief; absent on older stages.
   completedTs?: string;
+  // On the "brief" stage of a brief Karol sent for Laura's review: Karol's email (marks it as hers).
+  by?: string;
   status: "pending" | "done";
   decision?: "approved" | "changes_requested" | "extra_revision";
   late?: boolean;
