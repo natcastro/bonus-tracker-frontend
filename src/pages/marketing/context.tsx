@@ -197,19 +197,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       try { return await fn(); }
       catch (err) { console.error(`Failed to load ${label}:`, err); return fallback; }
     };
-    // Video people only work with To Do: no briefs, no requests, no shared notification inbox are even fetched.
-    const isVideo = myRoleForLoad === "video";
     const [n, rq, b, t, tt, vu] = await Promise.all([
-      isVideo ? Promise.resolve([]) : safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
-      isVideo ? Promise.resolve([]) : safe("requests", () => getMarketingRequests(hasInternalRole ? undefined : myEmail), []),
-      hasInternalRole && !isVideo ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
+      safe("notifications", () => getMarketingNotifications(hasInternalRole ? undefined : myEmail), []),
+      safe("requests", () => getMarketingRequests(hasInternalRole ? undefined : myEmail), []),
+      hasInternalRole ? safe("briefs", () => getMarketingBriefs(), []) : Promise.resolve([]),
       hasInternalRole ? safe("private tasks", () => getPrivateTasks(myEmail), []) : Promise.resolve([]),
       hasInternalRole ? safe("todo tasks", () => getTodoTasks(), []) : Promise.resolve([]),
       hasInternalRole ? safe("video users", () => getVideoUsers(), []) : Promise.resolve([]),
     ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
-    // Everyone sees the whole To Do board; a Video person can only act on the tasks assigned to them.
+    // Video sees exactly what Diseño sees; it can only act on the tasks assigned to it.
     setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt); setVideoUsers(vu);
   }, [myEmail, myRoleForLoad]);
 

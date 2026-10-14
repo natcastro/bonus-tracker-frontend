@@ -6,7 +6,6 @@ import MyTasksPage from "./pages/MyTasksPage";
 import DashboardPage from "./pages/DashboardPage";
 import TodoPage from "./pages/TodoPage";
 import TeamDashboardPage from "./pages/TeamDashboardPage";
-import VideoDashboardPage from "./pages/VideoDashboardPage";
 import BriefDetailPage from "./pages/BriefDetailPage";
 import TodoTaskDetailPage from "./pages/TodoTaskDetailPage";
 import RequestsPage from "./pages/RequestsPage";
@@ -55,15 +54,14 @@ function InternalShell() {
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MyTasksPage />} />
           <Route path="todo" element={<TodoPage />} />
-          <Route path="dashboard" element={authedUser.role === "video" ? <VideoDashboardPage /> : <TeamDashboardPage />} />
+          <Route path="dashboard" element={<TeamDashboardPage />} />
           <Route path="todo/:id" element={<TodoTaskDetailPage />} />
-          {/* Briefs and Solicitudes are closed to the Video role (anything else falls through to "tasks" below). */}
-          {authedUser.role !== "video" && <Route path="home" element={<DashboardPage />} />}
-          {authedUser.role !== "video" && <Route path="brief/:id" element={<BriefDetailPage />} />}
+          <Route path="home" element={<DashboardPage />} />
+          <Route path="brief/:id" element={<BriefDetailPage />} />
           {/* Everyone reaches Solicitudes, but RequestsPage itself only shows the full
               list/assign/reassign/delete tools to Laura/Karol — Diseño just gets the
               "copiar enlace" box so they can hand it out too. */}
-          {authedUser.role !== "video" && <Route path="requests" element={<RequestsPage />} />}
+          <Route path="requests" element={<RequestsPage />} />
           <Route path="*" element={<Navigate to="tasks" replace />} />
         </Routes>
       </div>

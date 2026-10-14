@@ -95,7 +95,7 @@ export default function MyTasksPage() {
         // different variants can be at different stages/roles at once.
         if (!currentActiveStages(b).some(s => s.role === myRole)) return false;
         // Each Diseño person only sees briefs assigned specifically to them, never a colleague's.
-        if (myRole === "diseno") {
+        if (workRole === "diseno") {
           return !!b.assignedDisenoEmail && b.assignedDisenoEmail.toLowerCase() === authedUser?.email.toLowerCase();
         }
         return true;
@@ -125,7 +125,7 @@ export default function MyTasksPage() {
   // Solicitudes assigned to you work exactly like To Do tasks — they belong in the same "mis
   // tareas" list, not off in a separate corner only Solicitudes/To Do shows.
   const myPendingRequests = useMemo(() => {
-    if (myRole !== "diseno") return [];
+    if (workRole !== "diseno") return [];
     return requests
       .filter(r => r.status === "in_progress" && r.assignedDisenoEmail?.toLowerCase() === authedUser?.email.toLowerCase())
       .sort((a, b) => {

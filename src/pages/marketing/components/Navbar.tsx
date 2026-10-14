@@ -23,7 +23,7 @@ export default function Navbar() {
         FTC Hub — <span style={{ color: MT.primary }}>Marketing</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        {authedUser?.role !== "video" && <NotificationBell />}
+        <NotificationBell />
         {access?.isAdmin && (
           <button onClick={() => setShowSettings(true)} title="Configurar correos de notificación" style={{
             display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30,

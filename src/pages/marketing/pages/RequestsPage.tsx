@@ -66,7 +66,7 @@ export default function RequestsPage() {
 
   // Diseño can hand out the public link too, but the full list — and assigning/reassigning
   // requests from it — stays Laura/Karol's job.
-  if (authedUser?.role === "diseno") {
+  if (authedUser?.role === "diseno" || authedUser?.role === "video") {
     return (
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
         <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Solicitudes</h1>
