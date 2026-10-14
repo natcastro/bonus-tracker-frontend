@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Contractor } from "./hrData";
 import { STATUS_LABEL, approvalsComplete, cycleTotals, formatMoney, cycleInfo } from "./hrData";
-import { Banner } from "./ui";
+import { Banner, Empty } from "./ui";
 import CycleReview from "./CycleReview";
 
 // A supervisor's people for the current cycle (also used by William for contractors without a supervisor).
@@ -28,7 +28,7 @@ export default function TeamList({ store, team, who }: { store: HrStore; team: C
       {(store.isUploadDay || store.isApprovalDay) && pending.length === 0 && team.length > 0 && <Banner tone="ok">✓ Todo tu equipo ya está enviado a William.</Banner>}
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 0 }}>Ciclo actual: <strong>{info.name} {store.year}</strong> ({info.rangeEs}) · {who}</p>
       <div className="card" style={{ overflowX: "auto" }}>
-        {rows.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>No tienes personas a cargo todavía.</p> : (
+        {rows.length === 0 ? <Empty icon="–" title="Sin personas a cargo" hint="Cuando William te asigne personas, las verás aquí." /> : (
           <table className="data-table">
             <thead><tr><th>Persona</th><th>Pago</th><th>Pendiente por aprobar</th><th>Bono / monto variable</th><th>Total</th><th>Estado</th><th /></tr></thead>
             <tbody>

@@ -5,7 +5,7 @@ import {
   CURRENCIES, STATUS_LABEL, amountInWords, cycleTotals, daysOfCycle, formatMoney, isWeekend, looksEnglish, maskAccount, cycleInfo,
   overLimit, weekdayLabel, HR_HEAD,
 } from "./hrData";
-import { Banner, Stat, Tabs } from "./ui";
+import { Banner, PageHeader, Stat, Tabs } from "./ui";
 import SignaturePad from "./SignaturePad";
 import InvoicePreview from "./InvoicePreview";
 
@@ -18,7 +18,7 @@ export default function EmployeeView({ store, c, embedded }: { store: HrStore; c
 
   return (
     <div>
-      {!embedded && <h2 style={{ marginTop: 0 }}>Hola, {c.legalName.split(" ")[0]}</h2>}
+      {!embedded && <PageHeader role="employee" name={c.legalName} title={`Hola, ${c.legalName.split(" ")[0]}`} chip={c.paymentMethod === "adp" ? "ADP" : "Contratista"} subtitle={`${c.position} · ${c.country}${c.region ? ` ${c.region}` : ""} · ${c.currency}`} />}
       <Tabs tabs={[["ciclo", "Mi ciclo actual"], ["historial", "Historial de pagos"], ["perfil", "Mi perfil"]]} value={tab} onChange={t => { setTab(t); setViewId(null); }} />
 
       {tab === "ciclo" && <CurrentCycle store={store} c={c} />}
@@ -83,7 +83,6 @@ function CurrentCycle({ store, c }: { store: HrStore; c: Contractor }) {
 
 function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycle }) {
   const [signature, setSignature] = useState<string | null>(cy.signature);
-  const [showPreview, setShowPreview] = useState(false);
   const info = cycleInfo(cy.year, cy.month);
   const t = cycleTotals(c, cy);
   const hourly = c.payType === "hourly";
@@ -122,56 +121,62 @@ function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycl
         {c.payType === "variable"
           ? <Stat label="Monto variable" value={cy.variableAmount === null ? "—" : formatMoney(t.variable, c.currency)} sub="Lo define tu supervisor" grey />
           : <Stat label="Bono" value={cy.bonus === null ? "—" : formatMoney(t.bonus, c.currency)} sub={c.bonusCap > 0 ? `Lo define tu supervisor · máx. ${formatMoney(c.bonusCap, c.currency)}` : "Lo define tu supervisor"} grey />}
-        <Stat label="Total hasta ahora" value={formatMoney(t.total, c.currency)} sub={t.total > 0 ? amountInWords(t.total, c.currency) : undefined} />
+        <Stat strong label="Total hasta ahora" value={formatMoney(t.total, c.currency)} sub={t.total > 0 ? amountInWords(t.total, c.currency) : undefined} />
       </div>
       {over && <Banner tone="bad">El total supera el límite de {formatMoney(CURRENCIES[c.currency].limit, c.currency)}. Revisa tus horas o avisa a William.</Banner>}
 
+      <div className="hr-split">
+        <div style={{ minWidth: 0 }}>
       <div className="card" style={{ overflowX: "auto" }}>
-        {hourly ? (
-          <>
-            <h4 style={{ marginTop: 0 }}>¿Cuántas horas trabajaste cada día y qué hiciste?</h4>
-            <table className="data-table">
-              <thead><tr><th>Día</th><th style={{ width: 90 }}>Horas</th><th>Qué hice (en inglés)</th><th /></tr></thead>
-              <tbody>
-                {daysOfCycle(cy.year, cy.month).map(d => {
-                  const e = cy.days.find(x => x.date === d);
-                  const future = d > store.todayIso;
-                  const off = locked || future || !!e?.approved;
-                  return (
-                    <tr key={d} style={{ opacity: future ? 0.45 : 1, background: isWeekend(d) ? "#f8fafc" : undefined }}>
-                      <td style={{ whiteSpace: "nowrap" }}>{weekdayLabel(d)}</td>
-                      <td><input className="form-control" type="number" min="0" max="24" step="0.25" disabled={off} value={e?.hours || ""} placeholder="0"
-                        onChange={ev => store.updateDay(cy.id, d, { hours: Math.min(24, Number(ev.target.value) || 0) })} /></td>
-                      <td><input className="form-control" disabled={off} value={e?.note ?? ""} placeholder={future ? "" : "Ex: Answered customer chats…"}
-                        onChange={ev => store.updateDay(cy.id, d, { note: ev.target.value })} /></td>
-                      <td>{e?.approved ? <span className="badge badge-success">✓ Aprobado</span> : e && e.hours > 0 ? <span className="badge badge-warning">Pendiente</span> : null}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </>
-        ) : (
-          <>
-            <h4 style={{ marginTop: 0 }}>¿Qué entregaste este mes?</h4>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Tu pago no depende de horas, así que no las registras. Escribe en inglés una descripción general: la gerencia quiere ver lo que se hizo.</p>
-            <textarea className="form-control" rows={5} disabled={locked || cy.summaryApproved} value={cy.summary} onChange={e => store.setSummary(cy.id, e.target.value)} placeholder="Ex: Designed the monthly campaign banners and updated product images." />
-            {cy.summaryApproved && <span className="badge badge-success" style={{ marginTop: 8 }}>✓ Aprobado</span>}
-          </>
-        )}
-      </div>
-
-      {!locked && (
-        <div className="card">
-          <h4 style={{ marginTop: 0 }}>Firma y cierre</h4>
-          <SignaturePad value={signature} onChange={setSignature} />
-          {problems.length > 0 && <ul style={{ color: "#991b1b", fontSize: "0.85rem", paddingLeft: "1.1rem" }}>{problems.map(p => <li key={p}>{p}</li>)}</ul>}
-          <button className="btn btn-primary" style={{ marginTop: 8 }} disabled={problems.length > 0} onClick={() => store.closeCycle(cy.id, signature!)}>Firmar y cerrar mi ciclo</button>
+          {hourly ? (
+            <>
+              <h4 style={{ marginTop: 0 }}>¿Cuántas horas trabajaste cada día y qué hiciste?</h4>
+              <table className="data-table">
+                <thead><tr><th>Día</th><th style={{ width: 90 }}>Horas</th><th>Qué hice (en inglés)</th><th /></tr></thead>
+                <tbody>
+                  {daysOfCycle(cy.year, cy.month).map(d => {
+                    const e = cy.days.find(x => x.date === d);
+                    const future = d > store.todayIso;
+                    const off = locked || future || !!e?.approved;
+                    return (
+                      <tr key={d} style={{ opacity: future ? 0.45 : 1, background: isWeekend(d) ? "#f8fafc" : undefined }}>
+                        <td style={{ whiteSpace: "nowrap" }}>{weekdayLabel(d)}</td>
+                        <td><input className="form-control" type="number" min="0" max="24" step="0.25" disabled={off} value={e?.hours || ""} placeholder="0"
+                          onChange={ev => store.updateDay(cy.id, d, { hours: Math.min(24, Number(ev.target.value) || 0) })} /></td>
+                        <td><input className="form-control" disabled={off} value={e?.note ?? ""} placeholder={future ? "" : "Ex: Answered customer chats…"}
+                          onChange={ev => store.updateDay(cy.id, d, { note: ev.target.value })} /></td>
+                        <td>{e?.approved ? <span className="badge badge-success">✓ Aprobado</span> : e && e.hours > 0 ? <span className="badge badge-warning">Pendiente</span> : null}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <>
+              <h4 style={{ marginTop: 0 }}>¿Qué entregaste este mes?</h4>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Tu pago no depende de horas, así que no las registras. Escribe en inglés una descripción general: la gerencia quiere ver lo que se hizo.</p>
+              <textarea className="form-control" rows={5} disabled={locked || cy.summaryApproved} value={cy.summary} onChange={e => store.setSummary(cy.id, e.target.value)} placeholder="Ex: Designed the monthly campaign banners and updated product images." />
+              {cy.summaryApproved && <span className="badge badge-success" style={{ marginTop: 8 }}>✓ Aprobado</span>}
+            </>
+          )}
         </div>
-      )}
-
-      <button className="btn btn-secondary btn-sm" onClick={() => setShowPreview(v => !v)}>{showPreview ? "Ocultar mi cuenta de cobro" : "Ver cómo quedará mi cuenta de cobro"}</button>
-      {showPreview && <div style={{ marginTop: "1rem" }}><InvoicePreview c={c} cycle={{ ...cy, signature }} number={cy.number} /></div>}
+  
+        {!locked && (
+          <div className="card">
+            <h4 style={{ marginTop: 0 }}>Firma y cierre</h4>
+            <SignaturePad value={signature} onChange={setSignature} />
+            {problems.length > 0 && <ul style={{ color: "#991b1b", fontSize: "0.85rem", paddingLeft: "1.1rem" }}>{problems.map(p => <li key={p}>{p}</li>)}</ul>}
+            <button className="btn btn-primary" style={{ marginTop: 8 }} disabled={problems.length > 0} onClick={() => store.closeCycle(cy.id, signature!)}>Firmar y cerrar mi ciclo</button>
+          </div>
+        )}
+  
+          </div>
+        <aside className="hr-split__side" aria-label="Vista previa de tu cuenta de cobro">
+          <div className="hr-sidehead"><span>Tu cuenta de cobro</span><span className="hr-live">EN VIVO</span></div>
+          <InvoicePreview c={c} cycle={{ ...cy, signature }} number={cy.number} />
+        </aside>
+      </div>
     </div>
   );
 }

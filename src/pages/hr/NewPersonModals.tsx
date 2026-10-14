@@ -15,10 +15,7 @@ const Q: React.CSSProperties = { fontWeight: 700, fontSize: "0.9rem", margin: "0
 const Choice = ({ options, value, onChange }: { options: [string, string][]; value: string; onChange: (v: string) => void }) => (
   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
     {options.map(([k, l]) => (
-      <button key={k} type="button" onClick={() => onChange(k)} style={{
-        fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "7px 14px", borderRadius: 999,
-        border: `1.5px solid ${value === k ? "#0f766e" : "#e2e8f0"}`, background: value === k ? "#0f766e14" : "#fff", color: value === k ? "#0f766e" : "#475569",
-      }}>{l}</button>
+      <button key={k} type="button" className="hr-pill" aria-pressed={value === k} onClick={() => onChange(k)}>{l}</button>
     ))}
   </div>
 );

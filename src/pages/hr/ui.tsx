@@ -1,31 +1,60 @@
 import type { ReactNode } from "react";
 
 export const COLOR = "#0f766e";
+export type RoleKind = "hr" | "accounting" | "supervisor" | "employee";
 
-export function Banner({ tone, children }: { tone: "info" | "warn" | "ok" | "bad"; children: ReactNode }) {
-  const t = { info: ["#e0f2fe", "#075985"], warn: ["#fef3c7", "#92400e"], ok: ["#dcfce7", "#166534"], bad: ["#fee2e2", "#991b1b"] }[tone];
-  return <div style={{ background: t[0], color: t[1], borderRadius: 8, padding: "0.6rem 1rem", fontSize: "0.85rem", marginBottom: "1rem" }}>{children}</div>;
+export const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+
+export function Avatar({ name, role, size = 46 }: { name: string; role: RoleKind; size?: number }) {
+  return <span className="hr-avatar" data-role={role} style={{ ["--sz" as string]: `${size}px` }} aria-hidden>{initials(name)}</span>;
 }
 
-export function Stat({ label, value, sub, grey }: { label: string; value: ReactNode; sub?: ReactNode; grey?: boolean }) {
+// Greeting block at the top of every role's page.
+export function PageHeader({ role, name, title, subtitle, chip, right }: { role: RoleKind; name: string; title: string; subtitle?: ReactNode; chip?: string; right?: ReactNode }) {
   return (
-    <div className="stat-card" style={{ borderTopColor: grey ? "#cbd5e1" : COLOR, opacity: grey ? 0.8 : 1, background: grey ? "#f8fafc" : undefined }}>
-      <h3>{label}</h3>
-      <div className="amount" style={{ color: grey ? "#64748b" : COLOR, fontSize: "1.5rem" }}>{value}</div>
-      {sub && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{sub}</div>}
+    <div className="hr-pagehead" data-role={role}>
+      <div className="hr-pagehead__who">
+        <Avatar name={name} role={role} />
+        <div style={{ minWidth: 0 }}>
+          <h2>{title}{chip && <span className="hr-rolechip">{chip}</span>}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+export function Banner({ tone, children }: { tone: "info" | "warn" | "ok" | "bad"; children: ReactNode }) {
+  return <div className={`hr-banner hr-banner--${tone}`} role={tone === "bad" ? "alert" : "status"}><div>{children}</div></div>;
+}
+
+export function Stat({ label, value, sub, grey, strong }: { label: string; value: ReactNode; sub?: ReactNode; grey?: boolean; strong?: boolean }) {
+  return (
+    <div className={`stat-card${grey ? " hr-stat-locked" : ""}${strong ? " hr-stat-total" : ""}`}>
+      <h3>{grey ? "🔒 " : ""}{label}</h3>
+      <div className="amount">{value}</div>
+      {sub && <div style={{ fontSize: "0.74rem", color: "var(--hr-muted)", lineHeight: 1.35 }}>{sub}</div>}
     </div>
   );
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: [T, string][]; value: T; onChange: (v: T) => void }) {
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: "1rem" }}>
+    <div className="hr-tabs" role="tablist">
       {tabs.map(([k, l]) => (
-        <button key={k} onClick={() => onChange(k)} style={{
-          fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "7px 14px", borderRadius: 999,
-          border: `1px solid ${value === k ? COLOR : "#e2e8f0"}`, background: value === k ? `${COLOR}14` : "#fff", color: value === k ? COLOR : "#64748b",
-        }}>{l}</button>
+        <button key={k} role="tab" className="hr-tab" aria-selected={value === k} onClick={() => onChange(k)}>{l}</button>
       ))}
+    </div>
+  );
+}
+
+export function Empty({ title, hint, icon = "✓" }: { title: string; hint?: ReactNode; icon?: string }) {
+  return (
+    <div className="hr-empty">
+      <div className="hr-empty__icon" aria-hidden>{icon}</div>
+      <strong>{title}</strong>
+      {hint && <span>{hint}</span>}
     </div>
   );
 }

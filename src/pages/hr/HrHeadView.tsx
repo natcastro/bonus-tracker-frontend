@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import { HR_HEAD, PAY_TYPE_LABEL, STATUS_LABEL, cycleTotals, formatMoney, cycleInfo } from "./hrData";
 import ImportPeopleButton from "./ImportPeopleButton";
-import { Banner, Tabs } from "./ui";
+import { Banner, Empty, PageHeader, Tabs } from "./ui";
 import CycleReview from "./CycleReview";
 import TeamList from "./TeamList";
 import HistoryTable from "./HistoryTable";
@@ -23,15 +23,14 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" }}>
-        <h2 style={{ margin: 0 }}>Hola, {HR_HEAD}</h2>
+      <PageHeader role="hr" name={HR_HEAD} title={`Hola, ${HR_HEAD}`} chip="HR" subtitle="Aprueba los ciclos, crea personas y revisa el historial."
+        right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nueva persona</button>
           <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
           <ImportPeopleButton store={store} label="⬆ Cargar contratistas desde Excel" onDone={() => { setTab("personas"); setOpenId(null); }} />
           {store.imported && <button className="btn btn-secondary" onClick={() => store.resetDemo()}>↺ Volver a datos de prueba</button>}
-        </div>
-      </div>
+        </div>} />
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
       <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
@@ -41,7 +40,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         <CycleReview store={store} c={store.contractor(open.contractorId)} cy={open} mode="hr" onBack={() => setOpenId(null)} />
       ) : (
         <div className="card" style={{ overflowX: "auto" }}>
-          {toReview.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>No hay ciclos esperando tu aprobación.</p> : (
+          {toReview.length === 0 ? <Empty title="Todo al día" hint="No hay ciclos esperando tu aprobación. Cuando un supervisor termine el suyo, aparecerá aquí." /> : (
             <table className="data-table">
               <thead><tr><th>Persona</th><th>Mes</th><th>Total</th><th>Aprobó</th><th /></tr></thead>
               <tbody>{toReview.map(cy => {

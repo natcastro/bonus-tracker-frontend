@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import { cycleFileName, cycleTotals, formatMoney, cycleInfo, pad4 } from "./hrData";
 import InvoicePreview from "./InvoicePreview";
+import { Empty } from "./ui";
 
 // Every approved cycle, per person and month — what accounting works from.
 export default function HistoryTable({ store }: { store: HrStore }) {
@@ -31,7 +32,7 @@ export default function HistoryTable({ store }: { store: HrStore }) {
         </select>
       </div>
       <div className="card" style={{ overflowX: "auto" }}>
-        {rows.length === 0 ? <p style={{ margin: 0, color: "var(--text-muted)" }}>Todavía no hay ciclos aprobados.</p> : (
+        {rows.length === 0 ? <Empty icon="–" title="Todavía no hay ciclos aprobados" hint="Los pagos aprobados por William aparecerán aquí, mes por mes." /> : (
           <table className="data-table">
             <thead><tr><th>Persona</th><th>Mes</th><th>#</th><th>Pago</th><th>Bono</th><th>Total</th><th /></tr></thead>
             <tbody>{rows.map(r => {

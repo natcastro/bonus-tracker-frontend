@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import type { Supervisor } from "./hrData";
-import { Tabs } from "./ui";
+import { PageHeader, Tabs } from "./ui";
 import TeamList from "./TeamList";
 import EmployeeView from "./EmployeeView";
 
@@ -17,8 +17,7 @@ export default function SupervisorView({ store, s }: { store: HrStore; s: Superv
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Hola, {s.firstName}</h2>
-      {own && <p style={{ margin: "-0.25rem 0 0.75rem", fontSize: "0.85rem", color: "var(--text-muted)" }}>Tienes dos roles: apruebas los pagos de tu equipo <strong>y</strong> también llenas tu propio ciclo de pago.</p>}
+      <PageHeader role="supervisor" name={`${s.firstName} ${s.lastName}`.trim()} title={`Hola, ${s.firstName}`} chip="Supervisor" subtitle={own ? <>Tienes dos roles: apruebas los pagos de tu equipo <strong>y</strong> también llenas tu propio ciclo de pago.</> : s.position} />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === "equipo" && <TeamList store={store} team={team} who={`${s.firstName} ${s.lastName}`} />}
       {tab === "mio" && own && <EmployeeView store={store} c={own} embedded />}
