@@ -1,6 +1,6 @@
 import type * as XLSXType from "xlsx";
-import type { Contractor, Currency, Supervisor } from "./hrData";
-import { CURRENCIES, EXTRA_DEFAULTS } from "./hrData";
+import type { Contractor, Currency, Supervisor } from "../../src/pages/hr/hrData";
+import { CURRENCIES, EXTRA_DEFAULTS } from "../../src/pages/hr/hrData";
 
 // Reads HR's "Base de Datos contratistas" sheet (international + local USA sections) into contractors and
 // supervisors. Nothing is saved: the result is handed to the page, which keeps it in memory.

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import { HR_HEAD, PAY_TYPE_LABEL, STATUS_LABEL, cycleTotals, formatMoney, cycleInfo } from "./hrData";
-import ImportPeopleButton from "./ImportPeopleButton";
 import { Banner, Empty, PageHeader, Tabs } from "./ui";
 import CycleReview from "./CycleReview";
 import TeamList from "./TeamList";
@@ -31,7 +30,6 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nueva persona</button>
           <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
-          <ImportPeopleButton store={store} label="⬆ Cargar contratistas desde Excel" onDone={() => { setTab("personas"); setOpenId(null); }} />
         </div>} />
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
@@ -63,16 +61,6 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "personas" && (
         <div>
-          {store.report && (
-            <div className="card" style={{ borderLeft: "4px solid #0f766e" }}>
-              <h4 style={{ marginTop: 0 }}>Excel cargado</h4>
-              <p style={{ margin: "0 0 6px", fontSize: "0.9rem" }}>
-                <strong>{store.report.contractors}</strong> personas ({store.report.international} por transferencia internacional, {store.report.adp} por ADP) · <strong>{store.report.supervisors}</strong> supervisores, {store.report.dualRole} de ellos también cobran · {store.report.needsReview} con puntos por revisar.
-              </p>
-              {store.report.fixes.length > 0 && <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "#334155" }}>{store.report.fixes.map(f => <li key={f}>{f}</li>)}</ul>}
-              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "8px 0 0" }}>🔒 Estos datos solo viven en esta pestaña del navegador: no se guardan en el código ni en la base de datos. Faltan los datos fijos (correo, Tax ID, dirección y cuenta bancaria).</p>
-            </div>
-          )}
           <div className="card" style={{ overflowX: "auto" }}>
             <h4 style={{ marginTop: 0 }}>Personas ({store.contractors.length})</h4>
             <table className="data-table">

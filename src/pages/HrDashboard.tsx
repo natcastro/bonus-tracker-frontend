@@ -11,7 +11,7 @@ import EmployeeView from "./hr/EmployeeView";
 import SupervisorView from "./hr/SupervisorView";
 import HrHeadView from "./hr/HrHeadView";
 import AccountingView from "./hr/AccountingView";
-import ImportPeopleButton from "./hr/ImportPeopleButton";
+import { fetchHrPeople } from "./hr/hrApi";
 import "./hr/hr.css";
 
 // PROTOTYPE — fake data (or people loaded from HR's Excel into this tab only); nothing is saved. The real
@@ -21,6 +21,11 @@ export default function HrDashboard() {
   const store = useHrStore();
   const [persona, setPersona] = useState<Persona | null>(null);
   const { viewAs, email, access, getRole } = useHubAccess();
+  const [loadErr, setLoadErr] = useState("");
+  useEffect(() => {
+    fetchHrPeople().then(r => store.loadPeople(r.contractors, r.supervisors)).catch((e: Error) => setLoadErr(e.message || "No pude cargar las personas."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Someone whose Hub Access names a specific HR role (or an admin previewing them) goes straight to
   // their own page; the main admin with no preview still gets the "pick a user" screen.
@@ -89,33 +94,19 @@ export default function HrDashboard() {
           </div>
         )}
 
-        {lostPerson && (
-          <Banner tone="warn">No encuentro a <strong>{nick || "esta persona"}</strong> en las personas cargadas. Carga el Excel de contratistas (abajo) y vuelve a entrar.</Banner>
+        {loadErr && <Banner tone="warn">{loadErr}</Banner>}
+        {!store.ready && !loadErr && <div className="card" style={{ color: "var(--hr-muted)" }}>Cargando personas…</div>}
+        {lostPerson && store.ready && (
+          <Banner tone="warn">No encuentro a <strong>{nick || "esta persona"}</strong> en HR. Pídele a William que la agregue o revisa el nombre en Accesos.</Banner>
         )}
 
-        {!shown && (
+        {store.ready && !shown && (
           <section className="hr-view">
             <div className="hr-pagehead">
               <div>
                 <h2>¿Cómo quieres ver HR?</h2>
                 <p>Elige un usuario para ver la página como la vería esa persona.</p>
               </div>
-            </div>
-
-            <div className="card" style={{ borderLeft: `4px solid ${store.imported ? "#16a34a" : "#f59e0b"}` }}>
-              {store.imported ? (
-                <>
-                  <strong>Contratistas reales cargados</strong> — {store.contractors.length} personas y {store.supervisors.length} supervisores. Quedan solo en esta pestaña del navegador.
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <ImportPeopleButton store={store} label="⬆ Cargar otro Excel" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <strong>Aún no hay personas cargadas.</strong> Para ver a los contratistas, empleados y supervisores, carga el Excel <em>"Base de Datos contratistas Int y Locales"</em>. No están guardados en la página por privacidad: se leen desde tu archivo y solo viven en esta pestaña.
-                  <div style={{ marginTop: 10 }}><ImportPeopleButton store={store} primary label="⬆ Cargar contratistas desde Excel" /></div>
-                </>
-              )}
             </div>
 
             {group("HR", card({ kind: "hr" }, "hr", HR_HEAD, "Jefe de HR — aprueba y crea personas", "hr"))}

@@ -1,47 +1,35 @@
 import { useEffect, useState } from "react";
 import type { Contractor, Cycle, Supervisor } from "./hrData";
-import type { ImportReport } from "./hrImport";
-import { formatMoney, HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
+import { saveHrPerson } from "./hrApi";
+import { formatMoney, HR_HEAD, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
 
-const PEOPLE_KEY = "hr_proto_people";
-const STATE_KEY = "hr_proto_state"; // people + cycles, so the work survives switching "view as" persona (tab only)
-type Saved = { contractors: Contractor[]; supervisors: Supervisor[]; cycles?: Cycle[] };
-// William is the HR head AND supervises people: one person, one account. Older loaded data (or a differently
-// spelled sheet) may list him as a separate supervisor, so fold him back into the HR head here.
+// Cycles are kept for this browser tab only (until the server-side cycle storage exists), so the work
+// survives switching "view as" persona. The people themselves always come from the protected server.
+const STATE_KEY = "hr_proto_state";
+const readCycles = (): Cycle[] | null => { try { const v = JSON.parse(sessionStorage.getItem(STATE_KEY) ?? "null") as { cycles?: Cycle[] } | null; return v?.cycles ?? null; } catch { return null; } };
+
+// William is the HR head AND supervises people: one person, one account.
 export const isHrHeadName = (n: string) => /^will?i?am\s+calle/.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim());
-export function foldHrHead<T extends Saved>(v: T): T {
-  const heads = v.supervisors.filter(x => isHrHeadName(`${x.firstName} ${x.lastName}`));
-  if (heads.length === 0) return v;
-  const ids = new Set(heads.map(h => h.id));
-  return { ...v, supervisors: v.supervisors.filter(x => !ids.has(x.id)), contractors: v.contractors.map(c => (c.supervisorId !== null && ids.has(c.supervisorId) ? { ...c, supervisorId: null } : c)) };
-}
-const readSaved = (): Saved | null => {
-  for (const k of [STATE_KEY, PEOPLE_KEY]) { try { const v = JSON.parse(sessionStorage.getItem(k) ?? "null") as Saved | null; if (v) return foldHrHead(v); } catch { /* try next */ } }
-  return null;
-};
-export const readSavedPeople = (): { contractors: Contractor[]; supervisors: Supervisor[] } | null => readSaved();
-export function savePeople(contractors: Contractor[], supervisors: Supervisor[]) {
-  try { sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors, supervisors })); sessionStorage.removeItem(STATE_KEY); } catch { /* blocked: ignore */ }
-}
 const two = (n: number) => String(n).padStart(2, "0");
 export type SimDay = "real" | "upload" | "approve";
 
 // In-memory state shared by every "view as" persona, so what one role does shows up for the next.
 export function useHrStore() {
-  // People loaded from HR's Excel live only in this browser tab (sessionStorage) — never in the code or a database.
-  const saved = readSaved();
-  const [imported, setImported] = useState(!!saved);
-  const [report, setReport] = useState<ImportReport | null>(null);
-  const [contractors, setContractors] = useState<Contractor[]>(saved?.contractors ?? SEED_CONTRACTORS);
-  const [supervisors, setSupervisors] = useState<Supervisor[]>(saved?.supervisors ?? SEED_SUPERVISORS);
-  const [cycles, setCycles] = useState<Cycle[]>(() => saved?.cycles ?? buildSeedCycles(new Date(), saved?.contractors ?? SEED_CONTRACTORS, !saved));
+  // The people come from the protected server (hr-people function) and are never written to the browser.
+  const [ready, setReady] = useState(false);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
   const [notice, setNotice] = useState("");
+  const persist = (kind: "contractor" | "supervisor", data: Contractor | Supervisor) => {
+    saveHrPerson(kind, data).catch((e: Error) => setNotice(`No pude guardar en el servidor: ${e.message}`));
+  };
   const [simDay, setSimDay] = useState<SimDay>("real");
 
   useEffect(() => {
-    if (!imported) return;
-    try { sessionStorage.setItem(STATE_KEY, JSON.stringify({ contractors, supervisors, cycles })); } catch { /* too big: keep in memory */ }
-  }, [imported, contractors, supervisors, cycles]);
+    if (!ready) return;
+    try { sessionStorage.setItem(STATE_KEY, JSON.stringify({ cycles })); } catch { /* too big: keep in memory */ }
+  }, [ready, cycles]);
 
   const real = new Date();
   const { year, month } = currentCycleKey(real);
@@ -116,7 +104,7 @@ export function useHrStore() {
       const before = contractors.find(c => c.id === id);
       const updated = contractors.map(c => (c.id === id ? { ...data, id, issues: [] } : c));
       setContractors(updated);
-      try { if (imported) sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors: updated, supervisors })); } catch { /* keep in memory */ }
+      persist("contractor", { ...data, id, issues: [] });
       // someone who now sends invoices needs a cycle to fill in
       if (data.sendsInvoice && !cycles.some(x => x.contractorId === id && x.year === year && x.month === month)) {
         setCycles([...cycles, { id: Math.max(0, ...cycles.map(c => c.id)) + 1, contractorId: id, year, month, days: [], summary: "", summaryApproved: false, bonus: null, variableAmount: null, closed: false, signature: null, status: "abierto", number: null }]);
@@ -126,17 +114,14 @@ export function useHrStore() {
     nextNumber: (contractorId: number) => nextCycleNumber(cycles, contractorId),
 
     // HR
-    loadPeople: (list: Contractor[], sups: Supervisor[], rep?: ImportReport) => {
-      savePeople(list, sups);
-      setContractors(list); setSupervisors(sups); setCycles(buildSeedCycles(new Date(), list, false)); setImported(true); setReport(rep ?? null);
-      setNotice(`Cargados ${list.length} contratistas y ${sups.length} supervisores desde el Excel. Quedan solo en esta pestaña del navegador.`);
+    loadPeople: (list: Contractor[], sups: Supervisor[]) => {
+      const kept = readCycles();
+      const ids = new Set(list.map(c => c.id));
+      setContractors(list); setSupervisors(sups);
+      setCycles(kept && kept.every(c => ids.has(c.contractorId)) ? kept : buildSeedCycles(new Date(), list, false));
+      setReady(true);
     },
-    resetDemo: () => {
-      try { sessionStorage.removeItem(PEOPLE_KEY); sessionStorage.removeItem(STATE_KEY); } catch { /* ignore */ }
-      setContractors(SEED_CONTRACTORS); setSupervisors(SEED_SUPERVISORS); setCycles(buildSeedCycles(new Date(), SEED_CONTRACTORS)); setImported(false); setReport(null);
-      setNotice("Datos de prueba restaurados.");
-    },
-    imported, report,
+    ready,
     hrApprove: (id: number) => {
       const cy = cycles.find(x => x.id === id)!;
       setCycles(cycles.map(x => (x.id === id ? { ...x, status: "aprobada", number: nextCycleNumber(cycles, x.contractorId) } : x)));
@@ -150,9 +135,10 @@ export function useHrStore() {
       const id = Math.max(0, ...contractors.map(c => c.id)) + 1;
       if (alsoSupervisor) {
         const [first, ...rest] = data.legalName.trim().split(/\s+/);
-        setSupervisors([...supervisors, { id: Math.max(0, ...supervisors.map(s => s.id)) + 1, firstName: first, lastName: rest.join(" "), position: data.position, contractorId: id }]);
+        const sup = { id: Math.max(0, ...supervisors.map(s => s.id)) + 1, firstName: first, lastName: rest.join(" "), position: data.position, contractorId: id };
+        setSupervisors([...supervisors, sup]); persist("supervisor", sup);
       }
-      setContractors([...contractors, { ...data, id }]);
+      setContractors([...contractors, { ...data, id }]); persist("contractor", { ...data, id });
       if (data.sendsInvoice) setCycles([...cycles, {
         id: Math.max(0, ...cycles.map(c => c.id)) + 1, contractorId: id, year, month, days: [], summary: "", summaryApproved: false,
         bonus: null, variableAmount: null, closed: false, signature: null, status: "abierto", number: null,
@@ -160,7 +146,8 @@ export function useHrStore() {
       setNotice(`Contratista creado: ${data.legalName}${alsoSupervisor ? " (también supervisor)" : ""}. Su primera cuenta de cobro será la 0001.`);
     },
     createSupervisor: (data: Omit<Supervisor, "id">) => {
-      setSupervisors([...supervisors, { ...data, id: Math.max(0, ...supervisors.map(s => s.id)) + 1 }]);
+      const sup = { ...data, id: Math.max(0, ...supervisors.map(s => s.id)) + 1 };
+      setSupervisors([...supervisors, sup]); persist("supervisor", sup);
       setNotice(`Supervisor creado: ${data.firstName} ${data.lastName}${data.contractorId ? " (también cobra como contratista)" : ""}.`);
     },
   };
