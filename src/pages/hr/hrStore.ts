@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Contractor, Cycle, Supervisor } from "./hrData";
+import type { ImportReport } from "./hrImport";
 import { formatMoney, HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
 
 const PEOPLE_KEY = "hr_proto_people";
@@ -11,6 +12,7 @@ export function useHrStore() {
   // People loaded from HR's Excel live only in this browser tab (sessionStorage) — never in the code or a database.
   const saved = (() => { try { return JSON.parse(sessionStorage.getItem(PEOPLE_KEY) ?? "null") as { contractors: Contractor[]; supervisors: Supervisor[] } | null; } catch { return null; } })();
   const [imported, setImported] = useState(!!saved);
+  const [report, setReport] = useState<ImportReport | null>(null);
   const [contractors, setContractors] = useState<Contractor[]>(saved?.contractors ?? SEED_CONTRACTORS);
   const [supervisors, setSupervisors] = useState<Supervisor[]>(saved?.supervisors ?? SEED_SUPERVISORS);
   const [cycles, setCycles] = useState<Cycle[]>(() => buildSeedCycles(new Date(), saved?.contractors ?? SEED_CONTRACTORS, !saved));
@@ -84,17 +86,17 @@ export function useHrStore() {
     },
 
     // HR
-    loadPeople: (list: Contractor[], sups: Supervisor[]) => {
+    loadPeople: (list: Contractor[], sups: Supervisor[], rep?: ImportReport) => {
       try { sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors: list, supervisors: sups })); } catch { /* too big or blocked: keep in memory only */ }
-      setContractors(list); setSupervisors(sups); setCycles(buildSeedCycles(new Date(), list, false)); setImported(true);
+      setContractors(list); setSupervisors(sups); setCycles(buildSeedCycles(new Date(), list, false)); setImported(true); setReport(rep ?? null);
       setNotice(`Cargados ${list.length} contratistas y ${sups.length} supervisores desde el Excel. Quedan solo en esta pestaña del navegador.`);
     },
     resetDemo: () => {
       try { sessionStorage.removeItem(PEOPLE_KEY); } catch { /* ignore */ }
-      setContractors(SEED_CONTRACTORS); setSupervisors(SEED_SUPERVISORS); setCycles(buildSeedCycles(new Date(), SEED_CONTRACTORS)); setImported(false);
+      setContractors(SEED_CONTRACTORS); setSupervisors(SEED_SUPERVISORS); setCycles(buildSeedCycles(new Date(), SEED_CONTRACTORS)); setImported(false); setReport(null);
       setNotice("Datos de prueba restaurados.");
     },
-    imported,
+    imported, report,
     hrApprove: (id: number) => {
       const cy = cycles.find(x => x.id === id)!;
       setCycles(cycles.map(x => (x.id === id ? { ...x, status: "aprobada", number: nextCycleNumber(cycles, x.contractorId) } : x)));

@@ -9,6 +9,7 @@ import EmployeeView from "./hr/EmployeeView";
 import SupervisorView from "./hr/SupervisorView";
 import HrHeadView from "./hr/HrHeadView";
 import AccountingView from "./hr/AccountingView";
+import ImportPeopleButton from "./hr/ImportPeopleButton";
 
 // PROTOTYPE — fake data, everything lives in memory and disappears on refresh. The real version will
 // store contractors/cycles server-side with encrypted bank/tax data (see the HR plan).
@@ -72,6 +73,22 @@ export default function HrDashboard() {
         {!persona && (
           <section>
             <header className="section-header"><h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><UsersIcon size={22} color={COLOR} /> ¿Cómo quieres ver HR?</h2></header>
+            <div className="card" style={{ borderLeft: `4px solid ${store.imported ? "#16a34a" : "#f59e0b"}`, marginBottom: "1.25rem" }}>
+              {store.imported ? (
+                <>
+                  <strong>✓ Contratistas reales cargados</strong> — {store.contractors.length} personas y {store.supervisors.length} supervisores. Quedan solo en esta pestaña del navegador.
+                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <ImportPeopleButton store={store} label="⬆ Cargar otro Excel" />
+                    <button className="btn btn-secondary" onClick={() => store.resetDemo()}>↺ Volver a los datos de prueba</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <strong>Ahora ves personas de prueba.</strong> Para ver a los contratistas, empleados y supervisores reales, carga el Excel <em>"Base de Datos contratistas Int y Locales"</em>: no están guardados en la página por privacidad, así que se leen desde tu archivo y solo viven en esta pestaña.
+                  <div style={{ marginTop: 8 }}><ImportPeopleButton store={store} primary label="⬆ Cargar contratistas desde Excel" /></div>
+                </>
+              )}
+            </div>
             <p style={{ color: "var(--text-muted)", marginTop: 0 }}>Elige un usuario para ver la página como la vería esa persona.</p>
             {group("HR", card({ kind: "hr" }, HR_HEAD, "Jefe de HR — aprueba, crea contratistas", "hr"))}
             {group("Contabilidad", card({ kind: "accounting" }, ACCOUNTANT, "Contadora — historial de pagos", "acc"))}

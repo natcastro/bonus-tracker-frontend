@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { HrStore } from "./hrStore";
 import { HR_HEAD, PAY_TYPE_LABEL, STATUS_LABEL, cycleTotals, formatMoney, cycleInfo } from "./hrData";
-import type { ImportReport } from "./hrImport";
+import ImportPeopleButton from "./ImportPeopleButton";
 import { Banner, Tabs } from "./ui";
 import CycleReview from "./CycleReview";
 import TeamList from "./TeamList";
@@ -17,19 +17,6 @@ export default function HrHeadView({ store }: { store: HrStore }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const [showNewC, setShowNewC] = useState(false);
   const [showNewS, setShowNewS] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [importErr, setImportErr] = useState("");
-  const [report, setReport] = useState<ImportReport | null>(null);
-  const importFile = async (f: File) => {
-    setImportErr("");
-    if (!window.confirm(store.imported ? "Esto reemplaza a las personas cargadas ahora. ¿Continuar?" : "Esto reemplaza los datos de prueba por las personas del Excel. ¿Continuar?")) return;
-    try {
-      const [XLSX, { parseContractorsSheet }] = await Promise.all([import("xlsx"), import("./hrImport")]);
-      const r = parseContractorsSheet(XLSX, XLSX.read(await f.arrayBuffer(), { type: "array" }));
-      store.loadPeople(r.contractors, r.supervisors);
-      setReport(r.report); setTab("personas"); setOpenId(null);
-    } catch (e: any) { setImportErr(e?.message ?? "No pude leer ese archivo."); }
-  };
   const toReview = store.cycles.filter(c => c.status === "con_hr");
   const open = openId !== null ? store.cycles.find(c => c.id === openId) : null;
   const noSupervisor = store.contractors.filter(c => c.supervisorId === null);
@@ -41,12 +28,10 @@ export default function HrHeadView({ store }: { store: HrStore }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nueva persona</button>
           <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
-          <button className="btn btn-secondary" onClick={() => fileRef.current?.click()}>⬆ Cargar contratistas desde Excel</button>
+          <ImportPeopleButton store={store} label="⬆ Cargar contratistas desde Excel" onDone={() => { setTab("personas"); setOpenId(null); }} />
           {store.imported && <button className="btn btn-secondary" onClick={() => store.resetDemo()}>↺ Volver a datos de prueba</button>}
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ""; }} />
         </div>
       </div>
-      {importErr && <Banner tone="bad">{importErr}</Banner>}
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}
       <Tabs tabs={[["revisar", `Por revisar (${toReview.length})`], ["equipo", "Mi equipo (sin supervisor)"], ["personas", "Personas registradas"], ["historial", "Historial"]]}
@@ -77,13 +62,13 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "personas" && (
         <div>
-          {report && (
+          {store.report && (
             <div className="card" style={{ borderLeft: "4px solid #0f766e" }}>
               <h4 style={{ marginTop: 0 }}>Excel cargado</h4>
               <p style={{ margin: "0 0 6px", fontSize: "0.9rem" }}>
-                <strong>{report.contractors}</strong> personas ({report.international} por transferencia internacional, {report.adp} por ADP) · <strong>{report.supervisors}</strong> supervisores, {report.dualRole} de ellos también cobran · {report.needsReview} con puntos por revisar.
+                <strong>{store.report.contractors}</strong> personas ({store.report.international} por transferencia internacional, {store.report.adp} por ADP) · <strong>{store.report.supervisors}</strong> supervisores, {store.report.dualRole} de ellos también cobran · {store.report.needsReview} con puntos por revisar.
               </p>
-              {report.fixes.length > 0 && <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "#334155" }}>{report.fixes.map(f => <li key={f}>{f}</li>)}</ul>}
+              {store.report.fixes.length > 0 && <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "#334155" }}>{store.report.fixes.map(f => <li key={f}>{f}</li>)}</ul>}
               <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "8px 0 0" }}>🔒 Estos datos solo viven en esta pestaña del navegador: no se guardan en el código ni en la base de datos. Faltan los datos fijos (correo, Tax ID, dirección y cuenta bancaria).</p>
             </div>
           )}
