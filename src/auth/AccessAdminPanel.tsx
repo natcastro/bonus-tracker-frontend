@@ -42,16 +42,6 @@ function parseTeams(teams: string[]) {
   return { plain, roles };
 }
 
-function formatTeamEntry(t: string): string {
-  const roleTeam = ROLE_TEAMS.find((rt) => t.startsWith(`${rt.key}:`));
-  if (roleTeam) {
-    const role = t.split(":")[1];
-    const label = role === "admin" ? roleTeam.adminLabel : role === "staff" ? roleTeam.staffLabel : roleTeam.extraRoles?.find(r => r.value === role)?.label ?? role;
-    return `${roleTeam.label} (${label})`;
-  }
-  return TEAM_OPTIONS.find((o) => o.key === t)?.label ?? t;
-}
-
 function EntryForm({
   initial, onSave, onCancel,
 }: {
@@ -233,6 +223,69 @@ function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart
   );
 }
 
+const SHORT: Record<string, string> = {
+  OPS: "Operations", APT: "Strategy", TKLIVES: "TikTok Lives", CSQUALITY: "Op. Tools", MGMT: "Management",
+  LOGISTICS: "Logística", DEVOLUCIONES: "Devoluciones", MEX: "México", MARKETING: "Marketing", HR: "HR",
+};
+const ROLE_SHORT: Record<string, string> = { admin: "Admin", staff: "Staff", carol: "Karol", supervisor: "Supervisor", accounting: "Contabilidad" };
+const HR_ROLE_SHORT: Record<string, string> = { admin: "Jefe de HR", staff: "Contratista", supervisor: "Supervisor", accounting: "Contabilidad" };
+const MKT_ROLE_SHORT: Record<string, string> = { admin: "Laura", staff: "Diseño", carol: "Karol" };
+const TEAM_COLOR: Record<string, string> = {
+  OPS: "#2563eb", APT: "#7c3aed", TKLIVES: "#db2777", CSQUALITY: "#0891b2", MGMT: "#475569",
+  LOGISTICS: "#b45309", DEVOLUCIONES: "#b45309", MEX: "#15803d", MARKETING: "#3E6B45", HR: "#0f766e", ALL: "#111827",
+};
+const pillOf = (t: string): { key: string; text: string } => {
+  if (t === "ALL") return { key: "ALL", text: "Todo" };
+  const [key, role] = t.split(":");
+  const base = SHORT[key] ?? key;
+  if (!role) return { key, text: base };
+  const r = key === "HR" ? HR_ROLE_SHORT[role] : key === "MARKETING" ? MKT_ROLE_SHORT[role] : ROLE_SHORT[role];
+  return { key, text: `${base} · ${r ?? role}` };
+};
+const initials = (n: string) => n.replace(/[—–-].*$/, "").trim().split(/[\s@._]+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("") || "?";
+const hue = (n: string) => { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+const ACC_CSS = `
+.acc-modal { position: relative; background: #fff; border-radius: 16px; box-shadow: 0 24px 64px rgba(15,23,42,.28); width: 760px; max-width: 100%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; animation: acc-in .2s cubic-bezier(.23,1,.32,1) backwards; }
+@keyframes acc-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+@media (prefers-reduced-motion: reduce) { .acc-modal { animation: none; } }
+.acc-head { padding: 1.2rem 1.5rem .9rem; border-bottom: 1px solid #eef0f3; }
+.acc-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.acc-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
+.acc-title small { font-weight: 600; color: #94a3b8; margin-left: 8px; font-size: .8rem; }
+.acc-x { background: none; border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 20px; cursor: pointer; color: #64748b; transition: background .15s; }
+.acc-x:hover { background: #f1f5f9; }
+.acc-bar { display: flex; gap: 8px; margin-top: .9rem; flex-wrap: wrap; }
+.acc-search { flex: 1 1 240px; min-width: 0; padding: .55rem .8rem .55rem 2.1rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .88rem; background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 10px 50% no-repeat; outline: none; transition: border-color .15s, box-shadow .15s; }
+.acc-search:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,.15); background-color: #fff; }
+.acc-btn { border: 1px solid #e2e8f0; background: #fff; color: #0f172a; padding: .5rem .85rem; border-radius: 10px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
+.acc-btn:hover { background: #f8fafc; } .acc-btn:active { transform: scale(.97); }
+.acc-btn--dark { background: #111827; color: #fff; border-color: #111827; } .acc-btn--dark:hover { background: #1f2937; }
+.acc-chips { display: flex; gap: 6px; margin-top: .8rem; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.acc-chip { flex: none; border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 999px; padding: .28rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.acc-chip b { font-weight: 700; opacity: .55; margin-left: 4px; }
+.acc-chip:hover { background: #f8fafc; }
+.acc-chip[aria-pressed="true"] { background: #111827; border-color: #111827; color: #fff; }
+.acc-body { padding: 1rem 1.5rem 1.4rem; overflow-y: auto; flex: 1; }
+.acc-list { display: flex; flex-direction: column; }
+.acc-row { display: flex; align-items: center; gap: 12px; padding: .7rem .4rem; border-bottom: 1px solid #f1f5f9; border-radius: 10px; transition: background .15s; }
+.acc-row:hover { background: #f8fafc; }
+.acc-av { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: .78rem; font-weight: 800; }
+.acc-main { flex: 1; min-width: 0; }
+.acc-name { font-weight: 700; font-size: .92rem; color: #0f172a; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.acc-mail { font-size: .78rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-pills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.acc-pill { font-size: .7rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
+.acc-adm { font-size: .64rem; font-weight: 800; letter-spacing: .04em; color: #6d28d9; background: #f1ebfe; border-radius: 999px; padding: .1rem .5rem; }
+.acc-act { display: flex; gap: 4px; flex: none; opacity: .0; transition: opacity .15s; }
+.acc-row:hover .acc-act, .acc-row:focus-within .acc-act { opacity: 1; }
+@media (hover: none) { .acc-act { opacity: 1; } }
+.acc-link { background: none; border: none; padding: .35rem .6rem; border-radius: 8px; font-size: .8rem; font-weight: 700; cursor: pointer; color: #334155; transition: background .15s; }
+.acc-link:hover { background: #eef2f7; } .acc-link--bad { color: #b91c1c; } .acc-link--bad:hover { background: #fef2f2; }
+.acc-empty { text-align: center; color: #94a3b8; font-size: .9rem; padding: 2.2rem 0; }
+@media (max-width: 560px) { .acc-head, .acc-body { padding-left: 1rem; padding-right: 1rem; } .acc-act { opacity: 1; } }
+`;
+
 export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { startViewAs } = useHubAccess();
@@ -241,6 +294,8 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const [adding, setAdding] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [showView, setShowView] = useState(false);
 
   const startPreview = (team: string, role: TeamRole, email?: string) => {
     startViewAs(team, role, email);
@@ -268,72 +323,80 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
     await load();
   };
 
-  const teamLabels = (teams: string[]) => {
-    if (teams.includes("ALL")) return "Todo";
-    return teams.map(formatTeamEntry).join(", ") || "Sin equipos";
-  };
+  const teamKeys = (e: HubAccessEntry) => e.teams.map(t => t.split(":")[0]);
+  const isAdminEntry = (e: HubAccessEntry) => e.isAdmin || e.teams.includes("ALL");
+  const chips: { key: string; label: string; count: number }[] = [{ key: "all", label: "Todos", count: entries.length }];
+  if (entries.some(isAdminEntry)) chips.push({ key: "admin", label: "Administradores", count: entries.filter(isAdminEntry).length });
+  Object.keys(SHORT).forEach(k => {
+    const n = entries.filter(e => teamKeys(e).includes(k)).length;
+    if (n) chips.push({ key: k, label: SHORT[k], count: n });
+  });
 
   const q = search.trim().toLowerCase();
-  const visibleEntries = q
-    ? entries.filter(e => e.email.toLowerCase().includes(q) || e.nickname.toLowerCase().includes(q) || teamLabels(e.teams).toLowerCase().includes(q))
-    : entries;
+  const visibleEntries = entries.filter(e => {
+    if (filter === "admin" ? !isAdminEntry(e) : filter !== "all" && !teamKeys(e).includes(filter)) return false;
+    if (!q) return true;
+    return e.email.toLowerCase().includes(q) || e.nickname.toLowerCase().includes(q) || e.teams.map(t => pillOf(t).text).join(" ").toLowerCase().includes(q);
+  });
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1.5rem" }}>
+      <style>{ACC_CSS}</style>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)" }} />
-      <div style={{ position: "relative", background: "#fff", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.25)", padding: "1.5rem", width: 560, maxWidth: "100%", maxHeight: "85vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Accesos a FTC Hub</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6B7280" }}>×</button>
+      <div className="acc-modal" role="dialog" aria-label="Accesos a FTC Hub">
+        <div className="acc-head">
+          <div className="acc-title">
+            <h2>Accesos a FTC Hub<small>{entries.length} personas</small></h2>
+            <button className="acc-x" onClick={onClose} aria-label="Cerrar">×</button>
+          </div>
+          <div className="acc-bar">
+            <input className="acc-search" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, correo o equipo…" aria-label="Buscar" />
+            <button className="acc-btn" onClick={() => setShowView(v => !v)} aria-expanded={showView}>👀 Ver como…</button>
+            <button className="acc-btn acc-btn--dark" onClick={() => { setAdding(true); setEditingEmail(null); }}>+ Agregar correo</button>
+          </div>
+          {!loading && entries.length > 0 && (
+            <div className="acc-chips" role="group" aria-label="Filtrar por equipo">
+              {chips.map(c => (
+                <button key={c.key} className="acc-chip" aria-pressed={filter === c.key} onClick={() => setFilter(c.key)}>{c.label}<b>{c.count}</b></button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <ViewAsPicker entries={entries} onStart={startPreview} />
+        <div className="acc-body">
+          {showView && <ViewAsPicker entries={entries} onStart={startPreview} />}
+          {adding && <EntryForm onSave={save} onCancel={() => setAdding(false)} />}
 
-        {!adding && !editingEmail && (
-          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)} style={{ marginBottom: "1rem" }}>+ Agregar correo</button>
-        )}
-
-        {adding && (
-          <EntryForm onSave={save} onCancel={() => setAdding(false)} />
-        )}
-
-        {!loading && entries.length > 0 && (
-          <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por correo, apodo o equipo/rol..."
-            className="form-control" style={{ marginBottom: "0.75rem" }}
-          />
-        )}
-
-        {loading ? (
-          <p style={{ color: "#6B7280", fontSize: 13 }}>Cargando…</p>
-        ) : entries.length === 0 ? (
-          <p style={{ color: "#6B7280", fontSize: 13 }}>Todavía no hay correos con acceso.</p>
-        ) : visibleEntries.length === 0 ? (
-          <p style={{ color: "#6B7280", fontSize: 13 }}>Ningún correo coincide con "{search}".</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {visibleEntries.map(e => (
-              editingEmail === e.email ? (
+          {loading ? (
+            <p className="acc-empty">Cargando…</p>
+          ) : entries.length === 0 ? (
+            <p className="acc-empty">Todavía no hay correos con acceso.</p>
+          ) : visibleEntries.length === 0 ? (
+            <p className="acc-empty">Nadie coincide con esos filtros.</p>
+          ) : (
+            <div className="acc-list">
+              {visibleEntries.map(e => editingEmail === e.email ? (
                 <EntryForm key={e.email} initial={e} onSave={save} onCancel={() => setEditingEmail(null)} />
               ) : (
-                <div key={e.email} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #E5E7EB", borderRadius: 8, padding: "0.6rem 0.8rem" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
-                      {e.nickname || e.email} {e.isAdmin && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#7c3aed", background: "#f1ebfe", borderRadius: 999, padding: "0.1rem 0.5rem", marginLeft: 6 }}>ADMIN</span>}
+                <div key={e.email} className="acc-row">
+                  <div className="acc-av" style={{ background: `hsl(${hue(e.email)} 70% 92%)`, color: `hsl(${hue(e.email)} 60% 30%)` }}>{initials(e.nickname || e.email)}</div>
+                  <div className="acc-main">
+                    <div className="acc-name">{e.nickname || e.email}{e.isAdmin && <span className="acc-adm">ADMIN</span>}</div>
+                    {e.nickname && <div className="acc-mail">{e.email}</div>}
+                    <div className="acc-pills">
+                      {e.teams.length === 0 && <span className="acc-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>Sin equipos</span>}
+                      {e.teams.map(t => { const p = pillOf(t); const c = TEAM_COLOR[p.key] ?? "#475569"; return <span key={t} className="acc-pill" style={{ background: `${c}14`, color: c }}>{p.text}</span>; })}
                     </div>
-                    {e.nickname && <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 1 }}>{e.email}</div>}
-                    <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{teamLabels(e.teams)}</div>
                   </div>
-                  <div style={{ display: "flex", gap: "0.4rem" }}>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingEmail(e.email)}>Editar</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => remove(e.email)}>Eliminar</button>
+                  <div className="acc-act">
+                    <button className="acc-link" onClick={() => { setEditingEmail(e.email); setAdding(false); }}>Editar</button>
+                    <button className="acc-link acc-link--bad" onClick={() => remove(e.email)}>Eliminar</button>
                   </div>
                 </div>
-              )
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
