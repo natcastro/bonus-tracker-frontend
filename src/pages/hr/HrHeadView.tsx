@@ -61,26 +61,27 @@ export default function HrHeadView({ store }: { store: HrStore }) {
 
       {tab === "personas" && (
         <div>
-          <div className="card" style={{ overflowX: "auto" }}>
+          <div className="card">
             <h4 style={{ marginTop: 0 }}>Personas ({store.contractors.length})</h4>
-            <table className="data-table">
-              <thead><tr><th>Nombre</th><th>Área</th><th>Ubicación</th><th>Método</th><th>Pago</th><th>Bono máx.</th><th>Supervisor</th><th>Ciclo actual</th><th>Revisar</th><th /></tr></thead>
+            <table className="data-table hr-people-table">
+              <thead><tr><th>Persona</th><th>Pago</th><th>Bono máx.</th><th>Supervisor</th><th>Ciclo actual</th><th /></tr></thead>
               <tbody>{store.contractors.map(c => {
                 const sup = store.supervisors.find(s => s.id === c.supervisorId);
                 const cy = store.currentCycle(c.id);
                 const issues = realIssues(c.issues);
                 return (
                   <tr key={c.id}>
-                    <td><strong>{c.legalName}</strong>{c.email && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{c.email}</div>}</td>
-                    <td>{c.position}</td>
-                    <td>{c.country}{c.region ? ` — ${c.region}` : ""}</td>
-                    <td>{c.paymentMethod === "adp" ? <span className="badge badge-warning">ADP</span> : <span className="badge badge-success">Transferencia</span>}{!c.sendsInvoice && <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>no envía cuenta de cobro</div>}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>{c.payType === "hourly" ? `${c.hourlyRate ? formatMoney(c.hourlyRate, c.currency) : "tarifa pendiente"}/h` : c.payType === "variable" ? `Variable${c.baseAmount ? ` (base ${formatMoney(c.baseAmount, c.currency)})` : ""}` : formatMoney(c.baseAmount, c.currency)}<div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{PAY_TYPE_LABEL[c.payType]}{c.monthlyCap ? ` · máx. mes ${formatMoney(c.monthlyCap, c.currency)}` : ""}{c.weeklyHoursCap ? ` · máx. ${c.weeklyHoursCap} h/sem` : ""}</div></td>
+                    <td><strong>{c.legalName}</strong><div className="hr-sub">{c.position} · {c.country}{c.region ? ` — ${c.region}` : ""}</div>{c.email && <div className="hr-sub">{c.email}</div>}</td>
+                    <td>{c.payType === "hourly" ? `${c.hourlyRate ? formatMoney(c.hourlyRate, c.currency) : "tarifa pendiente"}/h` : c.payType === "variable" ? `Variable${c.baseAmount ? ` (base ${formatMoney(c.baseAmount, c.currency)})` : ""}` : formatMoney(c.baseAmount, c.currency)}
+                      <div className="hr-sub">{PAY_TYPE_LABEL[c.payType]}{c.monthlyCap ? ` · máx. mes ${formatMoney(c.monthlyCap, c.currency)}` : ""}{c.weeklyHoursCap ? ` · máx. ${c.weeklyHoursCap} h/sem` : ""}</div>
+                      <div style={{ marginTop: 4 }}>{c.paymentMethod === "adp" ? <span className="badge badge-warning">ADP</span> : <span className="badge badge-success">Transferencia</span>}{!c.sendsInvoice && <span className="hr-sub"> · no envía cuenta de cobro</span>}</div></td>
                     <td>{c.payType === "variable" ? "—" : formatMoney(c.bonusCap, c.currency)}</td>
-                    <td>{sup ? `${sup.firstName} ${sup.lastName}` : `${HR_HEAD} (sin supervisor)`}</td>
+                    <td>{sup ? `${sup.firstName} ${sup.lastName}` : HR_HEAD}</td>
                     <td>{cy ? STATUS_LABEL[cy.status] : "—"}</td>
-                    <td>{issues.length > 0 ? <span className="badge badge-danger" title={issues.join("\n")}>{issues.length} punto(s)</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
-                    <td><button className="btn btn-secondary btn-sm" onClick={() => setEditId(c.id)}>Editar</button></td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      {issues.length > 0 && <span className="badge badge-danger" title={issues.join("\n")} style={{ marginRight: 6 }}>{issues.length} punto(s)</span>}
+                      <button className="btn btn-secondary btn-sm" onClick={() => setEditId(c.id)}>Editar</button>
+                    </td>
                   </tr>
                 );
               })}</tbody>

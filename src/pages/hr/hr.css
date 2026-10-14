@@ -222,3 +222,10 @@
 .hr-kv > div { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; overflow-wrap: anywhere; }
 .hr-kv > div > span { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--hr-faint); }
 .hr-pending { color: var(--hr-warn); font-style: normal; font-weight: 600; }
+
+/* People table fits the card: no sideways scrolling, long text wraps */
+.hr-people-table { width: 100%; table-layout: auto; }
+.hr-people-table td, .hr-people-table th { vertical-align: top; overflow-wrap: anywhere; }
+.hr-people-table .hr-sub { font-size: 0.75rem; color: var(--hr-muted); }
+.hr-people-table td:first-child { min-width: 180px; }
+.hr-root .data-table td, .hr-root .data-table th { overflow-wrap: anywhere; padding-left: 0.7rem; padding-right: 0.7rem; }
