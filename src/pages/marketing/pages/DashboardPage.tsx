@@ -31,11 +31,12 @@ function isOverdue(brief: MarketingBrief): boolean {
   return currentActiveStages(brief).some(s => s.role === "diseno" && !!s.deadline && isPastDeadline(s.deadline));
 }
 
-// Design delays, summed across variants for a variant-mode brief (the brief's own
-// designDelayCount stays 0 in that case since delays are tracked per variant instead).
+// Design delays = Diseño stages delivered late under the current cut-off, counted from the stages themselves (the same
+// ones the delay history lists) — not from the old running counter, which kept counting delays that no longer apply.
 function totalDesignDelayCount(brief: MarketingBrief): number {
-  if (brief.variants) return brief.variants.reduce((s, v) => s + v.designDelayCount, 0);
-  return brief.designDelayCount;
+  const late = (stages: MarketingStage[]) => stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).length;
+  if (brief.variants) return brief.variants.reduce((s, v) => s + late(v.stages), 0);
+  return late(brief.stages);
 }
 
 // For list/table views, a variant-mode brief shows whichever in-progress variant is most urgent
