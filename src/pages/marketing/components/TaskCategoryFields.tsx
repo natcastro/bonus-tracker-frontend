@@ -46,6 +46,10 @@ export const EMPTY_TASK_CATEGORY_STATE: TaskCategoryState = {
   videoProposito: "", videoScript: "", videoDescripcion: "",
 };
 
+// Digital pieces (and advertising for digital screens) are sized in pixels; only print jobs use cm / inch.
+export const usesPixels = (s: TaskCategoryState) => s.category === "piezas_digitales" || (s.category === "publicidad" && s.tipoMedio === "Digital Virtual");
+const unitOf = (s: TaskCategoryState): string => (usesPixels(s) ? "px" : s.unidad);
+
 function typesForCategory(category: TaskCategory | null): readonly string[] {
   if (category === "publicidad") return PUBLICIDAD_TYPES;
   if (category === "gran_formato") return GRAN_FORMATO_TYPES;
@@ -87,12 +91,12 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
     if (s.area.trim()) lines.push(`Área que solicita: ${s.area.trim()}`);
   }
   if (s.category === "gran_formato") {
-    if (s.ancho.trim() || s.alto.trim()) lines.push(`Medidas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
+    if (s.ancho.trim() || s.alto.trim()) lines.push(`Medidas: ${measure(s.ancho, unitOf(s))} x ${measure(s.alto, unitOf(s))}`);
     const place = [s.ambiente, s.ubicacion.trim()].filter(Boolean).join(" — ");
     if (place) lines.push(`Ubicación del impreso: ${place}`);
   }
   if ((s.category === "publicidad" || s.category === "piezas_digitales") && s.customMeasurements) {
-    lines.push(`Medidas personalizadas: ${measure(s.ancho, s.unidad)} x ${measure(s.alto, s.unidad)}`);
+    lines.push(`Medidas personalizadas: ${measure(s.ancho, unitOf(s))} x ${measure(s.alto, unitOf(s))}`);
   }
   if (s.category === "videos") {
     if (s.videoApp) lines.push(`App: ${s.videoApp === "Otro" && s.videoAppOtro.trim() ? s.videoAppOtro.trim() : s.videoApp}`);
@@ -144,14 +148,16 @@ function MeasureInputs({ state, set }: { state: TaskCategoryState; set: (patch: 
       />
       {value.trim() && (
         <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12.5, fontWeight: 700, color: MT.text3, pointerEvents: "none" }}>
-          {state.unidad}
+          {unitOf(state)}
         </span>
       )}
     </div>
   );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <SegButtons options={["cm", "inch"]} value={state.unidad} onChange={v => set({ unidad: v as "cm" | "inch" })} />
+      {usesPixels(state)
+        ? <div style={{ fontSize: 12, color: MT.text3 }}>Medidas en píxeles (px)</div>
+        : <SegButtons options={["cm", "inch"]} value={state.unidad} onChange={v => set({ unidad: v as "cm" | "inch" })} />}
       <div style={{ display: "flex", gap: 10 }}>
         {field(state.ancho, v => set({ ancho: v }), "Ancho")}
         {field(state.alto, v => set({ alto: v }), "Alto")}
@@ -266,7 +272,7 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
 
       {(state.category === "publicidad" || state.category === "piezas_digitales") && (
         <div>
-          <label style={labelStyle}>¿Quieres colocar medidas personalizadas?</label>
+          <label style={labelStyle}>{usesPixels(state) ? "¿Quieres colocar medidas personalizadas? (en píxeles)" : "¿Quieres colocar medidas personalizadas?"}</label>
           <SegButtons options={["Sí", "No"]} value={state.customMeasurements ? "Sí" : "No"} onChange={v => set({ customMeasurements: v === "Sí" })} />
           {state.customMeasurements && (
             <div style={{ marginTop: 10 }}>

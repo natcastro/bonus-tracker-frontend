@@ -26,8 +26,16 @@ const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
 // Only a late Diseño stage counts as "overdue" for alerts/health — a brief waiting on Laura
 // (review stages) never shows as late, since that delay isn't Diseño's to answer for. For a
 // variant-mode brief, it counts as overdue if ANY applicable variant's current Diseño stage is.
+// A brief with several variants is judged only by its first one: if the first was on time, the brief is on time.
+const countedVariant = (brief: MarketingBrief) => brief.variants?.find(v => v.applicable) ?? null;
+
 function isOverdue(brief: MarketingBrief): boolean {
   if (brief.status !== "in_progress") return false;
+  if (brief.variants) {
+    const fv = countedVariant(brief);
+    const st = fv && fv.status === "in_progress" ? fv.stages.find(x => x.key === fv.currentStage) : null;
+    return !!st && st.role === "diseno" && !!st.deadline && isPastDeadline(st.deadline);
+  }
   return currentActiveStages(brief).some(s => s.role === "diseno" && !!s.deadline && isPastDeadline(s.deadline));
 }
 
@@ -35,7 +43,7 @@ function isOverdue(brief: MarketingBrief): boolean {
 // ones the delay history lists) — not from the old running counter, which kept counting delays that no longer apply.
 function totalDesignDelayCount(brief: MarketingBrief): number {
   const late = (stages: MarketingStage[]) => stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).length;
-  if (brief.variants) return brief.variants.reduce((s, v) => s + late(v.stages), 0);
+  if (brief.variants) { const fv = countedVariant(brief); return fv ? late(fv.stages) : 0; }
   return late(brief.stages);
 }
 
@@ -90,7 +98,7 @@ export default function DashboardPage() {
   const delayRows = useMemo(() => {
     const rows: { brief: MarketingBrief; stage: MarketingStage; variant?: string }[] = [];
     [...inProgressBriefs, ...completedThisMonth].forEach(b => {
-      if (b.variants) b.variants.forEach(v => v.stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).forEach(st => rows.push({ brief: b, stage: st, variant: v.key })));
+      if (b.variants) { const v = countedVariant(b); if (v) v.stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).forEach(st => rows.push({ brief: b, stage: st, variant: v.key })); }
       else b.stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).forEach(st => rows.push({ brief: b, stage: st }));
     });
     return rows.sort((a, b) => (b.stage.completedAt ?? "").localeCompare(a.stage.completedAt ?? ""));

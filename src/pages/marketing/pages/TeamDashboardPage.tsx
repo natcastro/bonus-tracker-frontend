@@ -79,12 +79,13 @@ export default function TeamDashboardPage() {
       for (const b of published) {
         if (!b.assignedDisenoEmail || b.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
         const briefStageSets = b.variants ? b.variants.filter(v => v.applicable).map(v => v.stages) : [b.stages];
-        for (const stages of briefStageSets) {
+        for (const [setIdx, stages] of briefStageSets.entries()) {
           stages.forEach((s, i) => {
             if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
             const start = (i > 0 ? stages[i - 1].completedAt : b.startDate) ?? b.startDate;
             entries.push({
-              completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+              // a brief with several variants counts as late only through its first variant
+              completedAt: s.completedAt, late: setIdx === 0 && stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
               reference: `${b.reference} — ${stageLabel(s.key)}`, kind: "brief", linkTo: `/marketing/brief/${b.id}`,
             });
           });
