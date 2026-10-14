@@ -30,7 +30,6 @@ export default function HrHeadView({ store }: { store: HrStore }) {
           <button className="btn btn-primary" onClick={() => setShowNewC(true)}>+ Nueva persona</button>
           <button className="btn btn-secondary" onClick={() => setShowNewS(true)}>+ Nuevo supervisor</button>
           <ImportPeopleButton store={store} label="⬆ Cargar contratistas desde Excel" onDone={() => { setTab("personas"); setOpenId(null); }} />
-          {store.imported && <button className="btn btn-secondary" onClick={() => store.resetDemo()}>↺ Volver a datos de prueba</button>}
         </div>} />
       {store.isApprovalDay && <Banner tone={toReview.length > 0 ? "warn" : "ok"}>{toReview.length > 0 ? `⏰ Hoy 25 es el día de aprobar: tienes ${toReview.length} ciclo(s) esperando tu revisión.` : "✓ Hoy 25 es el día de aprobar y no tienes ciclos pendientes."}</Banner>}
       {store.isUploadDay && <Banner tone="info">Hoy 24 se están subiendo las cuentas de cobro. Mañana, 25, las apruebas.</Banner>}

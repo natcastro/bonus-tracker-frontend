@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Persona } from "./hr/hrData";
+import { useHubAccess } from "../auth/HubAccessContext";
+import { getHubNicknames } from "../services/api";
 import { ACCOUNTANT, HR_HEAD } from "./hr/hrData";
 import { useHrStore } from "./hr/hrStore";
 import { Avatar, Banner } from "./hr/ui";
@@ -18,6 +20,26 @@ export default function HrDashboard() {
   const navigate = useNavigate();
   const store = useHrStore();
   const [persona, setPersona] = useState<Persona | null>(null);
+  const { viewAs, email, access, getRole } = useHubAccess();
+
+  // Someone whose Hub Access names a specific HR role (or an admin previewing them) goes straight to
+  // their own page; the main admin with no preview still gets the "pick a user" screen.
+  const hrRole = getRole("HR");
+  const isSpecific = !!viewAs || (!!access && !access.isAdmin && !access.teams.includes("ALL") && access.teams.some(t => t.startsWith("HR:")));
+  const [nick, setNick] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isSpecific || (hrRole !== "supervisor" && hrRole !== "staff")) { setNick(""); return; }
+    getHubNicknames([email]).then(m => setNick(m[email.toLowerCase()] ?? "")).catch(() => setNick(""));
+  }, [isSpecific, hrRole, email]);
+  const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const autoPersona: Persona | null = !isSpecific ? null
+    : hrRole === "admin" ? { kind: "hr" }
+    : hrRole === "accounting" ? { kind: "accounting" }
+    : hrRole === "supervisor" ? ((s => (s ? { kind: "supervisor", id: s.id } as Persona : null))(store.supervisors.find(x => norm(`${x.firstName} ${x.lastName}`) === norm(nick ?? ""))))
+    : hrRole === "staff" ? ((c => (c ? { kind: "employee", id: c.id } as Persona : null))(store.contractors.find(x => norm(x.legalName) === norm(nick ?? ""))))
+    : null;
+  const shown: Persona | null = persona ?? autoPersona;
+  const lostPerson = isSpecific && !autoPersona && (hrRole === "supervisor" || hrRole === "staff") && nick !== null;
 
   const label = (p: Persona): string => {
     if (p.kind === "hr") return `${HR_HEAD} — HR`;
@@ -47,25 +69,17 @@ export default function HrDashboard() {
     <div className="hr-root">
       <nav className="top-nav">
         <div className="logo">FTC Hub — <span style={{ color: "var(--hr-accent)" }}>HR</span></div>
-        <div style={{ fontSize: "0.85rem", color: "var(--hr-muted)" }}>{persona ? `Viendo como: ${label(persona)}` : ""}</div>
+        <div style={{ fontSize: "0.85rem", color: "var(--hr-muted)" }}>{shown ? `Viendo como: ${label(shown)}` : ""}</div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          {persona && <button className="btn btn-secondary btn-sm" onClick={() => setPersona(null)}>Cambiar de usuario</button>}
+          {persona && !autoPersona && <button className="btn btn-secondary btn-sm" onClick={() => setPersona(null)}>Cambiar de usuario</button>}
           <button className="btn btn-secondary btn-sm" onClick={() => navigate("/")}>← Volver al Hub</button>
           <button className="btn btn-secondary btn-sm" onClick={() => { sessionStorage.clear(); navigate("/"); }}>Logout</button>
         </div>
       </nav>
 
       <main className="content-area">
-        <Banner tone="warn">Página de prueba — los datos no se guardan en ninguna base de datos. {store.imported ? "Las personas vienen de tu Excel y viven solo en esta pestaña." : "Al recargar vuelve al inicio."}</Banner>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.84rem", marginBottom: "1rem", flexWrap: "wrap", color: "var(--hr-muted)" }}>
-          <span>Fecha simulada:</span>
-          <select className="form-control" style={{ width: "auto", padding: "0.4rem 0.7rem" }} value={store.simDay} onChange={e => store.setSimDay(e.target.value as "real" | "upload" | "approve")}>
-            <option value="real">Hoy (real)</option>
-            <option value="upload">Día 24 — subir las cuentas de cobro</option>
-            <option value="approve">Día 25 — William aprueba</option>
-          </select>
-          <span>Ciclo actual: <strong style={{ color: "var(--hr-ink)" }}>{store.info.rangeEs}</strong></span>
+        <div style={{ fontSize: "0.84rem", marginBottom: "1rem", color: "var(--hr-muted)" }}>
+          Ciclo actual: <strong style={{ color: "var(--hr-ink)" }}>{store.info.rangeEs}</strong>
         </div>
 
         {store.notice && (
@@ -75,7 +89,11 @@ export default function HrDashboard() {
           </div>
         )}
 
-        {!persona && (
+        {lostPerson && (
+          <Banner tone="warn">No encuentro a <strong>{nick || "esta persona"}</strong> en las personas cargadas. Carga el Excel de contratistas (abajo) y vuelve a entrar.</Banner>
+        )}
+
+        {!shown && (
           <section className="hr-view">
             <div className="hr-pagehead">
               <div>
@@ -90,12 +108,11 @@ export default function HrDashboard() {
                   <strong>Contratistas reales cargados</strong> — {store.contractors.length} personas y {store.supervisors.length} supervisores. Quedan solo en esta pestaña del navegador.
                   <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <ImportPeopleButton store={store} label="⬆ Cargar otro Excel" />
-                    <button className="btn btn-secondary" onClick={() => store.resetDemo()}>↺ Volver a los datos de prueba</button>
                   </div>
                 </>
               ) : (
                 <>
-                  <strong>Ahora ves personas de prueba.</strong> Para ver a los contratistas, empleados y supervisores reales, carga el Excel <em>"Base de Datos contratistas Int y Locales"</em>. No están guardados en la página por privacidad: se leen desde tu archivo y solo viven en esta pestaña.
+                  <strong>Aún no hay personas cargadas.</strong> Para ver a los contratistas, empleados y supervisores, carga el Excel <em>"Base de Datos contratistas Int y Locales"</em>. No están guardados en la página por privacidad: se leen desde tu archivo y solo viven en esta pestaña.
                   <div style={{ marginTop: 10 }}><ImportPeopleButton store={store} primary label="⬆ Cargar contratistas desde Excel" /></div>
                 </>
               )}
@@ -108,11 +125,11 @@ export default function HrDashboard() {
           </section>
         )}
 
-        <div className="hr-view" key={persona ? `${persona.kind}-${"id" in persona ? persona.id : 0}` : "none"}>
-          {persona?.kind === "hr" && <HrHeadView store={store} />}
-          {persona?.kind === "accounting" && <AccountingView store={store} />}
-          {persona?.kind === "supervisor" && <SupervisorView store={store} s={store.supervisors.find(s => s.id === persona.id)!} />}
-          {persona?.kind === "employee" && <EmployeeView store={store} c={store.contractor(persona.id)} />}
+        <div className="hr-view" key={shown ? `${shown.kind}-${"id" in shown ? shown.id : 0}` : "none"}>
+          {shown?.kind === "hr" && <HrHeadView store={store} />}
+          {shown?.kind === "accounting" && <AccountingView store={store} />}
+          {shown?.kind === "supervisor" && <SupervisorView store={store} s={store.supervisors.find(s => s.id === shown.id)!} />}
+          {shown?.kind === "employee" && <EmployeeView store={store} c={store.contractor(shown.id)} />}
         </div>
       </main>
     </div>

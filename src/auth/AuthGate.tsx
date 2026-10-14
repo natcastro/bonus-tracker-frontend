@@ -15,6 +15,10 @@ function viewAsLabel(team: string, role: string): string {
     const label = role === "admin" ? "Laura" : role === "carol" ? "Karol" : "Diseño";
     return `${teamLabel} — ${label}`;
   }
+  if (team === "HR") {
+    const label = role === "admin" ? "William (jefe de HR)" : role === "accounting" ? "Contabilidad" : role === "supervisor" ? "Supervisor" : "Contratista";
+    return `${teamLabel} — ${label}`;
+  }
   return `${teamLabel} — ${role === "admin" ? "Administrador" : "Staff"}`;
 }
 

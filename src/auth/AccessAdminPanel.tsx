@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllHubAccess, upsertHubAccess, deleteHubAccess } from "../services/api";
 import type { HubAccessEntry } from "../services/api";
 import { useHubAccess } from "./HubAccessContext";
 import type { TeamRole } from "./HubAccessContext";
+import { readSavedPeople, savePeople } from "../pages/hr/hrStore";
 
 const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "OPS",        label: "FTC USA — Operations" },
@@ -13,10 +14,9 @@ const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "MGMT",       label: "Management" },
   { key: "LOGISTICS",  label: "Logística" },
   { key: "DEVOLUCIONES", label: "Devoluciones" },
-  { key: "HR",           label: "HR (Recursos Humanos)" },
 ];
 
-const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }];
+const ALL_TEAMS_FOR_PREVIEW = [...TEAM_OPTIONS, { key: "MEX", label: "FTC México" }, { key: "MARKETING", label: "Marketing" }, { key: "HR", label: "HR (Recursos Humanos)" }];
 
 // Teams where access also needs a role — stored in hub_access as "TEAM:role" (e.g. "MEX:admin").
 // extraRoles lets a team offer extra role buttons beyond admin/staff (only Marketing needs this, for Carol).
@@ -25,9 +25,13 @@ const ROLE_TEAMS: { key: string; label: string; adminLabel: string; staffLabel: 
   { key: "MARKETING", label: "Marketing",  adminLabel: "Laura (revisión)", staffLabel: "Diseño", extraRoles: [
     { value: "carol", label: "Karol (coordinación)" },
   ] },
+  { key: "HR", label: "HR (Recursos Humanos)", adminLabel: "William (jefe de HR)", staffLabel: "Contratista", extraRoles: [
+    { value: "supervisor", label: "Supervisor" },
+    { value: "accounting", label: "Contabilidad (Erika)" },
+  ] },
 ];
 
-type RoleValue = "admin" | "staff" | "carol" | "";
+type RoleValue = "admin" | "staff" | "carol" | "supervisor" | "accounting" | "";
 
 function parseTeams(teams: string[]) {
   const plain = teams.filter((t) => t !== "ALL" && !ROLE_TEAMS.some((rt) => t.startsWith(`${rt.key}:`)));
@@ -230,6 +234,62 @@ function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart
   );
 }
 
+// Creates one Hub Access row per person in HR's Excel, with a made-up address (prueba1@formatucuerpo.com…),
+// so each can be opened with "Ver el Hub como". Names/pay stay in this browser tab; only name + role go in the row.
+function HrTestUsers({ entries, onDone }: { entries: HubAccessEntry[]; onDone: () => Promise<void> }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const loaded = readSavedPeople();
+
+  const create = async (people: NonNullable<ReturnType<typeof readSavedPeople>>) => {
+    const wanted: { role: string; nick: string }[] = [
+      { role: "admin", nick: "William Calle — HR" },
+      { role: "accounting", nick: "Erika — Contabilidad" },
+      ...people.supervisors.map(s => ({ role: "supervisor", nick: `${s.firstName} ${s.lastName}`.trim() })),
+      ...people.contractors.map(c => ({ role: "staff", nick: c.legalName })),
+    ];
+    let n = Math.max(0, ...entries.map(e => Number(/^prueba(\d+)@formatucuerpo\.com$/.exec(e.email)?.[1] ?? 0)));
+    let made = 0;
+    for (const w of wanted) {
+      if (entries.some(e => e.teams.includes(`HR:${w.role}`) && e.nickname === w.nick)) continue;
+      n += 1; made += 1;
+      await upsertHubAccess(`prueba${n}@formatucuerpo.com`, [`HR:${w.role}`], false, w.nick);
+    }
+    await onDone();
+    setMsg(made ? `Listo: creé ${made} usuarios de prueba (prueba1@formatucuerpo.com, prueba2…). Ya aparecen abajo y en "Ver el Hub como" → HR.` : "Todos ya estaban creados.");
+  };
+
+  const run = async (f?: File) => {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      if (f) {
+        const [XLSX, { parseContractorsSheet }] = await Promise.all([import("xlsx"), import("../pages/hr/hrImport")]);
+        const r = parseContractorsSheet(XLSX, XLSX.read(await f.arrayBuffer(), { type: "array" }));
+        savePeople(r.contractors, r.supervisors);
+        await create({ contractors: r.contractors, supervisors: r.supervisors });
+      } else if (loaded) await create(loaded);
+    } catch (e: any) { setErr(e?.message ?? "No se pudo."); } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
+      <div style={{ fontWeight: 700, fontSize: 13, color: "#065F46", marginBottom: 4 }}>HR — usuarios de prueba</div>
+      <div style={{ fontSize: 12, color: "#047857", marginBottom: 8 }}>
+        Crea a William, Erika, los supervisores y los contratistas del Excel con correos falsos. Los montos y datos del Excel no se guardan en la base: se quedan en esta pestaña.
+      </div>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {loaded && <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => run()}>{busy ? "Creando…" : `Crear con las ${loaded.contractors.length} personas ya cargadas`}</button>}
+        <button className={`btn btn-sm ${loaded ? "btn-secondary" : "btn-primary"}`} disabled={busy} onClick={() => ref.current?.click()}>{loaded ? "Elegir otro Excel" : "Elegir el Excel y crear usuarios"}</button>
+        <input ref={ref} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) run(f); e.target.value = ""; }} />
+      </div>
+      {msg && <p style={{ fontSize: 12.5, color: "#065F46", margin: "8px 0 0" }}>{msg}</p>}
+      {err && <p className="error-msg">{err}</p>}
+    </div>
+  );
+}
+
 export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { startViewAs } = useHubAccess();
@@ -285,6 +345,7 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <ViewAsPicker entries={entries} onStart={startPreview} />
+        <HrTestUsers entries={entries} onDone={load} />
 
         {!adding && !editingEmail && (
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)} style={{ marginBottom: "1rem" }}>+ Agregar correo</button>

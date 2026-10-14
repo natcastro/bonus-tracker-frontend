@@ -1,23 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Contractor, Cycle, Supervisor } from "./hrData";
 import type { ImportReport } from "./hrImport";
 import { formatMoney, HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycles, currentCycleKey, cycleInfo, isReadyForHr, nextCycleNumber, overLimit, cycleTotals } from "./hrData";
 
 const PEOPLE_KEY = "hr_proto_people";
+const STATE_KEY = "hr_proto_state"; // people + cycles, so the work survives switching "view as" persona (tab only)
+type Saved = { contractors: Contractor[]; supervisors: Supervisor[]; cycles?: Cycle[] };
+const readSaved = (): Saved | null => {
+  for (const k of [STATE_KEY, PEOPLE_KEY]) { try { const v = JSON.parse(sessionStorage.getItem(k) ?? "null") as Saved | null; if (v) return v; } catch { /* try next */ } }
+  return null;
+};
+export const readSavedPeople = (): { contractors: Contractor[]; supervisors: Supervisor[] } | null => readSaved();
+export function savePeople(contractors: Contractor[], supervisors: Supervisor[]) {
+  try { sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors, supervisors })); sessionStorage.removeItem(STATE_KEY); } catch { /* blocked: ignore */ }
+}
 const two = (n: number) => String(n).padStart(2, "0");
 export type SimDay = "real" | "upload" | "approve";
 
 // In-memory state shared by every "view as" persona, so what one role does shows up for the next.
 export function useHrStore() {
   // People loaded from HR's Excel live only in this browser tab (sessionStorage) — never in the code or a database.
-  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(PEOPLE_KEY) ?? "null") as { contractors: Contractor[]; supervisors: Supervisor[] } | null; } catch { return null; } })();
+  const saved = readSaved();
   const [imported, setImported] = useState(!!saved);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [contractors, setContractors] = useState<Contractor[]>(saved?.contractors ?? SEED_CONTRACTORS);
   const [supervisors, setSupervisors] = useState<Supervisor[]>(saved?.supervisors ?? SEED_SUPERVISORS);
-  const [cycles, setCycles] = useState<Cycle[]>(() => buildSeedCycles(new Date(), saved?.contractors ?? SEED_CONTRACTORS, !saved));
+  const [cycles, setCycles] = useState<Cycle[]>(() => saved?.cycles ?? buildSeedCycles(new Date(), saved?.contractors ?? SEED_CONTRACTORS, !saved));
   const [notice, setNotice] = useState("");
   const [simDay, setSimDay] = useState<SimDay>("real");
+
+  useEffect(() => {
+    if (!imported) return;
+    try { sessionStorage.setItem(STATE_KEY, JSON.stringify({ contractors, supervisors, cycles })); } catch { /* too big: keep in memory */ }
+  }, [imported, contractors, supervisors, cycles]);
 
   const real = new Date();
   const { year, month } = currentCycleKey(real);
@@ -101,12 +116,12 @@ export function useHrStore() {
 
     // HR
     loadPeople: (list: Contractor[], sups: Supervisor[], rep?: ImportReport) => {
-      try { sessionStorage.setItem(PEOPLE_KEY, JSON.stringify({ contractors: list, supervisors: sups })); } catch { /* too big or blocked: keep in memory only */ }
+      savePeople(list, sups);
       setContractors(list); setSupervisors(sups); setCycles(buildSeedCycles(new Date(), list, false)); setImported(true); setReport(rep ?? null);
       setNotice(`Cargados ${list.length} contratistas y ${sups.length} supervisores desde el Excel. Quedan solo en esta pestaña del navegador.`);
     },
     resetDemo: () => {
-      try { sessionStorage.removeItem(PEOPLE_KEY); } catch { /* ignore */ }
+      try { sessionStorage.removeItem(PEOPLE_KEY); sessionStorage.removeItem(STATE_KEY); } catch { /* ignore */ }
       setContractors(SEED_CONTRACTORS); setSupervisors(SEED_SUPERVISORS); setCycles(buildSeedCycles(new Date(), SEED_CONTRACTORS)); setImported(false); setReport(null);
       setNotice("Datos de prueba restaurados.");
     },
