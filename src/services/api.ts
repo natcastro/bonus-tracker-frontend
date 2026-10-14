@@ -1843,8 +1843,9 @@ export async function uploadMarketingRequestFile(requesterEmail: string, file: F
   return urlData.publicUrl;
 }
 
-export type MarketingNotifySlot = "laura" | "carol" | "diseno_1" | "diseno_2" | "diseno_3";
-export type DisenoNotifySlot = "diseno_1" | "diseno_2" | "diseno_3";
+export type MarketingNotifySlot = "laura" | "carol" | "diseno_1" | "diseno_2" | "diseno_3" | "video_1" | "video_2";
+// Slots that also carry a country (Diseño and Video people are listed together when assigning work).
+export type DisenoNotifySlot = "diseno_1" | "diseno_2" | "diseno_3" | "video_1" | "video_2";
 
 export interface MarketingNotifyEmails {
   laura: string;
@@ -1852,15 +1853,19 @@ export interface MarketingNotifyEmails {
   diseno_1: string;
   diseno_2: string;
   diseno_3: string;
+  video_1: string;
+  video_2: string;
   // Which country each Diseño slot corresponds to — shown next to their name wherever someone
   // picks who a request/task goes to, so the requester knows who handles their country.
   diseno_1_country: string;
   diseno_2_country: string;
   diseno_3_country: string;
+  video_1_country: string;
+  video_2_country: string;
 }
 
-const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3"];
-const DISENO_NOTIFY_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3"];
+const NOTIFY_SLOTS: MarketingNotifySlot[] = ["laura", "carol", "diseno_1", "diseno_2", "diseno_3", "video_1", "video_2"];
+const DISENO_NOTIFY_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3", "video_1", "video_2"];
 
 // Display names come from each person's Hub Access nickname (see getHubNicknames) — this table
 // only maps a Marketing slot to an email address, so a name never has to be typed twice.
@@ -1868,8 +1873,8 @@ export async function getMarketingNotifyEmails(): Promise<MarketingNotifyEmails>
   const { data, error } = await supabase.from("marketing_notify_emails").select("*");
   if (error) throw error;
   const emails: MarketingNotifyEmails = {
-    laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "",
-    diseno_1_country: "", diseno_2_country: "", diseno_3_country: "",
+    laura: "", carol: "", diseno_1: "", diseno_2: "", diseno_3: "", video_1: "", video_2: "",
+    diseno_1_country: "", diseno_2_country: "", diseno_3_country: "", video_1_country: "", video_2_country: "",
   };
   (data ?? []).forEach((r: any) => {
     if (NOTIFY_SLOTS.includes(r.role)) emails[r.role as MarketingNotifySlot] = r.email ?? "";
@@ -1918,7 +1923,7 @@ export async function upsertHubAccess(email: string, teams: string[], isAdmin: b
   if (error) throw error;
 }
 
-export interface MarketingAccessPerson { email: string; nickname: string; role: "admin" | "staff" | "carol" }
+export interface MarketingAccessPerson { email: string; nickname: string; role: "admin" | "staff" | "carol" | "video" }
 
 // Everyone who already has a Marketing role in Hub Access — lets the Marketing settings panel
 // offer a picker instead of asking an admin to retype emails that are already configured there.
@@ -1938,7 +1943,7 @@ export async function getMarketingAccessDirectory(): Promise<MarketingAccessPers
     const entry = (r.teams ?? []).find((t: string) => t.startsWith("MARKETING:"));
     if (!entry) return;
     const role = entry.split(":")[1];
-    if (role === "admin" || role === "staff" || role === "carol") {
+    if (role === "admin" || role === "staff" || role === "carol" || role === "video") {
       out.push({ email: r.email, nickname: r.nickname ?? "", role });
     }
   });

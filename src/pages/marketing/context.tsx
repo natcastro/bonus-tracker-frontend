@@ -22,9 +22,13 @@ const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
   diseno_1: "marketplaces@formatucuerpo.com",
   diseno_2: "",
   diseno_3: "",
+  video_1: "",
+  video_2: "",
   diseno_1_country: "",
   diseno_2_country: "",
   diseno_3_country: "",
+  video_1_country: "",
+  video_2_country: "",
 };
 
 // Absolute link into the app for this email — the only way back in for someone with no Marketing
@@ -159,7 +163,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     [notifyEmails],
   );
 
-  const videoEmailList = useMemo(() => videoUsers.map(u => u.email), [videoUsers]);
+  // Everyone with the Video role in Hub Access, plus anyone picked in the Video slots of the notification settings.
+  const videoEmailList = useMemo(() => [...new Set([...videoUsers.map(u => u.email), notifyEmails.video_1, notifyEmails.video_2].map(e => e.trim().toLowerCase()).filter(Boolean))], [videoUsers, notifyEmails.video_1, notifyEmails.video_2]);
 
   const disenoDisplayName = (email: string | null): string => {
     if (!email) return "Diseño";
@@ -171,6 +176,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     if (notifyEmails.diseno_1) map[notifyEmails.diseno_1.toLowerCase()] = notifyEmails.diseno_1_country;
     if (notifyEmails.diseno_2) map[notifyEmails.diseno_2.toLowerCase()] = notifyEmails.diseno_2_country;
     if (notifyEmails.diseno_3) map[notifyEmails.diseno_3.toLowerCase()] = notifyEmails.diseno_3_country;
+    if (notifyEmails.video_1) map[notifyEmails.video_1.toLowerCase()] = notifyEmails.video_1_country;
+    if (notifyEmails.video_2) map[notifyEmails.video_2.toLowerCase()] = notifyEmails.video_2_country;
     return map;
   }, [notifyEmails]);
 
@@ -496,7 +503,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   const loadNicknames = useCallback(async (emails: MarketingNotifyEmails) => {
     try {
-      const map = await getHubNicknames([myEmail, emails.laura, emails.carol, emails.diseno_1, emails.diseno_2, emails.diseno_3]);
+      const map = await getHubNicknames([myEmail, emails.laura, emails.carol, emails.diseno_1, emails.diseno_2, emails.diseno_3, emails.video_1, emails.video_2]);
       setNicknames(map);
     } catch { /* nicknames are a display-only nicety — never block the app on this */ }
   }, [myEmail]);
@@ -512,9 +519,13 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           diseno_1: emails.diseno_1 || DEFAULT_NOTIFY_EMAILS.diseno_1,
           diseno_2: emails.diseno_2 || DEFAULT_NOTIFY_EMAILS.diseno_2,
           diseno_3: emails.diseno_3 || DEFAULT_NOTIFY_EMAILS.diseno_3,
+          video_1: emails.video_1 || DEFAULT_NOTIFY_EMAILS.video_1,
+          video_2: emails.video_2 || DEFAULT_NOTIFY_EMAILS.video_2,
           diseno_1_country: emails.diseno_1_country || DEFAULT_NOTIFY_EMAILS.diseno_1_country,
           diseno_2_country: emails.diseno_2_country || DEFAULT_NOTIFY_EMAILS.diseno_2_country,
           diseno_3_country: emails.diseno_3_country || DEFAULT_NOTIFY_EMAILS.diseno_3_country,
+          video_1_country: emails.video_1_country || DEFAULT_NOTIFY_EMAILS.video_1_country,
+          video_2_country: emails.video_2_country || DEFAULT_NOTIFY_EMAILS.video_2_country,
         };
         setNotifyEmails(merged);
         loadNicknames(merged);

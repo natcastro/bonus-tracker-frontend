@@ -10,15 +10,18 @@ const SLOTS: { slot: MarketingNotifySlot; label: string; role: MarketingAccessPe
   { slot: "diseno_1", label: "Diseño 1", role: "staff" },
   { slot: "diseno_2", label: "Diseño 2", role: "staff" },
   { slot: "diseno_3", label: "Diseño 3", role: "staff" },
+  { slot: "video_1",  label: "Video 1",  role: "video" },
+  { slot: "video_2",  label: "Video 2",  role: "video" },
 ];
 
-const DISENO_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3"];
+const DISENO_SLOTS: DisenoNotifySlot[] = ["diseno_1", "diseno_2", "diseno_3", "video_1", "video_2"];
 
 export default function MarketingSettingsPanel({ onClose }: { onClose: () => void }) {
   const { notifyEmails, updateNotifyEmail, updateNotifyCountry } = useMarketing();
   const [emails, setEmails] = useState<MarketingNotifyEmails>(notifyEmails);
   const [countries, setCountries] = useState<Record<DisenoNotifySlot, string>>({
     diseno_1: notifyEmails.diseno_1_country, diseno_2: notifyEmails.diseno_2_country, diseno_3: notifyEmails.diseno_3_country,
+    video_1: notifyEmails.video_1_country, video_2: notifyEmails.video_2_country,
   });
   const [people, setPeople] = useState<MarketingAccessPerson[]>([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
@@ -56,7 +59,7 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
     <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(17,24,39,0.35)" }} />
       <div style={{
-        position: "relative", width: 420, maxWidth: "92vw", background: MT.surface,
+        position: "relative", width: 420, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", background: MT.surface,
         borderRadius: MT.radiusLg, boxShadow: MT.shadowLg, padding: 26,
       }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
