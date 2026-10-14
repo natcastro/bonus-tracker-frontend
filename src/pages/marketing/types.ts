@@ -80,6 +80,24 @@ export function variantLabels(keys: VariantKey[]): string {
   return keys.map(variantLabel).join(" y ");
 }
 
+// "O-021 / O-121", "o-021/o-121" and "O-021  /  O-121" are the same SKU for history purposes.
+export function normalizeSku(ref: string): string {
+  return ref.toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ").trim();
+}
+
+// Variants of a SKU that already have a brief (read from the briefs themselves, so it is always in sync
+// with the database: deleting a brief frees its variant, and it survives logging out). "No aplica" ones don't count.
+export function variantsTakenFor(briefs: { reference: string; variants: BriefVariant[] | null }[], reference: string): Set<VariantKey> {
+  const sku = normalizeSku(reference);
+  const taken = new Set<VariantKey>();
+  if (!sku) return taken;
+  for (const b of briefs) {
+    if (normalizeSku(b.reference) !== sku || !b.variants) continue;
+    b.variants.forEach(v => { if (v.applicable) taken.add(v.key); });
+  }
+  return taken;
+}
+
 export interface BriefVariant {
   key: VariantKey;
   // false = "No aplica" — either never selected at creation, or marked so later with a reason.

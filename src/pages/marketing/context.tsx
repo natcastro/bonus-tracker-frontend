@@ -13,7 +13,7 @@ import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } fro
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, variantsTakenFor, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -589,6 +589,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   };
 
   const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => {
+    // One variant per brief; a variant that already has a brief for this SKU can't be created again.
+    if ((variantKeys?.length ?? 0) > 1) throw new Error("Cada brief lleva una sola variante. Crea un brief aparte para cada una.");
+    const dup = (variantKeys ?? []).find(k => variantsTakenFor(briefs, reference).has(k));
+    if (dup) throw new Error(`${variantLabel(dup)} ya tiene un brief para ${reference}.`);
     const stages = buildStages(startDate, briefLink);
     const nextDeadline = addWorkDaysIso(startDate, STAGE_DEFS[1].gapDays);
     const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();

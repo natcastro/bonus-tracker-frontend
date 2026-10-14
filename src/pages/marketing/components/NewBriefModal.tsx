@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { PRODUCT_LINES, todayIso, VARIANT_DEFS } from "../types";
+import { PRODUCT_LINES, todayIso, VARIANT_DEFS, normalizeSku, variantsTakenFor } from "../types";
 import type { VariantKey } from "../types";
 
 export default function NewBriefModal({ onClose }: { onClose: () => void }) {
-  const { createBrief, createDraftBrief, disenoEmailList, disenoDisplayName } = useMarketing();
+  const { createBrief, createDraftBrief, disenoEmailList, disenoDisplayName, briefs } = useMarketing();
   const [mode, setMode] = useState<"public" | "draft">("public");
   const [reference, setReference] = useState("");
   const [productLine, setProductLine] = useState("");
@@ -16,9 +16,21 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const toggleVariant = (key: VariantKey) => {
-    setVariantKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-  };
+  // One variant per brief: picking one greys out the rest; picking it again frees them.
+  const toggleVariant = (key: VariantKey) => setVariantKeys(prev => (prev[0] === key ? [] : [key]));
+
+  // SKU autocomplete: every reference already used in a brief, most recent first.
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const knownSkus = useMemo(() => {
+    const seen = new Map<string, string>();
+    [...briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).forEach(b => { const k = normalizeSku(b.reference); if (k && !seen.has(k)) seen.set(k, b.reference.trim()); });
+    return [...seen.values()];
+  }, [briefs]);
+  const q = normalizeSku(reference);
+  const suggestions = knownSkus.filter(r => normalizeSku(r) !== q && (q === "" || normalizeSku(r).includes(q))).slice(0, 6);
+  const taken = useMemo(() => variantsTakenFor(briefs, reference), [briefs, reference]);
+  const pickSku = (r: string) => { setReference(r); setShowSuggest(false); setActiveIdx(-1); setVariantKeys([]); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +82,38 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={labelStyle}>Referencia del producto</label>
-            <input style={inputStyle} value={reference} onChange={e => setReference(e.target.value)} placeholder="C-054" autoFocus required />
+            <div style={{ position: "relative" }}>
+              <input
+                style={inputStyle} value={reference} placeholder="C-054" autoFocus required autoComplete="off"
+                role="combobox" aria-expanded={showSuggest && suggestions.length > 0} aria-autocomplete="list"
+                onChange={e => { setReference(e.target.value); setShowSuggest(true); setActiveIdx(-1); setVariantKeys(k => k.filter(x => !variantsTakenFor(briefs, e.target.value).has(x))); }}
+                onFocus={() => setShowSuggest(true)}
+                onBlur={() => setShowSuggest(false)}
+                onKeyDown={e => {
+                  if (!showSuggest || suggestions.length === 0) return;
+                  if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => (i + 1) % suggestions.length); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx(i => (i <= 0 ? suggestions.length - 1 : i - 1)); }
+                  else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); pickSku(suggestions[activeIdx]); }
+                  else if (e.key === "Escape") { e.stopPropagation(); setShowSuggest(false); }
+                }}
+              />
+              {showSuggest && suggestions.length > 0 && (
+                <ul role="listbox" style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 5, margin: 0, padding: 4, listStyle: "none", background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 10, boxShadow: MT.shadowLg, maxHeight: 220, overflowY: "auto" }}>
+                  {suggestions.map((r, i) => {
+                    const n = variantsTakenFor(briefs, r).size;
+                    return (
+                      <li key={r} role="option" aria-selected={i === activeIdx}
+                        onMouseDown={e => { e.preventDefault(); pickSku(r); }}
+                        onMouseEnter={() => setActiveIdx(i)}
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, color: MT.text1, background: i === activeIdx ? MT.surfaceAlt : "transparent" }}>
+                        <span style={{ fontWeight: 600 }}>{r}</span>
+                        {n > 0 && <span style={{ fontSize: 11, color: MT.text3 }}>{n} variante{n === 1 ? "" : "s"} con brief</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
           <div>
             <label style={labelStyle}>Línea de producto</label>
@@ -97,20 +140,36 @@ export default function NewBriefModal({ onClose }: { onClose: () => void }) {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Variantes (opcional — déjalo vacío si este producto no tiene variantes)</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
-                  {VARIANT_DEFS.map(v => (
-                    <label key={v.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: MT.text1, cursor: "pointer" }}>
-                      <input type="checkbox" checked={variantKeys.includes(v.key)} onChange={() => toggleVariant(v.key)} />
-                      {v.label}
-                    </label>
-                  ))}
+                <label style={labelStyle}>Variante (opcional — una por brief; déjala vacía si el producto no tiene variantes)</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.45rem" }}>
+                  {VARIANT_DEFS.map(v => {
+                    const isTaken = taken.has(v.key);
+                    const selected = variantKeys[0] === v.key;
+                    const greyed = !isTaken && variantKeys.length > 0 && !selected;
+                    const disabled = isTaken || greyed;
+                    return (
+                      <button key={v.key} type="button" disabled={disabled} aria-pressed={selected} onClick={() => toggleVariant(v.key)}
+                        title={isTaken ? "Esta variante ya tiene un brief" : greyed ? "Ya elegiste otra variante — deselecciónala para cambiar" : undefined}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, textAlign: "left",
+                          fontFamily: MT.font, fontSize: 12.5, fontWeight: 600, padding: "9px 11px", borderRadius: 8,
+                          cursor: disabled ? "not-allowed" : "pointer",
+                          border: `1.5px solid ${selected ? MT.primary : isTaken ? "#86c79a" : MT.border}`,
+                          background: selected ? MT.primarySoft : isTaken ? "#eef8f1" : MT.surface,
+                          color: isTaken ? "#2f7a4b" : greyed ? MT.text3 : MT.text1,
+                          opacity: greyed ? 0.5 : 1, transition: "opacity .15s, border-color .15s, background .15s",
+                        }}>
+                        <span>{v.label}</span>
+                        {isTaken ? <span style={{ fontSize: 11, fontWeight: 700 }}>✓ ya tiene brief</span> : selected ? <span aria-hidden>●</span> : null}
+                      </button>
+                    );
+                  })}
                 </div>
-                {variantKeys.length > 0 && (
-                  <p style={{ fontSize: 11.5, color: MT.text3, margin: "6px 0 0" }}>
-                    Cada variante seleccionada tendrá su propia propuesta, revisión y aprobación — las demás quedan como "No aplica".
-                  </p>
-                )}
+                <p style={{ fontSize: 11.5, color: MT.text3, margin: "6px 0 0" }}>
+                  {taken.size > 0
+                    ? "Las que tienen ✓ ya tienen su brief. Para otra variante, crea un brief aparte."
+                    : "Cada brief lleva una sola variante. Si necesitas otra, crea un brief aparte."}
+                </p>
               </div>
             </>
           ) : (
