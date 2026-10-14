@@ -245,13 +245,13 @@ export default function TeamDashboardPage() {
         <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
           Diseño y Video — tiempo promedio de entrega (AHT)
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))", gap: "1rem" }}>
           {disenoStats.map((d, i) => (
             <button
               key={d.email}
               onClick={() => setSelectedEmail(selectedEmail === d.email ? null : d.email)}
               style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "1.25rem 1rem",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "2.1rem 1rem 1.25rem", minWidth: 0,
                 borderRadius: 12, cursor: "pointer", textAlign: "center", fontFamily: MT.font, position: "relative",
                 border: `1.5px solid ${selectedEmail === d.email ? MT.clay : MT.border}`,
                 background: selectedEmail === d.email ? MT.claySoft : MT.surface,
@@ -263,10 +263,10 @@ export default function TeamDashboardPage() {
                 background: i === 0 ? MT.moss : MT.border, color: i === 0 ? "#fff" : MT.text2,
                 fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
               }}>{i + 1}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, marginTop: 6 }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 6, maxWidth: "100%", overflowWrap: "anywhere" }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
               <span style={{ fontSize: 24, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>AHT promedio</span>
-              <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4 }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
+              <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4, textAlign: "center" }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
             </button>
           ))}
         </div>
