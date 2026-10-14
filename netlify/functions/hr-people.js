@@ -54,6 +54,10 @@ const isHead = (n) => /^will?i?am\s+calle/.test(norm(n));
 async function ensureAccessRows(all) {
   const r = await supa("hub_access?select=email,teams,nickname");
   const existing = r.ok ? await r.json() : [];
+  // William is one account (HR head + supervisor): drop any leftover separate "William Calle" supervisor/contractor row.
+  for (const e of existing.filter((x) => isHead(x.nickname) && !(x.teams || []).includes("HR:admin") && (x.teams || []).some((t) => t === "HR:supervisor" || t === "HR:staff"))) {
+    await supa(`hub_access?email=eq.${encodeURIComponent(e.email)}`, { method: "DELETE" });
+  }
   let n = Math.max(0, ...existing.map((e) => Number(/^prueba(\d+)@formatucuerpo\.com$/.exec(e.email)?.[1] ?? 0)));
   const wanted = [
     { role: "admin", nick: "William Calle — HR" },
