@@ -7,9 +7,9 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantLabels, variantStatusLabel } from "../types";
-import type { PublicationPlatform, StageKey, VariantKey, BriefVariant } from "../types";
-import { lateExplanation } from "../lateInfo";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantLabels, variantStatusLabel, stageLate, deadlineTimestamp } from "../types";
+import type { PublicationPlatform, StageKey, VariantKey, BriefVariant, MarketingStage } from "../types";
+import { lateExplanation, deliveredAt } from "../lateInfo";
 import { uploadMarketingReviewImage, getBriefNotificationTimes } from "../../../services/api";
 
 const ASSIGN_HELP_TEXT = "Elige a quién de Diseño se le asigna — los avisos de este brief (ajustes, aprobación, publicación) le llegarán solo a esa persona.";
@@ -78,6 +78,12 @@ export default function BriefDetailPage() {
     );
   }
 
+  // Late under the current 8 PM cut-off; older stages without an exact time are re-judged from that day's notification.
+  const lateNow = (st: MarketingStage) => {
+    if (!stageLate(st)) return false;
+    const at = !st.completedTs && st.deadline ? deliveredAt(st, briefNotifTimes) : null;
+    return !(at && at.ts.getTime() <= deadlineTimestamp(st.deadline!));
+  };
   const isVariantMode = !!brief.variants;
   const applicableVariants = brief.variants?.filter(v => v.applicable) ?? [];
   const activeVariantKey = selectedVariantKey ?? applicableVariants[0]?.key ?? null;
@@ -391,14 +397,14 @@ export default function BriefDetailPage() {
                   color={s.status === "done" ? MT.primary : isCurrent ? MT.moss : MT.text3}
                   label={s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
                 />
-                {s.status === "done" && s.late && (
+                {s.status === "done" && lateNow(s) && (
                   <button type="button" onClick={() => setLateOpen(lateOpen === s.key ? null : s.key)}
                     title="Ver a qué hora se entregó" style={{
                     fontFamily: MT.font, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`,
                     border: "none", cursor: "pointer", borderRadius: 999, padding: "2px 7px", flexShrink: 0,
                   }}>⚠ tarde {lateOpen === s.key ? "▴" : "▾"}</button>
                 )}
-                {s.status === "done" && s.late && lateOpen === s.key && (
+                {s.status === "done" && lateNow(s) && lateOpen === s.key && (
                   <div style={{ flexBasis: "100%", order: 99, fontSize: 12, color: MT.text1, background: `${MT.danger}0F`, border: `1px solid ${MT.danger}30`, borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
                     {lateExplanation(s, briefNotifTimes)}
                   </div>

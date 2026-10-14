@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
-import { stageLabel, todayIso, isPastDeadline, currentActiveStages } from "../types";
+import { stageLabel, todayIso, isPastDeadline, currentActiveStages, stageLate } from "../types";
 import type { MarketingBrief, MarketingRole, MarketingStage } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
 import DisenoFilterButton from "../components/DisenoFilterButton";
@@ -89,8 +89,8 @@ export default function DashboardPage() {
   const delayRows = useMemo(() => {
     const rows: { brief: MarketingBrief; stage: MarketingStage; variant?: string }[] = [];
     [...inProgressBriefs, ...completedThisMonth].forEach(b => {
-      if (b.variants) b.variants.forEach(v => v.stages.filter(st => st.role === "diseno" && st.status === "done" && st.late).forEach(st => rows.push({ brief: b, stage: st, variant: v.key })));
-      else b.stages.filter(st => st.role === "diseno" && st.status === "done" && st.late).forEach(st => rows.push({ brief: b, stage: st }));
+      if (b.variants) b.variants.forEach(v => v.stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).forEach(st => rows.push({ brief: b, stage: st, variant: v.key })));
+      else b.stages.filter(st => st.role === "diseno" && st.status === "done" && stageLate(st)).forEach(st => rows.push({ brief: b, stage: st }));
     });
     return rows.sort((a, b) => (b.stage.completedAt ?? "").localeCompare(a.stage.completedAt ?? ""));
   }, [inProgressBriefs, completedThisMonth]);

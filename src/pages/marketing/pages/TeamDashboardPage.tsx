@@ -4,7 +4,7 @@ import { MT } from "../theme";
 import { formatDateHuman } from "../theme";
 import StatusPill from "../components/StatusPill";
 import { useMarketing } from "../context";
-import { stageLabel, todoStageLabel, daysBetweenIso, todayIsoBogota } from "../types";
+import { stageLabel, todoStageLabel, daysBetweenIso, todayIsoBogota, stageLate } from "../types";
 import type { StageKey } from "../types";
 
 interface DeliveryEntry {
@@ -84,7 +84,7 @@ export default function TeamDashboardPage() {
             if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
             const start = (i > 0 ? stages[i - 1].completedAt : b.startDate) ?? b.startDate;
             entries.push({
-              completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+              completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
               reference: `${b.reference} — ${stageLabel(s.key)}`, kind: "brief", linkTo: `/marketing/brief/${b.id}`,
             });
           });
@@ -96,7 +96,7 @@ export default function TeamDashboardPage() {
           if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
           const start = (i > 0 ? t.stages[i - 1].completedAt : t.createdAt.slice(0, 10)) ?? t.createdAt.slice(0, 10);
           entries.push({
-            completedAt: s.completedAt, late: !!s.late, turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
             reference: `${t.title} — ${todoStageLabel(s.key)}`, kind: "todo", linkTo: `/marketing/todo/${t.id}`,
           });
         });
@@ -159,7 +159,7 @@ export default function TeamDashboardPage() {
       const allStages = b.variants ? b.variants.filter(v => v.applicable).flatMap(v => v.stages) : b.stages;
       for (const s of allStages) {
         if (s.status !== "done" || !s.completedAt) continue;
-        list.push({ completedAt: s.completedAt, late: !!s.late, role: s.role, stageKey: s.key });
+        list.push({ completedAt: s.completedAt, late: stageLate(s), role: s.role, stageKey: s.key });
       }
     }
     return list;

@@ -449,9 +449,18 @@ export function todayIso(): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10);
 }
 
-// All deadlines cut off at 5:30 PM Colombia time (fixed UTC-5, no DST).
+// All deadlines cut off at 8:00 PM Colombia time (late on the day, since urgent same-day art is sometimes approved) (fixed UTC-5, no DST).
 export function deadlineTimestamp(dateIso: string): number {
-  return new Date(`${dateIso}T17:30:00-05:00`).getTime();
+  return new Date(`${dateIso}T20:00:00-05:00`).getTime();
+}
+
+// A stage counts as late only if it was really delivered after its deadline under the CURRENT cut-off time. Stages that
+// stored the exact moment are re-judged (so moving the cut-off to 8 PM clears the ones delivered between 5:30 and 8 PM);
+// older ones without it keep the flag they were saved with.
+export function stageLate(s: { late?: boolean; completedTs?: string; deadline: string | null }): boolean {
+  if (!s.late) return false;
+  if (s.completedTs && s.deadline) return new Date(s.completedTs).getTime() > deadlineTimestamp(s.deadline);
+  return true;
 }
 
 export function isPastDeadline(dateIso: string): boolean {

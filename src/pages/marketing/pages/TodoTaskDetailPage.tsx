@@ -6,7 +6,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon } from "../../../components/icons";
-import { todoStageLabel, normalizeUrl, TODO_APPROVABLE_STAGES } from "../types";
+import { todoStageLabel, normalizeUrl, TODO_APPROVABLE_STAGES, stageLate } from "../types";
 import { uploadTodoTaskFile } from "../../../services/api";
 
 export default function TodoTaskDetailPage() {
@@ -84,7 +84,7 @@ export default function TodoTaskDetailPage() {
         <>
           <strong>{s.role === "carol" ? "Karol" : who(s.by, s.role)}</strong>{" "}
           {s.decision === "approved" ? <>aprobó sin cambios en <strong>{s.label}</strong></> : <>completó <strong>{s.label}</strong></>}
-          {s.late && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "1px 7px" }}>⚠ tarde</span>}
+          {stageLate(s) && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "1px 7px" }}>⚠ tarde</span>}
           {s.note && <div style={{ marginTop: 3, color: MT.text1, background: MT.surfaceAlt, borderRadius: 6, padding: "6px 9px", whiteSpace: "pre-wrap" }}>{s.note}</div>}
           {s.link && <div style={{ marginTop: 4 }}><Attachment url={s.link} /></div>}
         </>
@@ -138,7 +138,7 @@ export default function TodoTaskDetailPage() {
                   color={s.status === "done" ? MT.primary : isCurrent ? MT.clay : MT.text3}
                   label={s.skipped ? "— no hizo falta" : s.status === "done" ? `✓ ${formatDateHuman(s.completedAt)}` : formatDateHuman(s.deadline)}
                 />
-                {s.status === "done" && s.late && (
+                {s.status === "done" && stageLate(s) && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "2px 7px" }}>⚠ tarde</span>
                 )}
                 {s.link && (isImg(s.link) ? (
