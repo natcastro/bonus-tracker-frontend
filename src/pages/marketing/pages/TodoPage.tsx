@@ -96,7 +96,7 @@ export default function TodoPage() {
   );
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
