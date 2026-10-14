@@ -454,13 +454,14 @@ export function deadlineTimestamp(dateIso: string): number {
   return new Date(`${dateIso}T20:00:00-05:00`).getTime();
 }
 
-// A stage counts as late only if it was really delivered after its deadline under the CURRENT cut-off time. Stages that
-// stored the exact moment are re-judged (so moving the cut-off to 8 PM clears the ones delivered between 5:30 and 8 PM);
-// older ones without it keep the flag they were saved with.
-export function stageLate(s: { late?: boolean; completedTs?: string; deadline: string | null }): boolean {
-  if (!s.late) return false;
-  if (s.completedTs && s.deadline) return new Date(s.completedTs).getTime() > deadlineTimestamp(s.deadline);
-  return true;
+// Whether a finished stage was late, judged from its own dates (never from a stored flag, so the numbers stay true
+// when the cut-off changes or a flag is cleared): exact moment vs the 8 PM cut-off when we have it, otherwise the
+// delivery day vs the deadline day (a same-day delivery without a recorded time counts as on time).
+export function stageLate(s: { completedTs?: string; completedAt?: string | null; deadline: string | null }): boolean {
+  if (!s.deadline) return false;
+  if (s.completedTs) return new Date(s.completedTs).getTime() > deadlineTimestamp(s.deadline);
+  if (s.completedAt) return s.completedAt > s.deadline;
+  return false;
 }
 
 export function isPastDeadline(dateIso: string): boolean {
