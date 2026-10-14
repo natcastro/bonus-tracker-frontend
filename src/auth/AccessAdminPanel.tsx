@@ -4,8 +4,6 @@ import { getAllHubAccess, upsertHubAccess, deleteHubAccess } from "../services/a
 import type { HubAccessEntry } from "../services/api";
 import { useHubAccess } from "./HubAccessContext";
 import type { TeamRole } from "./HubAccessContext";
-import { isHrHeadName } from "../pages/hr/hrStore";
-import { fetchHrPeople } from "../pages/hr/hrApi";
 
 const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "OPS",        label: "FTC USA — Operations" },
@@ -235,48 +233,6 @@ function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart
   );
 }
 
-// Creates one Hub Access row per HR person, with a made-up address (prueba1@formatucuerpo.com…), so each can be
-// opened with "Ver el Hub como". Only name + role go in the row; pay data stays behind the protected server.
-function HrTestUsers({ entries, onDone }: { entries: HubAccessEntry[]; onDone: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-
-  const run = async () => {
-    setBusy(true); setErr(""); setMsg("");
-    try {
-      const people = await fetchHrPeople();
-      const wanted: { role: string; nick: string }[] = [
-        { role: "admin", nick: "William Calle — HR" },
-        { role: "accounting", nick: "Erika — Contabilidad" },
-        ...people.supervisors.filter(s => !isHrHeadName(`${s.firstName} ${s.lastName}`)).map(s => ({ role: "supervisor", nick: `${s.firstName} ${s.lastName}`.trim() })),
-        ...people.contractors.filter(c => !isHrHeadName(c.legalName)).map(c => ({ role: "staff", nick: c.legalName })),
-      ];
-      let n = Math.max(0, ...entries.map(e => Number(/^prueba(\d+)@formatucuerpo\.com$/.exec(e.email)?.[1] ?? 0)));
-      let made = 0;
-      for (const w of wanted) {
-        if (entries.some(e => e.teams.includes(`HR:${w.role}`) && e.nickname === w.nick)) continue;
-        n += 1; made += 1;
-        await upsertHubAccess(`prueba${n}@formatucuerpo.com`, [`HR:${w.role}`], false, w.nick);
-      }
-      await onDone();
-      setMsg(made ? `Listo: creé ${made} usuarios (prueba1@formatucuerpo.com, prueba2…). Ya aparecen abajo y en "Ver el Hub como" → HR.` : "Todos ya estaban creados.");
-    } catch (e: any) { setErr(e?.message ?? "No se pudo."); } finally { setBusy(false); }
-  };
-
-  return (
-    <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: "#065F46", marginBottom: 4 }}>HR — usuarios para "ver como"</div>
-      <div style={{ fontSize: 12, color: "#047857", marginBottom: 8 }}>
-        Crea a William, Erika, los supervisores y los contratistas registrados en HR, con correos falsos. Solo guarda nombre y rol aquí.
-      </div>
-      <button className="btn btn-sm btn-primary" disabled={busy} onClick={run}>{busy ? "Creando…" : "Crear los usuarios que falten"}</button>
-      {msg && <p style={{ fontSize: 12.5, color: "#065F46", margin: "8px 0 0" }}>{msg}</p>}
-      {err && <p className="error-msg">{err}</p>}
-    </div>
-  );
-}
-
 export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { startViewAs } = useHubAccess();
@@ -332,7 +288,6 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <ViewAsPicker entries={entries} onStart={startPreview} />
-        <HrTestUsers entries={entries} onDone={load} />
 
         {!adding && !editingEmail && (
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)} style={{ marginBottom: "1rem" }}>+ Agregar correo</button>

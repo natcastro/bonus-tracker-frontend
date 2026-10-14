@@ -47,6 +47,29 @@ function scopeFor(access, all) {
   return { contractors, supervisors: all.supervisors, canEdit: false };
 }
 
+const isHead = (n) => /^will?i?am\s+calle/.test(norm(n));
+
+// Every HR person gets a row in Hub Access (so the main admin sees them in "Usuarios" and can open "Ver como"):
+// a made-up address prueba1@formatucuerpo.com… until their real company email is set. Idempotent.
+async function ensureAccessRows(all) {
+  const r = await supa("hub_access?select=email,teams,nickname");
+  const existing = r.ok ? await r.json() : [];
+  let n = Math.max(0, ...existing.map((e) => Number(/^prueba(\d+)@formatucuerpo\.com$/.exec(e.email)?.[1] ?? 0)));
+  const wanted = [
+    { role: "admin", nick: "William Calle — HR" },
+    { role: "accounting", nick: "Erika — Contabilidad" },
+    ...all.supervisors.filter((s) => !isHead(`${s.firstName} ${s.lastName}`)).map((s) => ({ role: "supervisor", nick: `${s.firstName} ${s.lastName}`.trim() })),
+    ...all.contractors.filter((c) => !isHead(c.legalName)).map((c) => ({ role: "staff", nick: c.legalName })),
+  ];
+  const rows = [];
+  for (const w of wanted) {
+    if (existing.some((e) => (e.teams || []).includes(`HR:${w.role}`) && e.nickname === w.nick)) continue;
+    n += 1;
+    rows.push({ email: `prueba${n}@formatucuerpo.com`, teams: [`HR:${w.role}`], is_admin: false, nickname: w.nick });
+  }
+  if (rows.length) await supa("hub_access", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(rows) });
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.VITE_SUPABASE_URL) return json(500, { error: "Server not configured" });
@@ -71,6 +94,7 @@ export const handler = async (event) => {
 
   if (body.action === "list") {
     const { canEdit, ...people } = scoped;
+    if (canEdit) await ensureAccessRows(all).catch(() => {});
     return json(200, people);
   }
 
@@ -79,7 +103,11 @@ export const handler = async (event) => {
     const { kind, data } = body;
     if (!["contractor", "supervisor"].includes(kind) || !data || !Number.isInteger(data.id)) return json(400, { error: "Datos inválidos." });
     const r = await supa("hr_people", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ kind, id: data.id, data }) });
-    return r.ok ? json(200, { ok: true }) : json(500, { error: "No pude guardar." });
+    if (!r.ok) return json(500, { error: "No pude guardar." });
+    const next = { contractors: all.contractors.filter((c) => !(kind === "contractor" && c.id === data.id)), supervisors: all.supervisors.filter((x) => !(kind === "supervisor" && x.id === data.id)) };
+    next[kind === "contractor" ? "contractors" : "supervisors"].push(data);
+    await ensureAccessRows(next).catch(() => {});
+    return json(200, { ok: true });
   }
   return json(400, { error: "Acción desconocida." });
 };
