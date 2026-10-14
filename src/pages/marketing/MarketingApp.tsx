@@ -56,8 +56,9 @@ function InternalShell() {
           <Route path="todo" element={<TodoPage />} />
           <Route path="dashboard" element={<TeamDashboardPage />} />
           <Route path="todo/:id" element={<TodoTaskDetailPage />} />
-          <Route path="home" element={<DashboardPage />} />
-          <Route path="brief/:id" element={<BriefDetailPage />} />
+          {/* The Briefs section is closed to the Video role (it falls through to "tasks" below). */}
+          {authedUser.role !== "video" && <Route path="home" element={<DashboardPage />} />}
+          {authedUser.role !== "video" && <Route path="brief/:id" element={<BriefDetailPage />} />}
           {/* Everyone reaches Solicitudes, but RequestsPage itself only shows the full
               list/assign/reassign/delete tools to Laura/Karol — Diseño just gets the
               "copiar enlace" box so they can hand it out too. */}

@@ -347,7 +347,7 @@ export default function TeamDashboardPage() {
                 {selectedEntries.map((e, i) => (
                   <div
                     key={i}
-                    onClick={() => navigate(e.linkTo)}
+                    onClick={() => { if (!(authedUser?.role === "video" && e.kind === "brief")) navigate(e.linkTo); }}
                     style={{
                       display: "flex", alignItems: "center", gap: 10, padding: "0.55rem 0.8rem", cursor: "pointer",
                       borderTop: i === 0 ? "none" : `1px solid ${MT.border}`,
