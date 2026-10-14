@@ -6,8 +6,17 @@ import { formatMoney, HR_HEAD, SEED_CONTRACTORS, SEED_SUPERVISORS, buildSeedCycl
 const PEOPLE_KEY = "hr_proto_people";
 const STATE_KEY = "hr_proto_state"; // people + cycles, so the work survives switching "view as" persona (tab only)
 type Saved = { contractors: Contractor[]; supervisors: Supervisor[]; cycles?: Cycle[] };
+// William is the HR head AND supervises people: one person, one account. Older loaded data (or a differently
+// spelled sheet) may list him as a separate supervisor, so fold him back into the HR head here.
+export const isHrHeadName = (n: string) => /^will?i?am\s+calle/.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim());
+export function foldHrHead<T extends Saved>(v: T): T {
+  const heads = v.supervisors.filter(x => isHrHeadName(`${x.firstName} ${x.lastName}`));
+  if (heads.length === 0) return v;
+  const ids = new Set(heads.map(h => h.id));
+  return { ...v, supervisors: v.supervisors.filter(x => !ids.has(x.id)), contractors: v.contractors.map(c => (c.supervisorId !== null && ids.has(c.supervisorId) ? { ...c, supervisorId: null } : c)) };
+}
 const readSaved = (): Saved | null => {
-  for (const k of [STATE_KEY, PEOPLE_KEY]) { try { const v = JSON.parse(sessionStorage.getItem(k) ?? "null") as Saved | null; if (v) return v; } catch { /* try next */ } }
+  for (const k of [STATE_KEY, PEOPLE_KEY]) { try { const v = JSON.parse(sessionStorage.getItem(k) ?? "null") as Saved | null; if (v) return foldHrHead(v); } catch { /* try next */ } }
   return null;
 };
 export const readSavedPeople = (): { contractors: Contractor[]; supervisors: Supervisor[] } | null => readSaved();

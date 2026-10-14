@@ -4,7 +4,7 @@ import { getAllHubAccess, upsertHubAccess, deleteHubAccess } from "../services/a
 import type { HubAccessEntry } from "../services/api";
 import { useHubAccess } from "./HubAccessContext";
 import type { TeamRole } from "./HubAccessContext";
-import { readSavedPeople, savePeople } from "../pages/hr/hrStore";
+import { foldHrHead, isHrHeadName, readSavedPeople, savePeople } from "../pages/hr/hrStore";
 
 const TEAM_OPTIONS: { key: string; label: string }[] = [
   { key: "OPS",        label: "FTC USA — Operations" },
@@ -243,12 +243,13 @@ function HrTestUsers({ entries, onDone }: { entries: HubAccessEntry[]; onDone: (
   const [err, setErr] = useState("");
   const loaded = readSavedPeople();
 
-  const create = async (people: NonNullable<ReturnType<typeof readSavedPeople>>) => {
+  const create = async (raw: NonNullable<ReturnType<typeof readSavedPeople>>) => {
+    const people = foldHrHead(raw); // William supervises and is HR head: a single account
     const wanted: { role: string; nick: string }[] = [
       { role: "admin", nick: "William Calle — HR" },
       { role: "accounting", nick: "Erika — Contabilidad" },
       ...people.supervisors.map(s => ({ role: "supervisor", nick: `${s.firstName} ${s.lastName}`.trim() })),
-      ...people.contractors.map(c => ({ role: "staff", nick: c.legalName })),
+      ...people.contractors.filter(c => !isHrHeadName(c.legalName)).map(c => ({ role: "staff", nick: c.legalName })),
     ];
     let n = Math.max(0, ...entries.map(e => Number(/^prueba(\d+)@formatucuerpo\.com$/.exec(e.email)?.[1] ?? 0)));
     let made = 0;

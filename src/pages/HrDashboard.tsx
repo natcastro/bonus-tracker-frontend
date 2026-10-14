@@ -4,7 +4,7 @@ import type { Persona } from "./hr/hrData";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { getHubNicknames } from "../services/api";
 import { ACCOUNTANT, HR_HEAD } from "./hr/hrData";
-import { useHrStore } from "./hr/hrStore";
+import { useHrStore, isHrHeadName } from "./hr/hrStore";
 import { Avatar, Banner } from "./hr/ui";
 import type { RoleKind } from "./hr/ui";
 import EmployeeView from "./hr/EmployeeView";
@@ -33,7 +33,7 @@ export default function HrDashboard() {
   }, [isSpecific, hrRole, email]);
   const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   const autoPersona: Persona | null = !isSpecific ? null
-    : hrRole === "admin" ? { kind: "hr" }
+    : hrRole === "admin" || ((hrRole === "supervisor" || hrRole === "staff") && isHrHeadName(nick ?? "")) ? { kind: "hr" }
     : hrRole === "accounting" ? { kind: "accounting" }
     : hrRole === "supervisor" ? ((s => (s ? { kind: "supervisor", id: s.id } as Persona : null))(store.supervisors.find(x => norm(`${x.firstName} ${x.lastName}`) === norm(nick ?? ""))))
     : hrRole === "staff" ? ((c => (c ? { kind: "employee", id: c.id } as Persona : null))(store.contractors.find(x => norm(x.legalName) === norm(nick ?? ""))))
