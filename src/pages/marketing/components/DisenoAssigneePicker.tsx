@@ -5,7 +5,7 @@ import { MT } from "../theme";
 // to the name — so it reads as two separate columns. A plain <select> can't lay out its options
 // that way (an <option> is text-only), so this is a small custom listbox instead.
 export default function DisenoAssigneePicker({
-  value, onChange, options, disenoDisplayName, disenoCountry, placeholder = "Selecciona a alguien de Diseño...",
+  value, onChange, options, disenoDisplayName, disenoCountry, placeholder = "Selecciona a alguien de Diseño...", disabledEmails = [], tags = {},
 }: {
   value: string;
   onChange: (email: string) => void;
@@ -13,6 +13,9 @@ export default function DisenoAssigneePicker({
   disenoDisplayName: (email: string | null) => string;
   disenoCountry: (email: string) => string;
   placeholder?: string;
+  // People shown but not pickable (e.g. a Video person for a non-video task), and a small tag next to a name.
+  disabledEmails?: string[];
+  tags?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -48,16 +51,18 @@ export default function DisenoAssigneePicker({
           ) : (
             options.map(email => {
               const country = disenoCountry(email);
+              const off = disabledEmails.includes(email);
               return (
                 <div
                   key={email}
-                  onClick={() => { onChange(email); setOpen(false); }}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", cursor: "pointer", fontSize: 13 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
+                  onClick={() => { if (off) return; onChange(email); setOpen(false); }}
+                  title={off ? "No se puede asignar esta categoría a esta persona" : undefined}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", cursor: off ? "not-allowed" : "pointer", fontSize: 13, opacity: off ? 0.4 : 1 }}
+                  onMouseEnter={e => { if (!off) e.currentTarget.style.background = MT.surfaceAlt; }}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ color: MT.text1, fontWeight: 600 }}>{disenoDisplayName(email)}</span>
-                  <span style={{ color: MT.text3, fontSize: 12 }}>{country || "No sé el país"}</span>
+                  <span style={{ color: MT.text1, fontWeight: 600 }}>{disenoDisplayName(email)}{tags[email] && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>{tags[email]}</span>}</span>
+                  <span style={{ color: MT.text3, fontSize: 12 }}>{country || (tags[email] ? "" : "No sé el país")}</span>
                 </div>
               );
             })

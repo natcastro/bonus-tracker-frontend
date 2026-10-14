@@ -32,7 +32,7 @@ type BoardItem =
   | { kind: "request"; id: number; title: string; assignedDisenoEmail: string | null; status: "in_progress" | "completed"; sortKey: string; overdue: boolean; request: MarketingRequest };
 
 export default function TodoPage() {
-  const { todoTasks, disenoDisplayName, disenoEmailList, requests } = useMarketing();
+  const { todoTasks, disenoDisplayName, disenoEmailList, videoEmailList, requests } = useMarketing();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_progress" | "completed">("all");
@@ -141,7 +141,7 @@ export default function TodoPage() {
         <DisenoFilterButton
           active={disenoActive} onActivate={() => setDisenoActive(v => !v)}
           selected={disenoSelection} onChangeSelected={setDisenoSelection}
-          options={disenoEmailList} disenoDisplayName={disenoDisplayName}
+          options={[...disenoEmailList, ...videoEmailList]} label="Diseño / Video" disenoDisplayName={disenoDisplayName}
         />
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
           fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,

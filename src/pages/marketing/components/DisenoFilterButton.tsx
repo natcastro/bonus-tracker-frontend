@@ -5,7 +5,7 @@ import { MT } from "../theme";
 // to narrow it to specific people (an empty selection means "todos"). Shared by the Briefs and To
 // Do boards so both filter rows behave the same way.
 export default function DisenoFilterButton({
-  active, onActivate, selected, onChangeSelected, options, disenoDisplayName,
+  active, onActivate, selected, onChangeSelected, options, disenoDisplayName, label = "Diseño",
 }: {
   active: boolean;
   onActivate: () => void;
@@ -13,6 +13,7 @@ export default function DisenoFilterButton({
   onChangeSelected: (next: string[]) => void;
   options: string[];
   disenoDisplayName: (email: string) => string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ export default function DisenoFilterButton({
           color: active ? MT.primary : MT.text2,
           display: "flex", alignItems: "center", gap: 5,
         }}
-      >Diseño{active && !allSelected ? ` (${selected.length})` : ""} ▾</button>
+      >{label}{active && !allSelected ? ` (${selected.length})` : ""} ▾</button>
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 20, minWidth: 180,

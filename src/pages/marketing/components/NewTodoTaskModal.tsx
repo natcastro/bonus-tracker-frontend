@@ -80,16 +80,17 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label style={labelStyle}>{cat.category === "videos" ? "Asignar a (equipo de Video)" : "Asignar a"}</label>
-            {cat.category === "videos" && videoEmailList.length === 0 ? (
-              <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Todavía no hay personas con el rol Video. Un administrador las agrega en Accesos (Marketing → Video).</p>
-            ) : (
-              <DisenoAssigneePicker
-                key={cat.category === "videos" ? "video" : "diseno"}
-                value={assignedEmail} onChange={setAssignedEmail}
-                options={cat.category === "videos" ? videoEmailList : disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
-              />
-            )}
+            <label style={labelStyle}>Asignar a</label>
+            {/* Diseño and Video people share one list; the ones that can't take this kind of task are greyed out. */}
+            <DisenoAssigneePicker
+              value={assignedEmail} onChange={setAssignedEmail}
+              options={[...disenoEmailList, ...videoEmailList]}
+              disabledEmails={cat.category === "videos" ? disenoEmailList : videoEmailList}
+              tags={Object.fromEntries(videoEmailList.map(e => [e, "VIDEO"]))}
+              placeholder={cat.category === "videos" ? "Selecciona a alguien de Video..." : "Selecciona a alguien de Diseño..."}
+              disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
+            />
+            {cat.category === "videos" && videoEmailList.length === 0 && <p style={{ fontSize: 12, color: MT.text3, margin: "6px 0 0" }}>Todavía no hay personas con el rol Video. Un administrador las agrega en Accesos (Marketing → Video).</p>}
           </div>
 
           {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}

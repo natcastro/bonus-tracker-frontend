@@ -202,9 +202,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     ]);
     // Never show someone a notification about their own action — only about what others did.
     const others = n.filter(x => !x.actorEmail || x.actorEmail.toLowerCase() !== myEmail.toLowerCase());
-    // A Video person only ever sees the To Do tasks assigned to them.
-    const mine = isVideo ? tt.filter(x => x.assignedDisenoEmail.toLowerCase() === myEmail.toLowerCase()) : tt;
-    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(mine); setVideoUsers(vu);
+    // Everyone sees the whole To Do board; a Video person can only act on the tasks assigned to them.
+    setNotifications(others); setRequests(rq); setBriefs(b); setPrivateTasks(t); setTodoTasks(tt); setVideoUsers(vu);
   }, [myEmail, myRoleForLoad]);
 
   const createPrivateTask = async (title: string, dueAt: string) => {
