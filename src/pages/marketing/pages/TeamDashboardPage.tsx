@@ -245,13 +245,14 @@ export default function TeamDashboardPage() {
         <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
           Diseño y Video — tiempo promedio de entrega (AHT)
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))", gap: "1rem" }}>
+        {/* flex-wrap + grow: whatever is left on the last row stretches to fill it, so there is never an empty gap */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
           {disenoStats.map((d, i) => (
             <button
               key={d.email}
               onClick={() => setSelectedEmail(selectedEmail === d.email ? null : d.email)}
               style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "2.1rem 1rem 1.25rem", minWidth: 0,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "2.1rem 1rem 1.25rem", minWidth: 0, flex: "1 1 210px",
                 borderRadius: 12, cursor: "pointer", textAlign: "center", fontFamily: MT.font, position: "relative",
                 border: `1.5px solid ${selectedEmail === d.email ? MT.clay : MT.border}`,
                 background: selectedEmail === d.email ? MT.claySoft : MT.surface,
