@@ -80,7 +80,6 @@ interface MarketingCtx {
   variantLauraReview: (briefId: number, variantKey: VariantKey, action: "approve" | "request_changes", opts?: { link?: string; note?: string }) => Promise<void>;
   variantRequestExtraRevision: (briefId: number, variantKey: VariantKey, note?: string) => Promise<void>;
   variantConfirmPublish: (briefId: number, variantKey: VariantKey, note?: string) => Promise<void>;
-  startWaitingVariant: (briefId: number, variantKey: VariantKey) => Promise<void>;
   markVariantNotApplicable: (briefId: number, variantKey: VariantKey, reason: string) => Promise<void>;
 
   unreadCount: number;
@@ -648,22 +647,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return { variants: variants.map(v => (v.key === next.key ? started : v)), started };
   };
 
-  // Laura (or Karol) can start a waiting variant by hand — needed when the variant before it was already finished
-  // (so nothing will ever "approve" it) or when the team wants to begin it ahead of its turn.
-  const startWaitingVariant = async (briefId: number, variantKey: VariantKey) => {
-    if (authedUser?.role !== "laura" && authedUser?.role !== "carol") throw new Error("Solo Laura o Karol pueden iniciar una variante en espera.");
-    const brief = briefs.find(b => b.id === briefId);
-    const target = brief?.variants?.find(v => v.key === variantKey);
-    if (!brief || !brief.variants || !target?.waiting) return;
-    const today = todayIso();
-    const stages = buildStages(today, "").map(s => (s.key === "proposal" ? { ...s, deadline: addWorkDaysIso(today, ADAPTATION_PROPOSAL_DAYS) } : s));
-    const started: BriefVariant = { ...target, waiting: undefined, stages, currentStage: "proposal", status: "in_progress", completedAt: null };
-    const newVariants = brief.variants.map(v => (v.key === variantKey ? started : v));
-    await updateMarketingBrief(briefId, { variants: newVariants, status: "in_progress", completedAt: null });
-    await announceVariantStart(brief, started);
-    await reload();
-  };
-
   const announceVariantStart = async (brief: MarketingBrief, started: BriefVariant) => {
     const label = variantLabel(started.key);
     const deadline = started.stages.find(s => s.key === "proposal")?.deadline ?? null;
@@ -1176,7 +1159,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       authedUser, briefs, notifications, loading, reload,
       createBrief, createBriefForReview, createDraftBrief, publishBrief, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish, updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, deleteBrief,
-      startWaitingVariant, submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
+      submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
       unreadCount, markNotificationRead, deleteNotification, clearAllNotifications,
       privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask,
       todoTasks, createTodoTask, advanceTodoTask, approveTodoTask, deleteTodoTask,
