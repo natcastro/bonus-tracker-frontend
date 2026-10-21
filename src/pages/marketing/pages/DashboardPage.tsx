@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
-import { stageLabel, todayIso, isPastDeadline, currentActiveStages, stageLate, variantsInOrder } from "../types";
+import { stageLabel, todayIso, isPastDeadline, currentActiveStages, stageLate } from "../types";
 import type { MarketingBrief, MarketingRole, MarketingStage } from "../types";
 import { moodBunny } from "../../../components/moodBunny";
 import DisenoFilterButton from "../components/DisenoFilterButton";
@@ -27,7 +27,7 @@ const GROUP_DEFS: { key: GroupKey; label: string; color: string }[] = [
 // (review stages) never shows as late, since that delay isn't Diseño's to answer for. For a
 // variant-mode brief, it counts as overdue if ANY applicable variant's current Diseño stage is.
 // A brief with several variants is judged only by its first one: if the first was on time, the brief is on time.
-const countedVariant = (brief: MarketingBrief) => (brief.variants ? variantsInOrder(brief.variants.filter(v => v.applicable))[0] : null) ?? null;
+const countedVariant = (brief: MarketingBrief) => brief.variants?.find(v => v.applicable) ?? null;
 
 function isOverdue(brief: MarketingBrief): boolean {
   if (brief.status !== "in_progress") return false;
