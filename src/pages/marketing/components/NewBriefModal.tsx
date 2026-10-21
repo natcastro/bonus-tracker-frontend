@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import { PRODUCT_LINES, todayIso, VARIANT_DEFS, normalizeSku, variantsTakenFor } from "../types";
+import { PRODUCT_LINES, todayIso, VARIANT_DEFS, normalizeSku, variantsTakenFor, ADAPTATION_PROPOSAL_DAYS } from "../types";
 import type { VariantKey } from "../types";
 
 // forReview = Karol proposing a brief: it goes to Laura as a pending draft; Laura reviews, assigns Diseño and publishes it.
@@ -17,8 +17,9 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // One variant per brief: picking one greys out the rest; picking it again frees them.
-  const toggleVariant = (key: VariantKey) => setVariantKeys(prev => (prev[0] === key ? [] : [key]));
+  // Pick the variants in the order they should be worked: the order of the clicks is the order of the work
+  // (like picking photos in Instagram). Clicking a picked one removes it and the rest renumber.
+  const toggleVariant = (key: VariantKey) => setVariantKeys(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]));
 
   // SKU autocomplete: every reference already used in a brief, most recent first.
   const [showSuggest, setShowSuggest] = useState(false);
@@ -144,35 +145,39 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
               </div>}
               {forReview && <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>Laura recibe un aviso, revisa el brief y lo publica asignándolo a Diseño. Hasta entonces no corre ningún plazo.</p>}
               <div>
-                <label style={labelStyle}>Variante (opcional — una por brief; déjala vacía si el producto no tiene variantes)</label>
+                <label style={labelStyle}>Variantes (opcional) — elige en el orden en que se van a trabajar</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.45rem" }}>
                   {VARIANT_DEFS.map(v => {
                     const isTaken = taken.has(v.key);
-                    const selected = variantKeys[0] === v.key;
-                    const greyed = !isTaken && variantKeys.length > 0 && !selected;
-                    const disabled = isTaken || greyed;
+                    const pos = variantKeys.indexOf(v.key) + 1;
+                    const selected = pos > 0;
                     return (
-                      <button key={v.key} type="button" disabled={disabled} aria-pressed={selected} onClick={() => toggleVariant(v.key)}
-                        title={isTaken ? "Esta variante ya tiene un brief" : greyed ? "Ya elegiste otra variante — deselecciónala para cambiar" : undefined}
+                      <button key={v.key} type="button" disabled={isTaken} aria-pressed={selected} onClick={() => toggleVariant(v.key)}
+                        title={isTaken ? "Esta variante ya tiene un brief" : selected ? "Clic para quitarla" : undefined}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, textAlign: "left",
                           fontFamily: MT.font, fontSize: 12.5, fontWeight: 600, padding: "9px 11px", borderRadius: 8,
-                          cursor: disabled ? "not-allowed" : "pointer",
+                          cursor: isTaken ? "not-allowed" : "pointer",
                           border: `1.5px solid ${selected ? MT.primary : isTaken ? "#86c79a" : MT.border}`,
                           background: selected ? MT.primarySoft : isTaken ? "#eef8f1" : MT.surface,
-                          color: isTaken ? "#2f7a4b" : greyed ? MT.text3 : MT.text1,
-                          opacity: greyed ? 0.5 : 1, transition: "opacity .15s, border-color .15s, background .15s",
+                          color: isTaken ? "#2f7a4b" : MT.text1, transition: "border-color .15s, background .15s",
                         }}>
                         <span>{v.label}</span>
-                        {isTaken ? <span style={{ fontSize: 11, fontWeight: 700 }}>✓ ya tiene brief</span> : selected ? <span aria-hidden>●</span> : null}
+                        {isTaken ? <span style={{ fontSize: 11, fontWeight: 700 }}>✓ ya tiene brief</span>
+                          : selected ? <span aria-label={`Orden ${pos}`} style={{ width: 20, height: 20, borderRadius: 999, background: MT.primary, color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{pos}</span> : null}
                       </button>
                     );
                   })}
                 </div>
+                {variantKeys.length > 1 && (
+                  <p style={{ fontSize: 12, fontWeight: 700, color: MT.text1, margin: "8px 0 0" }}>
+                    {variantKeys.map((k, i) => `${i + 1} · ${VARIANT_DEFS.find(d => d.key === k)?.label}`).join("  →  ")}
+                  </p>
+                )}
                 <p style={{ fontSize: 11.5, color: MT.text3, margin: "6px 0 0" }}>
-                  {taken.size > 0
-                    ? "Las que tienen ✓ ya tienen su brief. Para otra variante, crea un brief aparte."
-                    : "Cada brief lleva una sola variante. Si necesitas otra, crea un brief aparte."}
+                  {variantKeys.length > 1
+                    ? `La 1 es la propuesta inicial (tiempo normal). Las demás se trabajan una por una: cada una empieza cuando se aprueba la anterior, con ${ADAPTATION_PROPOSAL_DAYS} días hábiles para su propuesta. Los enlaces de publicación se habilitan al terminar todas.`
+                    : taken.size > 0 ? "Las que tienen ✓ ya tienen su brief." : "Si eliges varias, se trabajan en el orden en que las marques."}
                 </p>
               </div>
             </>

@@ -82,6 +82,12 @@ export function variantLabels(keys: VariantKey[]): string {
   return keys.map(variantLabel).join(" y ");
 }
 
+// Applicable variants in the order they run (older briefs without an order keep the usual fixed order).
+export function variantsInOrder<T extends { key: VariantKey; order?: number }>(variants: T[]): T[] {
+  const idx = (k: VariantKey) => VARIANT_DEFS.findIndex(d => d.key === k);
+  return [...variants].sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || idx(a.key) - idx(b.key));
+}
+
 // "O-021 / O-121", "o-021/o-121" and "O-021  /  O-121" are the same SKU for history purposes.
 export function normalizeSku(ref: string): string {
   return ref.toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ").trim();
@@ -100,8 +106,17 @@ export function variantsTakenFor(briefs: { reference: string; variants: BriefVar
   return taken;
 }
 
+// Briefs created with several variants run them one at a time, in the order Laura picked: the first is the initial
+// proposal (normal timing); each next one starts only after the previous one is approved, with a shorter proposal time.
+export const ADAPTATION_PROPOSAL_DAYS = 2;
+
 export interface BriefVariant {
   key: VariantKey;
+  // Position Laura gave it (1 = initial proposal). Absent on briefs created before sequential variants existed —
+  // those keep running all their variants at the same time, untouched.
+  order?: number;
+  // true while it is waiting for the previous variant to be approved: nothing is assigned, no deadlines run.
+  waiting?: boolean;
   // false = "No aplica" — either never selected at creation, or marked so later with a reason.
   applicable: boolean;
   naReason: string | null;
@@ -119,6 +134,7 @@ export interface BriefVariant {
 export function variantStatusLabel(v: BriefVariant): string {
   if (!v.applicable) return "No aplica";
   if (v.status === "completed") return "Aprobada";
+  if (v.waiting) return "En espera";
   const stage = v.stages.find(s => s.key === v.currentStage);
   if (!stage) return "Pendiente";
   const startedAny = v.stages.some(s => s.status === "done");
@@ -227,7 +243,7 @@ export function stageLabel(key: StageKey | "completed"): string {
 export function currentActiveStages(brief: MarketingBrief): MarketingStage[] {
   if (brief.variants) {
     return brief.variants
-      .filter(v => v.applicable && v.status === "in_progress")
+      .filter(v => v.applicable && v.status === "in_progress" && !v.waiting)
       .map(v => v.stages.find(s => s.key === v.currentStage))
       .filter((s): s is MarketingStage => !!s);
   }

@@ -13,7 +13,7 @@ import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } fro
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, variantsTakenFor, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, variantsTakenFor, variantsInOrder, ADAPTATION_PROPOSAL_DAYS, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -621,16 +621,48 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   // One independent stage pipeline per selected variant — unselected ones are "No aplica" from
   // the start, no justification needed since they were never meant to apply.
+  // Stages of a variant that has not started: nothing is due, nothing is assigned, until it is activated.
+  const buildWaitingStages = () => STAGE_DEFS.map(def => ({ ...def, deadline: null, link: null, completedAt: null, status: "pending" as const }));
+
+  // Variants run one at a time in the order Laura picked (variantKeys order). The first starts now with the normal timing;
+  // the rest wait (applicable, but no active stage) until the one before them is approved. Variants she did not pick are "No aplica".
   const buildVariants = (startDate: string, variantKeys: VariantKey[]): BriefVariant[] | null => {
     if (variantKeys.length === 0) return null;
-    return VARIANT_DEFS.map(def => variantKeys.includes(def.key)
-      ? { key: def.key, applicable: true, naReason: null, currentStage: "proposal" as StageKey, status: "in_progress" as const, stages: buildStages(startDate, ""), lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null }
-      : { key: def.key, applicable: false, naReason: null, currentStage: "completed" as const, status: "completed" as const, stages: [], lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null });
+    const na = (key: VariantKey): BriefVariant => ({ key, applicable: false, naReason: null, currentStage: "completed", status: "completed", stages: [], lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null });
+    const picked = (key: VariantKey): BriefVariant => {
+      const order = variantKeys.indexOf(key) + 1;
+      const first = order === 1;
+      return { key, order, waiting: first ? undefined : true, applicable: true, naReason: null, currentStage: "proposal", status: "in_progress", stages: first ? buildStages(startDate, "") : buildWaitingStages(), lauraDelayDays: 0, designDelayCount: 0, extraRevisionRounds: 0, completedAt: null };
+    };
+    return VARIANT_DEFS.map(def => (variantKeys.includes(def.key) ? picked(def.key) : na(def.key)));
+  };
+
+  // Starts the next waiting variant (lowest order) — called when the previous one is approved (or marked "no aplica").
+  // The proposal of an adaptation gets the shorter ADAPTATION_PROPOSAL_DAYS; the rest of its stages keep the usual gaps.
+  const activateNextVariant = (variants: BriefVariant[], today: string): { variants: BriefVariant[]; started: BriefVariant | null } => {
+    const next = variantsInOrder(variants.filter(v => v.applicable && v.waiting))[0];
+    if (!next) return { variants, started: null };
+    const stages = buildStages(today, "").map(s => (s.key === "proposal" ? { ...s, deadline: addWorkDaysIso(today, ADAPTATION_PROPOSAL_DAYS) } : s));
+    const started: BriefVariant = { ...next, waiting: undefined, stages, currentStage: "proposal" };
+    return { variants: variants.map(v => (v.key === next.key ? started : v)), started };
+  };
+
+  const announceVariantStart = async (brief: MarketingBrief, started: BriefVariant) => {
+    const label = variantLabel(started.key);
+    const deadline = started.stages.find(s => s.key === "proposal")?.deadline ?? null;
+    await notify(brief.id, `Empieza ${label} de ${brief.reference} (la variante anterior quedó aprobada).`);
+    const recipients = brief.assignedDisenoEmail ? [brief.assignedDisenoEmail] : (notifyEmails.carol ? [notifyEmails.carol] : []);
+    for (const email of recipients) {
+      await sendMarketingEmail(
+        email,
+        `Empieza la siguiente variante — ${label} (${brief.reference})`,
+        emailHtml({ intro: "La variante anterior ya fue aprobada. Te toca trabajar la siguiente, a partir del diseño aprobado.", reference: `${brief.reference} — ${label}`, nextTask: stageLabel("proposal"), deadline, link: appUrl(`/marketing/brief/${brief.id}`) }),
+      );
+    }
   };
 
   const createBrief = async (reference: string, productLine: string, startDate: string, briefLink: string, assignedDisenoEmail?: string, variantKeys?: VariantKey[]) => {
-    // One variant per brief; a variant that already has a brief for this SKU can't be created again.
-    if ((variantKeys?.length ?? 0) > 1) throw new Error("Cada brief lleva una sola variante. Crea un brief aparte para cada una.");
+    // A variant that already has a brief for this SKU can't be created again.
     const dup = (variantKeys ?? []).find(k => variantsTakenFor(briefs, reference).has(k));
     if (dup) throw new Error(`${variantLabel(dup)} ya tiene un brief para ${reference}.`);
     const stages = buildStages(startDate, briefLink);
@@ -664,7 +696,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // Karol proposes a brief: it waits as a pending draft until Laura reviews it and publishes it (assigning Diseño),
   // which is when the normal flow and its deadlines start.
   const createBriefForReview = async (reference: string, productLine: string, startDate: string, briefLink: string, variantKeys?: VariantKey[]) => {
-    if ((variantKeys?.length ?? 0) > 1) throw new Error("Cada brief lleva una sola variante. Crea un brief aparte para cada una.");
     const dup = (variantKeys ?? []).find(k => variantsTakenFor(briefs, reference).has(k));
     if (dup) throw new Error(`${variantLabel(dup)} ya tiene un brief para ${reference}.`);
     const stages = STAGE_DEFS.map(def => ({ ...def, deadline: null, link: def.key === "brief" ? (briefLink || null) : null, completedAt: null, status: "pending" as const, ...(def.key === "brief" ? { by: myEmail } : {}) }));
@@ -696,7 +727,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await updateMarketingBrief(briefId, {
       startDate: today, estimatedStartDate: null, currentStage: "proposal", status: "in_progress", stages,
       // a brief that carries a variant (sent by Karol) gets that variant's own stages and deadlines from today
-      ...(brief.variants ? { variants: brief.variants.map(v => (v.applicable ? { ...v, stages: buildStages(today, link) } : v)) } : {}),
+      ...(brief.variants ? { variants: brief.variants.map(v => (v.applicable && !v.waiting ? { ...v, stages: buildStages(today, link) } : v)) } : {}),
       assignedDisenoEmail: assignedDisenoEmail ?? null, carolNotifiedAt,
     });
     await notifyBriefLive(briefId, brief.reference, assignedDisenoEmail ?? null, nextDeadline);
@@ -927,7 +958,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     let anyLate = false;
     let anyNextDeadline: string | null = null;
     const newVariants = brief.variants.map(v => {
-      if (!variantKeys.includes(v.key) || !v.applicable || v.status === "completed") return v;
+      if (!variantKeys.includes(v.key) || !v.applicable || v.waiting || v.status === "completed") return v;
       const stageIdx = v.stages.findIndex(s => s.key === v.currentStage);
       const stage = v.stages[stageIdx];
       const isLate = !!stage.deadline && isPastDeadline(stage.deadline);
@@ -971,9 +1002,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
         if (s.key === "publish") return { ...s, deadline: publishDeadline };
         return s;
       });
-      const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: "publish" as StageKey, lauraDelayDays: v.lauraDelayDays + (isLateApprove ? 1 : 0) } : v);
+      const approvedVariants = brief.variants.map(v => v.key === variantKey ? { ...v, stages: newStages, currentStage: "publish" as StageKey, lauraDelayDays: v.lauraDelayDays + (isLateApprove ? 1 : 0) } : v);
+      // Sequential briefs: approving this variant is what starts the next one in line.
+      const { variants: newVariants, started } = activateNextVariant(approvedVariants, today);
       await updateMarketingBrief(briefId, { variants: newVariants });
       await notify(briefId, `Laura aprobó ${label} de ${brief.reference} — falta que Diseño confirme la publicación.${isLateApprove ? " (tarde)" : ""}${opts?.note ? ` Nota: ${opts.note}` : ""}`);
+      if (started) await announceVariantStart(brief, started);
       for (const email of disenoRecipients(brief)) {
         await sendMarketingEmail(
           email,
@@ -1067,9 +1101,13 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const brief = briefs.find(b => b.id === briefId);
     if (!brief || !brief.variants) return;
     const today = todayIso();
-    const newVariants = brief.variants.map(v => v.key === variantKey ? { ...v, applicable: false, naReason: reason.trim(), status: "completed" as const, currentStage: "completed" as const } : v);
+    const marked = brief.variants.map(v => v.key === variantKey ? { ...v, applicable: false, waiting: undefined, naReason: reason.trim(), status: "completed" as const, currentStage: "completed" as const } : v);
+    // If that was the variant being worked on and others are waiting, the next one starts now.
+    const nothingRunning = !marked.some(v => v.applicable && !v.waiting && v.status === "in_progress");
+    const { variants: newVariants, started } = nothingRunning ? activateNextVariant(marked, today) : { variants: marked, started: null };
     await updateMarketingBrief(briefId, { variants: newVariants, ...recomputeBriefCompletion(newVariants, today) });
     await notify(briefId, `${variantLabel(variantKey)} marcada como no aplica en ${brief.reference}. Motivo: ${reason.trim()}`);
+    if (started) await announceVariantStart(brief, started);
     await reload();
   };
 
