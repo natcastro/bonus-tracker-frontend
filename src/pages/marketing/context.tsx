@@ -241,12 +241,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const created = await apiCreateTodoTask({
       taskType, title, description, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
     });
-    await notify(null, `Karol asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
-    const emailBody = [description && `Descripción: ${description}`, emailNote && `Nota de Karol: ${emailNote}`].filter(Boolean).join(" — ") || undefined;
+    // Karol or Laura can assign To Do tasks — the notices name whoever actually did it.
+    const assigner = authedUser?.role === "laura" ? "Laura" : "Karol";
+    await notify(null, `${assigner} asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
+    const emailBody = [description && `Descripción: ${description}`, emailNote && `Nota de ${assigner}: ${emailNote}`].filter(Boolean).join(" — ") || undefined;
     await sendMarketingEmail(
       assignedDisenoEmail,
       `Nueva tarea (To Do) — ${title}`,
-      emailHtml({ intro: "Karol te asignó una nueva tarea rápida.", reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody, link: appUrl(`/marketing/todo/${created.id}`) }),
+      emailHtml({ intro: `${assigner} te asignó una nueva tarea rápida.`, reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody, link: appUrl(`/marketing/todo/${created.id}`) }),
     );
     await reload();
   };

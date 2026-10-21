@@ -148,10 +148,16 @@ export default function MyTasksPage() {
           </p>
         </div>
         {myRole === "laura" && (
-          <button onClick={() => setShowNew(true)} style={{
-            fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-          }}>+ Nuevo</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setShowNew(true)} style={{
+              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            }}>+ Nuevo</button>
+            <button onClick={() => setShowNewTodo(true)} style={{
+              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            }}>+ Nueva tarea</button>
+          </div>
         )}
         {myRole === "carol" && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

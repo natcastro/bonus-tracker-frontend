@@ -80,7 +80,7 @@ export default function TodoTaskDetailPage() {
   // Activity history — built from what each stage recorded (who, when, link, note, late), newest first.
   const who = (email?: string, role?: string) => email ? disenoDisplayName(email) : role === "carol" ? "Karol" : role === "diseno" ? disenoDisplayName(task.assignedDisenoEmail) : "Alguien";
   const events: { ts: string; text: React.ReactNode }[] = [
-    { ts: task.createdAt, text: <>Karol asignó la tarea a <strong>{disenoDisplayName(task.assignedDisenoEmail)}</strong>.</> },
+    { ts: task.createdAt, text: <>Tarea asignada a <strong>{disenoDisplayName(task.assignedDisenoEmail)}</strong>.</> },
     ...task.stages.filter(s => s.status === "done").map(s => ({
       ts: s.completedTs ?? `${s.completedAt}T12:00:00`,
       text: (
