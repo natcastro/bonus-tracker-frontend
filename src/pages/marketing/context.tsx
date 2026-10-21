@@ -371,6 +371,11 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     deadline: string; assignedDisenoEmail?: string;
   }): Promise<number> => {
     if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
+    if (opts.assignedDisenoEmail) {
+      const toVideo = videoEmailList.includes(opts.assignedDisenoEmail.toLowerCase());
+      if (opts.taskType === "Video" && !toVideo) throw new Error("Las solicitudes de Video solo se pueden hacer a personas de Video.");
+      if (opts.taskType !== "Video" && toVideo) throw new Error("Esa persona es de Video: solo recibe solicitudes de la categoría Video.");
+    }
     const stages = buildRequestStages(opts.deadline);
     const assignedDisenoEmail = opts.assignedDisenoEmail ?? null;
     const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
@@ -381,6 +386,16 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       stages, revisionRounds: 0, completedAt: null, assignedDisenoEmail, carolNotifiedAt,
     });
     await notifyRequestLive(created.id, opts.title, assignedDisenoEmail, stages[0].deadline);
+    // Confirmation to whoever sent it, so they know it arrived and that they will hear back when Diseño delivers.
+    const safeTitle = opts.title.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+    await sendMarketingEmail(
+      myEmail,
+      `Recibimos tu solicitud — ${opts.title}`,
+      emailHtml({
+        intro: "Tu solicitud fue enviada y Diseño ya fue notificado. Te escribiremos de nuevo cuando haya una entrega lista para que la revises, y desde ese correo podrás aprobarla o pedir ajustes.",
+        reference: safeTitle, nextTask: "Entrega de Diseño", deadline: stages[0].deadline, link: appUrl(`/marketing/request/${created.id}`),
+      }),
+    );
     await notify(null, `${nicknames[myEmail.toLowerCase()] || myEmail} creó una nueva solicitud: ${opts.title}.`);
     await reload();
     return created.id;

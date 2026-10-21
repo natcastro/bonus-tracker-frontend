@@ -49,8 +49,10 @@ export default function RequestDetailPage() {
   // no Marketing role at all can only see requests they created or were explicitly shared.
   const canView = !!myRole || isRequester || isSharedViewer;
   const currentStage = request.stages.find(s => s.key === request.currentStage);
-  const isMyDisenoAssignment = myRole !== "diseno" || !request.assignedDisenoEmail || request.assignedDisenoEmail.toLowerCase() === myEmail;
-  const canDeliver = request.status === "in_progress" && currentStage?.role === "diseno" && myRole === "diseno" && isMyDisenoAssignment;
+  // A Video person delivers like a Diseño person (requests can be assigned to them too).
+  const worksAsDiseno = myRole === "diseno" || myRole === "video";
+  const isMyDisenoAssignment = !worksAsDiseno || !request.assignedDisenoEmail || request.assignedDisenoEmail.toLowerCase() === myEmail;
+  const canDeliver = request.status === "in_progress" && currentStage?.role === "diseno" && worksAsDiseno && isMyDisenoAssignment;
   const canReview = request.status === "in_progress" && currentStage?.role === "requester" && isRequester;
   const canAssign = myRole === "laura" || myRole === "carol";
 

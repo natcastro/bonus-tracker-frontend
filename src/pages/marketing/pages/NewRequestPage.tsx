@@ -14,16 +14,18 @@ import DisenoAssigneePicker from "../components/DisenoAssigneePicker";
 // needed. Someone internal copies this page's URL (from the Solicitudes tab) and sends it to
 // whoever needs to ask Diseño for something.
 export default function NewRequestPage() {
-  const { createRequest, disenoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
+  const { createRequest, disenoEmailList, videoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
   const { email, name } = useHubAccess();
   const navigate = useNavigate();
-  const [cat, setCat] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
+  const [cat, setCatState] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState(todayIso());
   const [assignedDisenoEmail, setAssignedDisenoEmail] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  // Switching to/from Video changes who can take the request, so the pick is cleared.
+  const setCat = (next: TaskCategoryState) => { if ((next.category === "videos") !== (cat.category === "videos")) setAssignedDisenoEmail(""); setCatState(next); };
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -144,9 +146,14 @@ export default function NewRequestPage() {
 
           <label style={labelStyle}>¿A quién se le hace la solicitud?</label>
           <div style={{ marginBottom: 14 }}>
+            {/* Diseño and Video people in one list; video requests go to Video people, everything else to Diseño. */}
             <DisenoAssigneePicker
               value={assignedDisenoEmail} onChange={setAssignedDisenoEmail}
-              options={disenoEmailList} disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
+              options={[...disenoEmailList, ...videoEmailList]}
+              disabledEmails={cat.category === "videos" ? disenoEmailList : videoEmailList}
+              tags={Object.fromEntries(videoEmailList.map(e => [e, "VIDEO"]))}
+              placeholder={cat.category === "videos" ? "Selecciona a alguien de Video..." : "Selecciona a alguien de Diseño..."}
+              disenoDisplayName={disenoDisplayName} disenoCountry={disenoCountry}
             />
           </div>
 
