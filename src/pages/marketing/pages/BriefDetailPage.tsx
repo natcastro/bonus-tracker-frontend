@@ -379,15 +379,17 @@ export default function BriefDetailPage() {
       ) : isVariantMode && activeVariant?.waiting ? (
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.5rem", textAlign: "center", color: MT.text2, fontSize: 13, lineHeight: 1.6 }}>
           <strong style={{ color: MT.text1 }}>{readyToStart(activeVariant) ? "Listo para iniciar" : "En espera"} — variante {activeVariant.order}</strong><br />
-          Empieza cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
-          Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).
-          {(myRole === "laura" || myRole === "carol") && (
+          {readyToStart(activeVariant)
+            ? <>Las variantes anteriores ya terminaron. Al iniciarla se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).</>
+            : <>Empieza sola cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
+              Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).</>}
+          {(myRole === "laura" || myRole === "carol") && readyToStart(activeVariant) && (
             <div style={{ marginTop: 12 }}>
               <button disabled={busy} onClick={() => run(() => startWaitingVariant(brief.id, activeVariant.key))} style={{
                 fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                 background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "8px 16px",
               }}>▶ Iniciar esta variante ahora</button>
-              <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>Úsalo si la anterior ya terminó o si quieres adelantarla.</div>
+              <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>La anterior ya terminó, así que esta no empezará sola. Al iniciarla corre su plazo.</div>
             </div>
           )}
         </div>
