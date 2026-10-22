@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon, PencilIcon } from "../../../components/icons";
-import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantLabels, variantStatusLabel, stageLate, deadlineTimestamp } from "../types";
+import { stageLabel, isPastDeadline, normalizeUrl, PUBLICATION_PLATFORMS, VARIANT_DEFS, variantLabel, variantLabels, variantStatusLabel, variantsInOrder, ADAPTATION_PROPOSAL_DAYS, stageLate, deadlineTimestamp } from "../types";
 import type { PublicationPlatform, StageKey, VariantKey, BriefVariant, MarketingStage } from "../types";
 import { lateExplanation, deliveredAt } from "../lateInfo";
 import { uploadMarketingReviewImage, getBriefNotificationTimes } from "../../../services/api";
@@ -29,7 +29,7 @@ function variantDotColor(v: BriefVariant): string {
   if (!v.applicable) return MT.border;
   if (v.status === "completed") return MT.primary;
   const label = variantStatusLabel(v);
-  if (label === "Pendiente") return MT.text3;
+  if (label === "Pendiente" || label === "En espera") return MT.text3;
   if (label === "Cambios solicitados") return MT.danger;
   return MT.moss;
 }
@@ -85,8 +85,9 @@ export default function BriefDetailPage() {
     return !(at && at.ts.getTime() <= deadlineTimestamp(st.deadline!));
   };
   const isVariantMode = !!brief.variants;
-  const applicableVariants = brief.variants?.filter(v => v.applicable) ?? [];
-  const activeVariantKey = selectedVariantKey ?? applicableVariants[0]?.key ?? null;
+  const applicableVariants = variantsInOrder(brief.variants?.filter(v => v.applicable) ?? []);
+  // Open on the variant being worked right now (the others may be waiting their turn).
+  const activeVariantKey = selectedVariantKey ?? (applicableVariants.find(v => !v.waiting && v.status === "in_progress") ?? applicableVariants[0])?.key ?? null;
   const activeVariant = isVariantMode ? brief.variants!.find(v => v.key === activeVariantKey) ?? null : null;
 
   // In variant mode, everything below reads from the selected variant's own pipeline instead of
@@ -94,7 +95,7 @@ export default function BriefDetailPage() {
   const activeStages = isVariantMode ? (activeVariant?.stages ?? []) : brief.stages;
   const activeCurrentStage = isVariantMode ? (activeVariant?.currentStage ?? "completed") : brief.currentStage;
   const activeCompletedAt = isVariantMode ? (activeVariant?.completedAt ?? null) : brief.completedAt;
-  const activeInProgress = isVariantMode ? activeVariant?.status === "in_progress" : brief.status === "in_progress";
+  const activeInProgress = isVariantMode ? activeVariant?.status === "in_progress" && !activeVariant?.waiting : brief.status === "in_progress";
   const currentStage = activeStages.find(s => s.key === activeCurrentStage);
   const myRole = authedUser?.role;
   // A Diseño person can only act on briefs assigned specifically to them, never a colleague's.
@@ -205,8 +206,8 @@ export default function BriefDetailPage() {
     <div style={{ width: 200, flexShrink: 0 }}>
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "0.6rem", position: "sticky", top: 60 }}>
         <p style={{ fontSize: 10.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", padding: "0.3rem 0.4rem" }}>Variantes</p>
-        {VARIANT_DEFS.map(def => {
-          const v = brief.variants!.find(x => x.key === def.key)!;
+        {[...variantsInOrder(brief.variants!.filter(x => x.applicable)), ...brief.variants!.filter(x => !x.applicable)].map(v => {
+          const def = VARIANT_DEFS.find(d => d.key === v.key)!;
           const isSelected = activeVariantKey === def.key;
           return (
             <button key={def.key} onClick={() => { setSelectedVariantKey(def.key); setCoSubmitKeys(null); }} style={{
@@ -217,8 +218,11 @@ export default function BriefDetailPage() {
               color: v.applicable ? (isSelected ? MT.primary : MT.text1) : MT.text3,
               marginBottom: 2,
             }}>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: variantDotColor(v), flexShrink: 0 }} />
+              {v.order && v.applicable
+                ? <span style={{ width: 18, height: 18, borderRadius: 999, background: variantDotColor(v), color: "#fff", fontSize: 10.5, fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}>{v.order}</span>
+                : <span style={{ width: 8, height: 8, borderRadius: 999, background: variantDotColor(v), flexShrink: 0 }} />}
               <span style={{ flex: 1 }}>{def.label}</span>
+              {v.waiting && <span style={{ fontSize: 10, fontWeight: 700, color: MT.text3 }}>en espera</span>}
             </button>
           );
         })}
@@ -369,6 +373,12 @@ export default function BriefDetailPage() {
       {isVariantMode && !activeVariant?.applicable ? (
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.5rem", textAlign: "center", color: MT.text2, fontSize: 12.5 }}>
           Esta variante no aplica para este brief.
+        </div>
+      ) : isVariantMode && activeVariant?.waiting ? (
+        <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.5rem", textAlign: "center", color: MT.text2, fontSize: 13, lineHeight: 1.6 }}>
+          <strong style={{ color: MT.text1 }}>En espera — variante {activeVariant.order}</strong><br />
+          Empieza cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
+          Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).
         </div>
       ) : (
       <>
