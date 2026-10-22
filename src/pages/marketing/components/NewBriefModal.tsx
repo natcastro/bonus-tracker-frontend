@@ -4,7 +4,7 @@ import { useMarketing } from "../context";
 import { PRODUCT_LINES, todayIso, VARIANT_DEFS, normalizeSku, variantsTakenFor, ADAPTATION_PROPOSAL_DAYS } from "../types";
 import type { VariantKey } from "../types";
 
-// forReview = Karol proposing a brief: it goes to Laura as a pending draft; Laura reviews, assigns Diseño and publishes it.
+// The "Brief" tab of the unified New menu (NewItemModal): form only, no frame. forReview = Karol proposing a brief: it goes to Laura as a pending draft; Laura reviews, assigns Diseño and publishes it.
 export default function NewBriefModal({ onClose, forReview = false }: { onClose: () => void; forReview?: boolean }) {
   const { createBrief, createBriefForReview, createDraftBrief, disenoEmailList, disenoDisplayName, briefs } = useMarketing();
   const [mode, setMode] = useState<"public" | "draft">("public");
@@ -61,28 +61,13 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(44,42,32,0.35)" }} />
-      <div style={{
-        position: "relative", width: 460, maxWidth: "92vw", background: MT.surface,
-        borderRadius: MT.radiusLg, boxShadow: MT.shadowLg, padding: 26,
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-          Nuevo brief
-        </div>
-        <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>{forReview ? "Enviar brief a Laura" : "Crear brief de producto"}</h3>
-
-        {!forReview && <div style={{ display: "flex", gap: 6, marginBottom: 18, background: MT.surfaceAlt, borderRadius: 8, padding: 3 }}>
-          {([["public", "Tarea pública"], ["draft", "Tarea pendiente (privada)"]] as const).map(([m, label]) => (
-            <button key={m} type="button" onClick={() => setMode(m)} style={{
-              flex: 1, fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-              padding: "8px 10px", borderRadius: 6, border: "none",
-              background: mode === m ? MT.surface : "transparent",
-              color: mode === m ? MT.text1 : MT.text2,
-              boxShadow: mode === m ? MT.shadow : "none",
-            }}>{label}</button>
-          ))}
-        </div>}
+    <div>
+        {!forReview && (
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: MT.text2, marginBottom: 14, cursor: "pointer" }}>
+            <input type="checkbox" checked={mode === "draft"} onChange={e => setMode(e.target.checked ? "draft" : "public")} style={{ marginTop: 2 }} />
+            <span><strong style={{ color: MT.text1 }}>Guardar como pendiente (privado)</strong> — nadie recibe aviso; lo publicas cuando quieras.</span>
+          </label>
+        )}
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
@@ -200,7 +185,6 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
             }}>{saving ? "Creando..." : forReview ? "Enviar a Laura" : mode === "draft" ? "Crear tarea pendiente" : "Crear brief"}</button>
           </div>
         </form>
-      </div>
     </div>
   );
 }
