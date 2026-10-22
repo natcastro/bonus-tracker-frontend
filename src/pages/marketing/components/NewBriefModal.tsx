@@ -30,7 +30,8 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
     return [...seen.values()];
   }, [briefs]);
   const q = normalizeSku(reference);
-  const suggestions = knownSkus.filter(r => normalizeSku(r) !== q && (q === "" || normalizeSku(r).includes(q))).slice(0, 6);
+  // Only once the person starts typing (never on an empty field), so the list does not cover the form on open.
+  const suggestions = q === "" ? [] : knownSkus.filter(r => normalizeSku(r) !== q && normalizeSku(r).includes(q)).slice(0, 6);
   const taken = useMemo(() => variantsTakenFor(briefs, reference), [briefs, reference]);
   const pickSku = (r: string) => { setReference(r); setShowSuggest(false); setActiveIdx(-1); setVariantKeys([]); };
 
@@ -91,7 +92,6 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
                 style={inputStyle} value={reference} placeholder="C-054" autoFocus required autoComplete="off"
                 role="combobox" aria-expanded={showSuggest && suggestions.length > 0} aria-autocomplete="list"
                 onChange={e => { setReference(e.target.value); setShowSuggest(true); setActiveIdx(-1); setVariantKeys(k => k.filter(x => !variantsTakenFor(briefs, e.target.value).has(x))); }}
-                onFocus={() => setShowSuggest(true)}
                 onBlur={() => setShowSuggest(false)}
                 onKeyDown={e => {
                   if (!showSuggest || suggestions.length === 0) return;
