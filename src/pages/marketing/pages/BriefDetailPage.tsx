@@ -39,7 +39,7 @@ export default function BriefDetailPage() {
   const navigate = useNavigate();
   const {
     authedUser, briefs, notifications, submitDesignStage, lauraReview, requestExtraRevision, confirmPublish,
-    submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
+    startWaitingVariant, submitVariantProposal, variantLauraReview, variantRequestExtraRevision, variantConfirmPublish, markVariantNotApplicable,
     updateStageLink, updatePublicationLink, approvePublicationLinks, assignBrief, publishBrief, disenoEmailList, disenoDisplayName, deleteBrief,
   } = useMarketing();
   const brief = briefs.find(b => b.id === Number(id));
@@ -379,6 +379,15 @@ export default function BriefDetailPage() {
           <strong style={{ color: MT.text1 }}>En espera — variante {activeVariant.order}</strong><br />
           Empieza cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
           Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).
+          {(myRole === "laura" || myRole === "carol") && (
+            <div style={{ marginTop: 12 }}>
+              <button disabled={busy} onClick={() => run(() => startWaitingVariant(brief.id, activeVariant.key))} style={{
+                fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+                background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "8px 16px",
+              }}>▶ Iniciar esta variante ahora</button>
+              <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>Úsalo si la anterior ya terminó o si quieres adelantarla.</div>
+            </div>
+          )}
         </div>
       ) : (
       <>
