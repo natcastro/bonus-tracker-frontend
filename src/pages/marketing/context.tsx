@@ -648,13 +648,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return { variants: variants.map(v => (v.key === next.key ? started : v)), started };
   };
 
-  // Laura (or Karol) can start a waiting variant by hand — needed when the variant before it was already finished
-  // (so nothing will ever "approve" it) or when the team wants to begin it ahead of its turn.
+  // Laura (or Karol) can start a waiting variant by hand — only when every variant before it is already finished
+  // (so nothing will ever "approve" it and trigger the automatic hand-off). Never to jump the queue.
   const startWaitingVariant = async (briefId: number, variantKey: VariantKey) => {
     if (authedUser?.role !== "laura" && authedUser?.role !== "carol") throw new Error("Solo Laura o Karol pueden iniciar una variante en espera.");
     const brief = briefs.find(b => b.id === briefId);
     const target = brief?.variants?.find(v => v.key === variantKey);
     if (!brief || !brief.variants || !target?.waiting) return;
+    // Never while another variant of the brief is still in progress: only the automatic hand-off (final approval) starts the
+    // next one then. This is just for variants whose predecessors are already finished (e.g. fixed-up older briefs).
+    const unfinishedBefore = brief.variants.some(v => v.applicable && (v.order ?? 99) < (target.order ?? 99) && v.status !== "completed");
+    if (unfinishedBefore) throw new Error("Esta variante empieza sola cuando se apruebe la anterior.");
     const today = todayIso();
     const stages = buildStages(today, "").map(s => (s.key === "proposal" ? { ...s, deadline: addWorkDaysIso(today, ADAPTATION_PROPOSAL_DAYS) } : s));
     const started: BriefVariant = { ...target, waiting: undefined, stages, currentStage: "proposal", status: "in_progress", completedAt: null };

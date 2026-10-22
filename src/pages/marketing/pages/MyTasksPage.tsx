@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
-import NewBriefModal from "../components/NewBriefModal";
-import NewTodoTaskModal from "../components/NewTodoTaskModal";
+import NewItemModal from "../components/NewItemModal";
 import DeadlineBadge from "../components/DeadlineBadge";
 import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
 import { stageLabel, todoStageLabel, requestStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
@@ -20,15 +19,9 @@ function formatDueIn(dueAt: string): { label: string; overdue: boolean } {
 }
 
 export default function MyTasksPage() {
-  const { authedUser, briefs, todoTasks, requests, privateTasks, createPrivateTask, togglePrivateTaskCompleted, deletePrivateTask } = useMarketing();
+  const { authedUser, briefs, todoTasks, requests, privateTasks, togglePrivateTaskCompleted, deletePrivateTask } = useMarketing();
   const navigate = useNavigate();
   const [showNew, setShowNew] = useState(false);
-  const [showNewTodo, setShowNewTodo] = useState(false);
-  const [showNewForLaura, setShowNewForLaura] = useState(false);
-  const [showNewTask, setShowNewTask] = useState(false);
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDue, setTaskDue] = useState("");
-  const [taskSaving, setTaskSaving] = useState(false);
   const myRole = authedUser?.role;
   // Video people work the To Do pipeline exactly like a Diseño person (the tasks are already limited to theirs).
   const workRole = myRole === "video" ? "diseno" : myRole;
@@ -49,18 +42,6 @@ export default function MyTasksPage() {
     const totalHours = done.reduce((s, t) => s + (new Date(t.completedAt!).getTime() - new Date(t.createdAt).getTime()) / 3_600_000, 0);
     return totalHours / done.length;
   }, [completedPrivateTasks]);
-
-  const submitNewTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskTitle.trim() || !taskDue) return;
-    setTaskSaving(true);
-    try {
-      await createPrivateTask(taskTitle.trim(), new Date(taskDue).toISOString());
-      setTaskTitle(""); setTaskDue(""); setShowNewTask(false);
-    } finally {
-      setTaskSaving(false);
-    }
-  };
 
   const myDrafts = useMemo(() => {
     if (myRole !== "laura") return [];
@@ -147,30 +128,10 @@ export default function MyTasksPage() {
               : "Entregas pendientes de Diseño"}
           </p>
         </div>
-        {myRole === "laura" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setShowNew(true)} style={{
-              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>+ Nuevo</button>
-            <button onClick={() => setShowNewTodo(true)} style={{
-              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>+ Nueva tarea</button>
-          </div>
-        )}
-        {myRole === "carol" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setShowNewForLaura(true)} style={{
-              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>+ Brief para Laura</button>
-            <button onClick={() => setShowNewTodo(true)} style={{
-              fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
-            }}>+ Nueva tarea</button>
-          </div>
-        )}
+        <button onClick={() => setShowNew(true)} style={{
+          fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+          background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+        }}>+ Nuevo</button>
       </div>
 
       {/* Private tasks — a personal to-do only the owner can see, like what people currently
@@ -192,36 +153,7 @@ export default function MyTasksPage() {
               </p>
             )}
           </div>
-          <button onClick={() => setShowNewTask(v => !v)} style={{
-            fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer",
-            background: showNewTask ? MT.surfaceAlt : MT.moss, color: showNewTask ? MT.text2 : "#fff",
-            border: "none", borderRadius: 8, padding: "8px 14px",
-          }}>{showNewTask ? "Cancelar" : "+ Nueva tarea privada"}</button>
         </div>
-
-        {showNewTask && (
-          <form onSubmit={submitNewTask} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: "1rem" }}>
-            <div style={{ flex: "1 1 220px" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 4 }}>Qué tienes que hacer</label>
-              <input
-                autoFocus value={taskTitle} onChange={e => setTaskTitle(e.target.value)}
-                placeholder="Ej. Revisar catálogo de octubre"
-                style={{ width: "100%", fontFamily: MT.font, fontSize: 13, padding: "8px 10px", border: `1px solid ${MT.border}`, borderRadius: 6, outline: "none" }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 4 }}>Para cuándo</label>
-              <input
-                type="datetime-local" value={taskDue} onChange={e => setTaskDue(e.target.value)}
-                style={{ fontFamily: MT.font, fontSize: 13, padding: "8px 10px", border: `1px solid ${MT.border}`, borderRadius: 6, outline: "none" }}
-              />
-            </div>
-            <button type="submit" disabled={taskSaving || !taskTitle.trim() || !taskDue} style={{
-              fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: taskSaving ? "not-allowed" : "pointer",
-              background: MT.moss, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px",
-            }}>{taskSaving ? "Guardando..." : "Guardar"}</button>
-          </form>
-        )}
 
         {pendingPrivateTasks.length === 0 ? (
           <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Sin tareas privadas pendientes.</p>
@@ -522,9 +454,7 @@ export default function MyTasksPage() {
         </div>
       )}
 
-      {showNew && <NewBriefModal onClose={() => setShowNew(false)} />}
-      {showNewForLaura && <NewBriefModal forReview onClose={() => setShowNewForLaura(false)} />}
-      {showNewTodo && <NewTodoTaskModal onClose={() => setShowNewTodo(false)} />}
+      {showNew && <NewItemModal onClose={() => setShowNew(false)} />}
     </div>
   );
 }

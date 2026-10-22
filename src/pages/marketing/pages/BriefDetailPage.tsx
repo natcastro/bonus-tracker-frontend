@@ -84,6 +84,8 @@ export default function BriefDetailPage() {
     const at = !st.completedTs && st.deadline ? deliveredAt(st, briefNotifTimes) : null;
     return !(at && at.ts.getTime() <= deadlineTimestamp(st.deadline!));
   };
+  // A waiting variant is "listo para iniciar" once every variant before it is already finished; otherwise it still waits its turn.
+  const readyToStart = (v: BriefVariant) => !!v.waiting && applicableVariants.filter(x => (x.order ?? 99) < (v.order ?? 99)).every(x => x.status === "completed");
   const isVariantMode = !!brief.variants;
   const applicableVariants = variantsInOrder(brief.variants?.filter(v => v.applicable) ?? []);
   // Open on the variant being worked right now (the others may be waiting their turn).
@@ -222,7 +224,7 @@ export default function BriefDetailPage() {
                 ? <span style={{ width: 18, height: 18, borderRadius: 999, background: variantDotColor(v), color: "#fff", fontSize: 10.5, fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}>{v.order}</span>
                 : <span style={{ width: 8, height: 8, borderRadius: 999, background: variantDotColor(v), flexShrink: 0 }} />}
               <span style={{ flex: 1 }}>{def.label}</span>
-              {v.waiting && <span style={{ fontSize: 10, fontWeight: 700, color: MT.text3 }}>en espera</span>}
+              {v.waiting && <span style={{ fontSize: 10, fontWeight: 700, color: readyToStart(v) ? MT.primary : MT.text3 }}>{readyToStart(v) ? "listo para iniciar" : "en espera"}</span>}
             </button>
           );
         })}
@@ -234,7 +236,7 @@ export default function BriefDetailPage() {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: "0.75rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: MT.text1 }}>{variantLabel(activeVariant.key)}</h2>
-        <StatusPill solid color={activeVariant.status === "completed" ? MT.primary : MT.moss} label={variantStatusLabel(activeVariant)} />
+        <StatusPill solid color={activeVariant.status === "completed" ? MT.primary : MT.moss} label={activeVariant.waiting && readyToStart(activeVariant) ? "Listo para iniciar" : variantStatusLabel(activeVariant)} />
       </div>
       {activeVariant.applicable && activeVariant.status === "in_progress" && (myRole === "laura" || myRole === "carol") && (
         <button onClick={() => handleMarkNotApplicable(activeVariant.key)} style={{
@@ -376,16 +378,18 @@ export default function BriefDetailPage() {
         </div>
       ) : isVariantMode && activeVariant?.waiting ? (
         <div style={{ background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "1.5rem", textAlign: "center", color: MT.text2, fontSize: 13, lineHeight: 1.6 }}>
-          <strong style={{ color: MT.text1 }}>En espera — variante {activeVariant.order}</strong><br />
-          Empieza cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
-          Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).
-          {(myRole === "laura" || myRole === "carol") && (
+          <strong style={{ color: MT.text1 }}>{readyToStart(activeVariant) ? "Listo para iniciar" : "En espera"} — variante {activeVariant.order}</strong><br />
+          {readyToStart(activeVariant)
+            ? <>Las variantes anteriores ya terminaron. Al iniciarla se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).</>
+            : <>Empieza sola cuando se apruebe la variante anterior ({variantLabel(applicableVariants.find(v => (v.order ?? 0) === (activeVariant.order ?? 0) - 1)?.key ?? activeVariant.key)}).
+              Entonces se asigna y corre su plazo ({ADAPTATION_PROPOSAL_DAYS} días hábiles para la propuesta).</>}
+          {(myRole === "laura" || myRole === "carol") && readyToStart(activeVariant) && (
             <div style={{ marginTop: 12 }}>
               <button disabled={busy} onClick={() => run(() => startWaitingVariant(brief.id, activeVariant.key))} style={{
                 fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
                 background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "8px 16px",
               }}>▶ Iniciar esta variante ahora</button>
-              <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>Úsalo si la anterior ya terminó o si quieres adelantarla.</div>
+              <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>La anterior ya terminó, así que esta no empezará sola. Al iniciarla corre su plazo.</div>
             </div>
           )}
         </div>

@@ -47,13 +47,8 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(44,42,32,0.35)" }} />
-      <div style={{ position: "relative", width: 460, maxWidth: "92vw", maxHeight: "88vh", overflowY: "auto", background: MT.surface, borderRadius: MT.radiusLg, boxShadow: MT.shadowLg, padding: 26 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-          Nueva tarea (To Do)
-        </div>
-        <h3 style={{ margin: "0 0 14px", color: MT.text1, fontSize: 18 }}>Selecciona a continuación el tipo de arte a realizar</h3>
+    <div>
+        <p style={{ margin: "0 0 12px", color: MT.text2, fontSize: 13, fontWeight: 600 }}>Selecciona a continuación el tipo de arte a realizar</p>
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <TaskCategoryFields state={cat} onChange={setCat} />
@@ -106,7 +101,6 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
             }}>{saving ? "Creando..." : "Asignar tarea"}</button>
           </div>
         </form>
-      </div>
     </div>
   );
 }
