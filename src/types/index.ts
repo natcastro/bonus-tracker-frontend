@@ -180,6 +180,9 @@ export interface OpsAmazonPerformance {
   year: number;
   cycleId: string;
   rating: "good" | "regular" | "poor";
+  // Quiz grading (newer records). null on records saved with the old Good / Regular / Poor pick.
+  scorePct?: number | null;
+  quiz?: import("../services/opsBonus").AmazonQuiz | null;
 }
 
 // ── Account Protection Team (Juan) ────────────────────────────────────────────

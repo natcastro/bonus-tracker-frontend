@@ -467,9 +467,14 @@ export async function getOpsAmazonPerformance(year: number, cycleId: string): Pr
 }
 
 export async function upsertOpsAmazonPerformance(d: Omit<OpsAmazonPerformance, "id">): Promise<void> {
+  const base = { agent_id: d.agentId, year: d.year, cycle_id: d.cycleId, rating: d.rating };
   const { error } = await supabase.from("ops_amazon_performance")
-    .upsert({ agent_id: d.agentId, year: d.year, cycle_id: d.cycleId, rating: d.rating }, { onConflict: "agent_id,year,cycle_id" });
-  if (error) throw error;
+    .upsert({ ...base, score_pct: d.scorePct ?? null, quiz: d.quiz ?? null }, { onConflict: "agent_id,year,cycle_id" });
+  if (error) {
+    // The score columns come from supabase/ops-amazon-quiz.sql; until it is run only the rating can be stored.
+    if (/score_pct|quiz/.test(error.message ?? "")) throw new Error("Falta correr el SQL ops-amazon-quiz.sql en Supabase para guardar el cuestionario.");
+    throw error;
+  }
 }
 
 // ── Account Protection: Unified Claims ───────────────────────────────────────
@@ -711,7 +716,7 @@ function mapOpsTikTokScore(r: any): OpsTikTokScore {
 }
 
 function mapOpsAmazonPerformance(r: any): OpsAmazonPerformance {
-  return { id: r.id, agentId: r.agent_id, year: r.year, cycleId: r.cycle_id, rating: r.rating };
+  return { id: r.id, agentId: r.agent_id, year: r.year, cycleId: r.cycle_id, rating: r.rating, scorePct: r.score_pct ?? null, quiz: r.quiz ?? null };
 }
 
 function mapAptClaim(r: any): AptClaim {

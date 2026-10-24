@@ -37,6 +37,51 @@ export const AMAZON_PERFORMANCE_BONUS: Record<string, number> = {
   poor: 0,
 };
 
+// ── Amazon Performance as a graded quiz ───────────────────────────────────────────────────────────
+// Instead of one Good / Regular / Poor pick, whoever reviews grades each area of the work; every area has a weight and
+// the bonus is that share of the $30 cap. The A2C area is calculated from how many arrived vs. how many were answered.
+export interface AmazonQuiz {
+  a2cReceived: number | null;
+  a2cAnswered: number | null;
+  a2cAffected: number | null; // A2Cs that hurt the account or took money (information for the reviewer; Amazon-covered ones don't count)
+  scores: Record<string, number | null>; // area key -> 0 | 25 | 50 | 75 | 100
+  notes: string;
+}
+
+export const AMAZON_QUIZ_STEPS = [0, 25, 50, 75, 100];
+export const AMAZON_QUIZ_CRITERIA: { key: string; label: string; weight: number; hint: string; auto?: boolean }[] = [
+  { key: "a2c",        label: "A2Cs respondidos",                    weight: 25, auto: true, hint: "Se calcula solo: A2Cs respondidos entre A2Cs recibidos." },
+  { key: "messages",   label: "Mensajes (tiempo de respuesta)",       weight: 15, hint: "¿Respondió los mensajes de clientes pronto?" },
+  { key: "calls",      label: "Llamadas",                             weight: 10, hint: "¿Contestó las llamadas a tiempo?" },
+  { key: "returns",    label: "Devoluciones",                         weight: 15, hint: "¿Atendió las devoluciones pronto y bien?" },
+  { key: "appeals",    label: "Apelaciones",                          weight: 15, hint: "¿Hizo las apelaciones que se podían apelar, y a tiempo?" },
+  { key: "efficiency", label: "Eficiencia y efectividad",             weight: 20, hint: "En general: ¿fue eficiente y efectivo? ¿Hubo negligencia?" },
+];
+export const EMPTY_AMAZON_QUIZ: AmazonQuiz = { a2cReceived: null, a2cAnswered: null, a2cAffected: null, scores: {}, notes: "" };
+
+// 100 when nothing arrived; otherwise answered / received, capped at 100. null while the counts are missing.
+export function amazonA2cScore(q: AmazonQuiz): number | null {
+  if (q.a2cReceived === null || q.a2cReceived === undefined) return null;
+  if (q.a2cReceived <= 0) return 100;
+  if (q.a2cAnswered === null || q.a2cAnswered === undefined) return null;
+  return Math.min(100, Math.round((q.a2cAnswered / q.a2cReceived) * 100));
+}
+export function amazonCriterionScore(q: AmazonQuiz, key: string): number | null {
+  return key === "a2c" ? amazonA2cScore(q) : (q.scores?.[key] ?? null);
+}
+export function amazonQuizPct(q: AmazonQuiz): number {
+  return Math.round(AMAZON_QUIZ_CRITERIA.reduce((s, c) => s + (c.weight * (amazonCriterionScore(q, c.key) ?? 0)) / 100, 0) * 100) / 100;
+}
+export const amazonQuizBonus = (pct: number): number => Math.round(FULLTIME_AMAZON_PERF_CAP * pct) / 100;
+export function amazonGradedCount(q: AmazonQuiz): number {
+  return AMAZON_QUIZ_CRITERIA.filter(c => amazonCriterionScore(q, c.key) !== null).length;
+}
+export const ratingFromPct = (pct: number): "good" | "regular" | "poor" => (pct >= 70 ? "good" : pct >= 30 ? "regular" : "poor");
+// Older records only have the Good / Regular / Poor pick; newer ones carry the quiz score.
+export function amazonPerfBonus(p: { rating: string; scorePct?: number | null }): number {
+  return p.scorePct !== null && p.scorePct !== undefined ? amazonQuizBonus(p.scorePct) : (AMAZON_PERFORMANCE_BONUS[p.rating] ?? 0);
+}
+
 // Same hour brackets as the hourly structure, scaled to the new $40 cap (0.8x of $50).
 export function calcHandlingTimeBonusFullTime(hours: number): number {
   if (hours <= 30)   return 40;

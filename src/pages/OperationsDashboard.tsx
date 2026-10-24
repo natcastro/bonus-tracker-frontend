@@ -1,8 +1,10 @@
 import UsdCop from "../components/UsdCop";
+import AmazonQuizCard from "../components/AmazonQuizCard";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { OpsApproval } from "../services/api";
 import { useMsal } from "@azure/msal-react";
+import type { AmazonQuiz } from "../services/opsBonus";
 import type { Agent, OpsAppeal, OpsHandlingTime, OpsTikTokScore, OpsAmazonPerformance } from "../types";
 import {
   getAgents, updateAgentName, createAgent,
@@ -18,7 +20,7 @@ import {
 import {
   OPS_APPEALS_BONUS, OPS_APPEALS_CAP, OPS_TOTAL_CAP, calcHandlingTimeBonus,
   FULLTIME_EFFECTIVE_CYCLE_START, FULLTIME_APPEALS_CAP, FULLTIME_HANDLING_CAP, FULLTIME_TIKTOK_CAP,
-  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, AMAZON_PERFORMANCE_BONUS, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime, mergeTikTokEntries,
+  FULLTIME_AMAZON_PERF_CAP, FULLTIME_TOTAL_CAP, amazonPerfBonus, ratingFromPct, AMAZON_QUIZ_CRITERIA, calcHandlingTimeBonusFullTime, calcTikTokBonusFullTime, tiktokCycleValueFullTime, mergeTikTokEntries,
 } from "../services/opsBonus";
 import { useHubAccess } from "../auth/HubAccessContext";
 import { buildOpsWorkbook, opsExportFileName } from "../services/opsExport";
@@ -162,7 +164,7 @@ export default function OperationsDashboard() {
       const handling = ht ? calcHandlingTimeBonusFullTime(ht.hours) : 0;
       const tiktok = Math.min(tiktokBonusFullTime, FULLTIME_TIKTOK_CAP);
       const perf = amazonPerformance.find((p) => p.agentId === ag.id);
-      const amazonPerf = perf ? Math.min(AMAZON_PERFORMANCE_BONUS[perf.rating] ?? 0, FULLTIME_AMAZON_PERF_CAP) : 0;
+      const amazonPerf = perf ? Math.min(amazonPerfBonus(perf), FULLTIME_AMAZON_PERF_CAP) : 0;
       const raw = appealCapped + handling + tiktok + amazonPerf;
       const total = Math.min(raw, FULLTIME_TOTAL_CAP);
       return { agent: ag, appealRaw, appealCapped, handling, tiktok, amazonPerf, raw, total, isFullTime: true };
@@ -235,23 +237,10 @@ export default function OperationsDashboard() {
     setTimeout(() => setHandlingSaved((prev) => ({ ...prev, [agentId]: false })), 2000);
   };
 
-  // ── Amazon Performance form per agent (full-time bonus structure only)
-  const [amazonForms, setAmazonForms] = useState<Record<number, string>>({});
-  const [amazonSaved, setAmazonSaved] = useState<Record<number, boolean>>({});
-
-  useEffect(() => {
-    const forms: Record<number, string> = {};
-    amazonPerformance.forEach((p) => { forms[p.agentId] = p.rating; });
-    setAmazonForms(forms);
-  }, [amazonPerformance]);
-
-  const saveAmazonPerformance = async (agentId: number) => {
-    const rating = amazonForms[agentId];
-    if (!rating) return;
-    await upsertOpsAmazonPerformance({ agentId, year: Number(year), cycleId, rating: rating as any });
+  // ── Amazon Performance quiz per agent (full-time bonus structure only)
+  const saveAmazonQuiz = async (agentId: number, quiz: AmazonQuiz, pct: number) => {
+    await upsertOpsAmazonPerformance({ agentId, year: Number(year), cycleId, rating: ratingFromPct(pct), scorePct: pct, quiz });
     await load();
-    setAmazonSaved((prev) => ({ ...prev, [agentId]: true }));
-    setTimeout(() => setAmazonSaved((prev) => ({ ...prev, [agentId]: false })), 2000);
   };
 
   // ── TikTok form
@@ -434,7 +423,7 @@ export default function OperationsDashboard() {
         appealBonus: OPS_APPEALS_BONUS, outcomeLabels: OUTCOME_LABELS,
         appealTypeLabel: (t) => APPEAL_TYPES.find((x) => x.value === t)?.label ?? "TikTok Appeals",
         handlingBonus: (agentId, hours) => (agentId === THOMAS_AGENT_ID && isFullTimeCycle ? calcHandlingTimeBonusFullTime(hours) : calcHandlingTimeBonus(hours)),
-        amazonBonus: (rating) => AMAZON_PERFORMANCE_BONUS[rating] ?? 0,
+        amazonBonus: amazonPerfBonus,
         tiktokEarned: earnedFor,
       });
       XLSX.writeFile(wb, opsExportFileName(cycleName, year));
@@ -783,38 +772,28 @@ export default function OperationsDashboard() {
             ) : (
               <>
                 <div className="card" style={{ background: "#f9fafb", marginBottom: "1rem" }}>
-                  <h3 style={{ marginBottom: "0.75rem" }}>Bonus Table</h3>
+                  <h3 style={{ marginBottom: "0.5rem" }}>Cómo se califica</h3>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0 0 0.75rem" }}>
+                    Quien revisa califica cada área. Cada una vale un porcentaje del bono máximo de ${FULLTIME_AMAZON_PERF_CAP}; el bono es la suma de lo que se gana en cada área, sin extremos de todo o nada.
+                  </p>
                   <table className="data-table">
-                    <thead><tr><th>Rating</th><th>Bonus</th></tr></thead>
+                    <thead><tr><th>Área</th><th>Vale</th><th>Máximo</th></tr></thead>
                     <tbody>
-                      <tr><td>Good</td><td>${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)}</td></tr>
-                      <tr><td>Regular</td><td>${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)}</td></tr>
-                      <tr><td>Poor</td><td>${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)}</td></tr>
+                      {AMAZON_QUIZ_CRITERIA.map((c) => (
+                        <tr key={c.key}><td>{c.label}</td><td>{c.weight}%</td><td>${((FULLTIME_AMAZON_PERF_CAP * c.weight) / 100).toFixed(2)}</td></tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
                 {visibleAgents.filter((ag) => ag.id === THOMAS_AGENT_ID).map((ag) => {
                   const current = amazonPerformance.find((p) => p.agentId === ag.id);
-                  const val = amazonForms[ag.id] ?? "";
                   return (
-                    <div key={ag.id} className="card">
-                      <h3 style={{ marginBottom: "1rem" }}>{ag.name}</h3>
-                      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-                        <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
-                          <label>Rating</label>
-                          <select className="form-control" value={val} onChange={(e) => setAmazonForms((p) => ({ ...p, [ag.id]: e.target.value }))}>
-                            <option value="" disabled>Select rating</option>
-                            <option value="good">Good (${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)})</option>
-                            <option value="regular">Regular (${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)})</option>
-                            <option value="poor">Poor (${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)})</option>
-                          </select>
-                        </div>
-                        <button className="btn btn-primary" style={{ background: amazonSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => saveAmazonPerformance(ag.id)}>
-                          {amazonSaved[ag.id] ? "Saved! ✓" : "Save"}
-                        </button>
-                      </div>
-                      {current && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {current.rating} → ${(AMAZON_PERFORMANCE_BONUS[current.rating] ?? 0).toFixed(2)}</p>}
-                    </div>
+                    <AmazonQuizCard
+                      key={ag.id} name={ag.name}
+                      initial={current?.quiz ?? null}
+                      savedAt={current ? (current.scorePct != null ? `guardado: ${current.scorePct}%` : `calificado antes como ${current.rating}`) : ""}
+                      onSave={(quiz, pct) => saveAmazonQuiz(ag.id, quiz, pct)}
+                    />
                   );
                 })}
               </>

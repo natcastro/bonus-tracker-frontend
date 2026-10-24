@@ -14,7 +14,7 @@ export interface OpsExportData {
   outcomeLabels: Record<string, string>;
   appealTypeLabel: (t: string | undefined) => string;
   handlingBonus: (agentId: number, hours: number) => number;
-  amazonBonus: (rating: string) => number;
+  amazonBonus: (p: OpsAmazonPerformance) => number;
   tiktokEarned: (score: number, duration: number) => { tier: number; earned: number };
 }
 
@@ -55,7 +55,7 @@ export function buildOpsWorkbook(XLSX: typeof XLSXType, d: OpsExportData) {
     };
   }), [12, 8, 8, 24, 24, 12]);
 
-  add("Amazon performance", d.amazonPerformance.map(p => ({ Agent: name(p.agentId), Rating: p.rating, "Bonus ($)": d.amazonBonus(p.rating) })), [18, 12, 10]);
+  add("Amazon performance", d.amazonPerformance.map(p => ({ Agent: name(p.agentId), Rating: p.rating, "Score (%)": p.scorePct ?? "", "Bonus ($)": d.amazonBonus(p) })), [18, 12, 10, 10]);
 
   return wb;
 }
