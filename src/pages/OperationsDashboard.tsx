@@ -31,6 +31,9 @@ const isCompanyEmail = (e: string) => e.toLowerCase().endsWith(`@${APPROVAL_EMAI
 // Admin actions in Operations (edit/delete/invalidate, agent changes) are only for this account —
 // no shared password. Matched against the Microsoft login email.
 const OPS_ADMIN_EMAILS = ["amazonassistant@formatucuerpo.com"];
+// Katalina (online supervisor) may invalidate / revalidate Thomas's appeals only — nothing else of the admin actions.
+const OPS_APPEAL_INVALIDATOR_EMAILS = ["supervisoronline@formatucuerpo.com"];
+const INVALIDATE_ONLY_THOMAS_MSG = "Solo puedes invalidar o revalidar los appeals de Thomas.";
 const ADMIN_ONLY_MSG = "Solo el administrador (amazonassistant@formatucuerpo.com) puede hacer esta acción.";
 
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
@@ -79,6 +82,8 @@ export default function OperationsDashboard() {
   const canExport = hasTeam("OPS"); // the Excel is for the Operations team only
   const isAdmin = OPS_ADMIN_EMAILS.includes(email.trim().toLowerCase());
   const isHubAdmin = !!access?.isAdmin; // only for the approval-settings gear (Natalie)
+  const isAppealInvalidator = OPS_APPEAL_INVALIDATOR_EMAILS.includes(email.trim().toLowerCase());
+  const canInvalidateAppeal = (a: OpsAppeal) => isAdmin || (isAppealInvalidator && a.agentId === THOMAS_AGENT_ID);
   const { instance: msal, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState("summary");
   const defaultCycle = (() => {
@@ -705,9 +710,9 @@ export default function OperationsDashboard() {
                           <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
                           <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
                           {a.invalidated ? (
-                            <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={async () => { await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
+                            <button className="btn btn-sm btn-secondary" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : (isAppealInvalidator ? INVALIDATE_ONLY_THOMAS_MSG : ADMIN_ONLY_MSG)} onClick={async () => { if (!canInvalidateAppeal(a)) return; await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
                           ) : (
-                            <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => { setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
+                            <button className="btn btn-sm btn-danger" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : (isAppealInvalidator ? INVALIDATE_ONLY_THOMAS_MSG : ADMIN_ONLY_MSG)} onClick={() => { if (!canInvalidateAppeal(a)) return; setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
                           )}
                         </td>
                       </tr>
@@ -1002,6 +1007,7 @@ export default function OperationsDashboard() {
             <form onSubmit={async (e) => {
               e.preventDefault();
               if (!invalidateNote.trim()) { setInvalidateError("La nota es obligatoria."); return; }
+              if (!canInvalidateAppeal(invalidatingAppeal)) { setInvalidateError(ADMIN_ONLY_MSG); return; }
               try {
                 await invalidateOpsAppeal(invalidatingAppeal.id, invalidateNote.trim());
                 setInvalidatingAppeal(null);
