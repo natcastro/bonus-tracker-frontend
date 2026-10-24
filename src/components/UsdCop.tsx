@@ -11,7 +11,7 @@ export default function UsdCop({ v, inline, plus }: { v: number; inline?: boolea
   return (
     <>
       {usd}
-      <span style={{ display: "block", color: "var(--text-muted)", fontSize: "0.72rem", fontWeight: 400, lineHeight: 1.3 }}>{formatCop(v)}</span>
+      <span style={{ display: "block", color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: 400, lineHeight: 1.2, marginTop: 2, letterSpacing: 0 }}>{formatCop(v)}</span>
     </>
   );
 }

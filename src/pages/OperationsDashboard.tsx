@@ -1,4 +1,4 @@
-import UsdCop, { formatCop } from "../components/UsdCop";
+import UsdCop from "../components/UsdCop";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { OpsApproval } from "../services/api";
@@ -477,7 +477,7 @@ export default function OperationsDashboard() {
                   <h3>{t.agent.name}</h3>
                   <div className="amount" style={{ color: "#7c3aed" }}><UsdCop v={t.total} /></div>
                   {t.raw > (t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP) && (
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Raw: <UsdCop v={t.raw} inline /> (capped at ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Raw: ${t.raw.toFixed(2)} (capped at ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</div>
                   )}
                 </div>
               ))}
@@ -491,14 +491,14 @@ export default function OperationsDashboard() {
                     <td>Appeals</td>
                     {agentTotals.map((t) => (
                       <td key={t.agent.id}>
-                        <UsdCop v={t.appealCapped} /> <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>(cap ${t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP})</span>
-                        {t.appealRaw > (t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP) && <div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>raw <UsdCop v={t.appealRaw} inline /></div>}
+                        ${t.appealCapped.toFixed(2)} <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>(cap ${t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP})</span>
+                        {t.appealRaw > (t.isFullTime ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP) && <div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>raw ${t.appealRaw.toFixed(2)}</div>}
                       </td>
                     ))}
                   </tr>
-                  <tr><td>Handling Time</td>{agentTotals.map((t) => <td key={t.agent.id}><UsdCop v={t.handling} /></td>)}</tr>
-                  <tr><td>Amazon Performance</td>{agentTotals.map((t) => <td key={t.agent.id}>{t.isFullTime ? <UsdCop v={t.amazonPerf} /> : "—"}</td>)}</tr>
-                  <tr><td>TikTok Score (shared)</td>{agentTotals.map((t) => <td key={t.agent.id}><UsdCop v={t.tiktok} /></td>)}</tr>
+                  <tr><td>Handling Time</td>{agentTotals.map((t) => <td key={t.agent.id}>${t.handling.toFixed(2)}</td>)}</tr>
+                  <tr><td>Amazon Performance</td>{agentTotals.map((t) => <td key={t.agent.id}>{t.isFullTime ? `$${t.amazonPerf.toFixed(2)}` : "—"}</td>)}</tr>
+                  <tr><td>TikTok Score (shared)</td>{agentTotals.map((t) => <td key={t.agent.id}>${t.tiktok.toFixed(2)}</td>)}</tr>
                   <tr style={{ fontWeight: 600 }}>
                     <td>Total</td>
                     {agentTotals.map((t) => <td key={t.agent.id}><UsdCop v={t.total} /> <span style={{ fontSize: "0.72rem", fontWeight: 400, color: "var(--text-muted)" }}>(cap ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</span></td>)}
@@ -517,11 +517,11 @@ export default function OperationsDashboard() {
                   <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>Solo bono — la base salarial la calcula Recursos Humanos.</p>
                   <table className="data-table">
                     <tbody>
-                      <tr><td>Bono Appeals — primer corte (Ago 24 – Sep 11)</td><td><UsdCop v={THOMAS_RECEIPT_FIRST_CORTE_APPEALS} /></td></tr>
-                      <tr><td>Bono Appeals — segundo corte (Sep 12 – Sep 23)</td><td><UsdCop v={THOMAS_RECEIPT_SECOND_CORTE_APPEALS} /></td></tr>
-                      <tr><td>Amazon Performance</td><td><UsdCop v={THOMAS_RECEIPT_AMAZON_PERF} /></td></tr>
-                      <tr><td>Handling Time</td><td><UsdCop v={thomas.handling} /></td></tr>
-                      <tr><td>TikTok Score</td><td><UsdCop v={thomas.tiktok} /></td></tr>
+                      <tr><td>Bono Appeals — primer corte (Ago 24 – Sep 11)</td><td>${THOMAS_RECEIPT_FIRST_CORTE_APPEALS.toFixed(2)}</td></tr>
+                      <tr><td>Bono Appeals — segundo corte (Sep 12 – Sep 23)</td><td>${THOMAS_RECEIPT_SECOND_CORTE_APPEALS.toFixed(2)}</td></tr>
+                      <tr><td>Amazon Performance</td><td>${THOMAS_RECEIPT_AMAZON_PERF.toFixed(2)}</td></tr>
+                      <tr><td>Handling Time</td><td>${thomas.handling.toFixed(2)}</td></tr>
+                      <tr><td>TikTok Score</td><td>${thomas.tiktok.toFixed(2)}</td></tr>
                       <tr style={{ fontWeight: 700 }}><td>Total</td><td><UsdCop v={receiptTotal} /></td></tr>
                     </tbody>
                   </table>
@@ -602,7 +602,7 @@ export default function OperationsDashboard() {
                     return (
                       <div className="badge" style={{ fontSize: "0.9rem", padding: "0.5rem 1rem", background: "#dbeafe", color: "#1e40af", border: "none", display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
-                        36-hour period ({THOMAS_BLUE_DOT_RANGE[0]} – {THOMAS_BLUE_DOT_RANGE[1]}): <UsdCop v={sum} inline />
+                        36-hour period ({THOMAS_BLUE_DOT_RANGE[0]} – {THOMAS_BLUE_DOT_RANGE[1]}): ${sum.toFixed(2)}
                       </div>
                     );
                   })()}
@@ -613,7 +613,7 @@ export default function OperationsDashboard() {
                     return (
                       <div className="badge" style={{ fontSize: "0.9rem", padding: "0.5rem 1rem", background: "#fef9c3", color: "#854d0e", border: "none", display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#eab308" }} />
-                        Full-time period ({THOMAS_YELLOW_DOT_RANGE[0]} – {THOMAS_YELLOW_DOT_RANGE[1]}): <UsdCop v={sum} inline />
+                        Full-time period ({THOMAS_YELLOW_DOT_RANGE[0]} – {THOMAS_YELLOW_DOT_RANGE[1]}): ${sum.toFixed(2)}
                       </div>
                     );
                   })()}
@@ -624,7 +624,7 @@ export default function OperationsDashboard() {
                         .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
                       const onlyThomas = filterAgentId === THOMAS_AGENT_ID || (filterAgentId === 0 && visibleAgents.every((a) => a.id === THOMAS_AGENT_ID));
                       const cap = onlyThomas && isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
-                      return <>Total Bonus: <UsdCop v={Math.min(raw, cap)} inline /> (cap ${cap})</>;
+                      return <>Total Bonus: ${Math.min(raw, cap).toFixed(2)} (cap ${cap})</>;
                     })()}
                   </div>
                 </div>
@@ -706,7 +706,7 @@ export default function OperationsDashboard() {
                           )}
                         </td>
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
-                        <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}><UsdCop v={a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0) : 0} /></td>
+                        <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>${a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                         <td>
                           <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
                           <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
@@ -758,14 +758,14 @@ export default function OperationsDashboard() {
                     </div>
                     {preview !== null && (
                       <div style={{ padding: "0.5rem 1rem", background: "#f3f0ff", borderRadius: "6px", fontWeight: 600, color: "#7c3aed", whiteSpace: "nowrap" }}>
-                        Bonus: <UsdCop v={preview} inline />
+                        Bonus: ${preview.toFixed(2)}
                       </div>
                     )}
                     <button className="btn btn-primary" style={{ background: handlingSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => saveHandlingTime(ag.id)}>
                       {handlingSaved[ag.id] ? "Saved! ✓" : "Save"}
                     </button>
                   </div>
-                  {ht && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {ht.hours}h → <UsdCop v={calcFn(ht.hours)} inline /></p>}
+                  {ht && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {ht.hours}h → ${calcFn(ht.hours).toFixed(2)}</p>}
                 </div>
               );
             })}
@@ -787,9 +787,9 @@ export default function OperationsDashboard() {
                   <table className="data-table">
                     <thead><tr><th>Rating</th><th>Bonus</th></tr></thead>
                     <tbody>
-                      <tr><td>Good</td><td><UsdCop v={AMAZON_PERFORMANCE_BONUS.good} /></td></tr>
-                      <tr><td>Regular</td><td><UsdCop v={AMAZON_PERFORMANCE_BONUS.regular} /></td></tr>
-                      <tr><td>Poor</td><td><UsdCop v={AMAZON_PERFORMANCE_BONUS.poor} /></td></tr>
+                      <tr><td>Good</td><td>${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)}</td></tr>
+                      <tr><td>Regular</td><td>${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)}</td></tr>
+                      <tr><td>Poor</td><td>${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)}</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -804,16 +804,16 @@ export default function OperationsDashboard() {
                           <label>Rating</label>
                           <select className="form-control" value={val} onChange={(e) => setAmazonForms((p) => ({ ...p, [ag.id]: e.target.value }))}>
                             <option value="" disabled>Select rating</option>
-                            <option value="good">Good (${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)} · {formatCop(AMAZON_PERFORMANCE_BONUS.good)})</option>
-                            <option value="regular">Regular (${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)} · {formatCop(AMAZON_PERFORMANCE_BONUS.regular)})</option>
-                            <option value="poor">Poor (${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)} · {formatCop(AMAZON_PERFORMANCE_BONUS.poor)})</option>
+                            <option value="good">Good (${AMAZON_PERFORMANCE_BONUS.good.toFixed(2)})</option>
+                            <option value="regular">Regular (${AMAZON_PERFORMANCE_BONUS.regular.toFixed(2)})</option>
+                            <option value="poor">Poor (${AMAZON_PERFORMANCE_BONUS.poor.toFixed(2)})</option>
                           </select>
                         </div>
                         <button className="btn btn-primary" style={{ background: amazonSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => saveAmazonPerformance(ag.id)}>
                           {amazonSaved[ag.id] ? "Saved! ✓" : "Save"}
                         </button>
                       </div>
-                      {current && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {current.rating} → <UsdCop v={AMAZON_PERFORMANCE_BONUS[current.rating] ?? 0} inline /></p>}
+                      {current && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {current.rating} → ${(AMAZON_PERFORMANCE_BONUS[current.rating] ?? 0).toFixed(2)}</p>}
                     </div>
                   );
                 })}
@@ -846,7 +846,7 @@ export default function OperationsDashboard() {
             <div className="card" style={{ overflowX: "auto" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3>Scores</h3>
-                <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>Total Bonus: <UsdCop v={isFullTimeCycle ? tiktokBonusFullTime : tiktokBonus} inline /></div>
+                <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>Total Bonus: ${(isFullTimeCycle ? tiktokBonusFullTime : tiktokBonus).toFixed(2)}</div>
               </div>
               <table className="data-table">
                 <thead><tr><th>Date Range</th><th>Score</th><th>Tier Value</th><th>Earned</th><th>Actions</th></tr></thead>
@@ -866,8 +866,8 @@ export default function OperationsDashboard() {
                       <tr key={t.id}>
                         <td>{t.duration > 1 ? `${t.date} – ${endDate.toISOString().slice(0, 10)}` : t.date}</td>
                         <td>{t.score}</td>
-                        <td><UsdCop v={mv} /></td>
-                        <td><UsdCop v={earned} plus /></td>
+                        <td>${mv.toFixed(2)}</td>
+                        <td>+${earned.toFixed(2)}</td>
                         <td>{t.id < 0
                           ? <span className="badge" title="Pulled automatically from TikTok Shop each day" style={{ background: "#e0f2fe", color: "#075985", border: "none" }}>Auto · TikTok</span>
                           : <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
