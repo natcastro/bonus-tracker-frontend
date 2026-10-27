@@ -313,6 +313,40 @@ export default function TeamDashboardPage() {
           ))}
         </div>
 
+        {/* Everything still pending, per person (Diseño and Video together), visible right away — no click needed. */}
+        {(() => {
+          const withOpen = disenoStats.filter(d => d.open.length > 0).sort((x, y) => y.open.length - x.open.length);
+          const total = withOpen.reduce((n, d) => n + d.open.length, 0);
+          const today = todayIsoBogota();
+          return (
+            <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginTop: "1rem", boxShadow: MT.shadow }}>
+              <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.7rem" }}>
+                Entregas pendientes — Diseño y Video ({total})
+              </p>
+              {withOpen.length === 0 ? (
+                <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Nada pendiente por ahora.</p>
+              ) : withOpen.map(d => (
+                <div key={d.email} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: MT.text1, display: "flex", alignItems: "center", gap: 6 }}>
+                    {d.name}
+                    {videoEmailList.includes(d.email) && <span style={{ fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}
+                    <span style={{ fontSize: 11, fontWeight: 600, color: MT.text3 }}>{d.open.length} pendiente{d.open.length === 1 ? "" : "s"}</span>
+                  </div>
+                  {[...d.open].sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999")).map(o => {
+                    const late = !!o.deadline && o.deadline < today;
+                    const canOpen = !(authedUser?.role === "video" && o.kind === "brief");
+                    return (
+                      <div key={o.key} onClick={() => { if (canOpen) navigate(o.linkTo); }} style={{ fontSize: 13, color: MT.text2, padding: "3px 0", cursor: canOpen ? "pointer" : "default" }}>
+                        • {o.label} — {o.stage}{o.deadline ? <> — <span style={{ color: late ? MT.danger : MT.text2, fontWeight: late ? 700 : 400 }}>{late ? "vencida " : ""}{formatDateHuman(o.deadline)}</span></> : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {videoPrivate.some(v => v.tasks.length > 0) && (
           <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginTop: "1rem", boxShadow: MT.shadow }}>
             <p style={{ fontWeight: 700, fontSize: 11, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.6rem" }}>Tareas privadas pendientes — equipo de Video</p>
