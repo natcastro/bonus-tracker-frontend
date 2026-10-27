@@ -1,3 +1,4 @@
+import { isAgentActiveFor } from "../services/agentActivity";
 import UsdCop from "../components/UsdCop";
 import AmazonQuizCard from "../components/AmazonQuizCard";
 import { useState, useEffect, useCallback } from "react";
@@ -42,8 +43,6 @@ const ADMIN_ONLY_MSG = "Solo el administrador (amazonassistant@formatucuerpo.com
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
 // so historical records/cycles before the cutoffs stay untouched.
 const THOMAS_AGENT_ID = 5;
-const LINDA_AGENT_ID = 17;
-const LINDA_LAST_CYCLE_START = "2026-09-12";
 const THOMAS_BLUE_DOT_RANGE: [string, string] = ["2026-08-24", "2026-09-11"];
 const THOMAS_YELLOW_DOT_RANGE: [string, string] = ["2026-09-12", "2026-09-23"];
 
@@ -147,9 +146,12 @@ export default function OperationsDashboard() {
   const cycleDates = getCycleDatesFromId(year, cycleId);
   const cycleFrom = cycleDates.from;
   const isFullTimeCycle = cycleFrom >= FULLTIME_EFFECTIVE_CYCLE_START;
-  // Linda left Sep 12, 2026 — hide her from any cycle starting on/after that date.
-  // Her historical records and past cycles remain fully visible/unaffected.
-  const visibleAgents = agents.filter((ag) => ag.id !== LINDA_AGENT_ID || cycleFrom < LINDA_LAST_CYCLE_START);
+  // Who counts in the cycle being viewed — no per-person exceptions, the agent list drives everything:
+  //  • someone who left (active_until) is hidden from every cycle that starts after they left, and stays in the older ones;
+  //  • a newly added agent shows from the current cycle on; in a finished cycle only if they actually have records there.
+  const cycleIsOver = cycleDates.to < new Date().toISOString().slice(0, 10);
+  const hasCycleData = (id: number) => appeals.some((a) => a.agentId === id) || handlingTimes.some((h) => h.agentId === id) || amazonPerformance.some((p) => p.agentId === id);
+  const visibleAgents = agents.filter((ag) => isAgentActiveFor(ag, cycleFrom) && (!cycleIsOver || hasCycleData(ag.id) || ag.id === THOMAS_AGENT_ID));
 
   const tiktokBonusFullTime = calcTikTokBonusFullTime(tiktokScores, cycleDays);
 
@@ -157,9 +159,9 @@ export default function OperationsDashboard() {
     const agAppeals = appeals.filter((a) => a.agentId === ag.id && a.status === "completed" && !a.invalidated);
     const appealRaw = agAppeals.reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
     const ht = handlingTimes.find((h) => h.agentId === ag.id);
-    const isThomasFullTime = ag.id === THOMAS_AGENT_ID && isFullTimeCycle;
+    const isFullTimeAgent = isFullTimeCycle; // every agent follows the current (full-time) structure
 
-    if (isThomasFullTime) {
+    if (isFullTimeAgent) {
       const appealCapped = Math.min(appealRaw, FULLTIME_APPEALS_CAP);
       const handling = ht ? calcHandlingTimeBonusFullTime(ht.hours) : 0;
       const tiktok = Math.min(tiktokBonusFullTime, FULLTIME_TIKTOK_CAP);
@@ -422,7 +424,7 @@ export default function OperationsDashboard() {
         })),
         appealBonus: OPS_APPEALS_BONUS, outcomeLabels: OUTCOME_LABELS,
         appealTypeLabel: (t) => APPEAL_TYPES.find((x) => x.value === t)?.label ?? "TikTok Appeals",
-        handlingBonus: (agentId, hours) => (agentId === THOMAS_AGENT_ID && isFullTimeCycle ? calcHandlingTimeBonusFullTime(hours) : calcHandlingTimeBonus(hours)),
+        handlingBonus: (_agentId, hours) => (isFullTimeCycle ? calcHandlingTimeBonusFullTime(hours) : calcHandlingTimeBonus(hours)),
         amazonBonus: amazonPerfBonus,
         tiktokEarned: earnedFor,
       });
@@ -608,12 +610,12 @@ export default function OperationsDashboard() {
                   })()}
                   <div className="badge badge-success" style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
                     {(() => {
-                      const raw = appeals
-                        .filter((a) => (filterAgentId === 0 || a.agentId === filterAgentId) && a.status === "completed" && !a.invalidated)
-                        .reduce((s, a) => s + (OPS_APPEALS_BONUS[a.outcome] ?? 0), 0);
-                      const onlyThomas = filterAgentId === THOMAS_AGENT_ID || (filterAgentId === 0 && visibleAgents.every((a) => a.id === THOMAS_AGENT_ID));
-                      const cap = onlyThomas && isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
-                      return <>Total Bonus: ${Math.min(raw, cap).toFixed(2)} (cap ${cap})</>;
+                      // each agent has their own cap; with several agents the total is the sum of what each can earn
+                      const capEach = isFullTimeCycle ? FULLTIME_APPEALS_CAP : OPS_APPEALS_CAP;
+                      const list = filterAgentId === 0 ? visibleAgents : visibleAgents.filter((a) => a.id === filterAgentId);
+                      const earned = list.reduce((sum, ag) => sum + Math.min(appeals.filter((x) => x.agentId === ag.id && x.status === "completed" && !x.invalidated).reduce((t, x) => t + (OPS_APPEALS_BONUS[x.outcome] ?? 0), 0), capEach), 0);
+                      const cap = capEach * Math.max(1, list.length);
+                      return <>Total Bonus: ${earned.toFixed(2)} (cap ${cap})</>;
                     })()}
                   </div>
                 </div>
@@ -723,7 +725,7 @@ export default function OperationsDashboard() {
             {visibleAgents.map((ag) => {
               const ht = handlingTimes.find((h) => h.agentId === ag.id);
               const val = handlingForms[ag.id] ?? "";
-              const isThomasFullTime = ag.id === THOMAS_AGENT_ID && isFullTimeCycle;
+              const isThomasFullTime = isFullTimeCycle;
               const calcFn = isThomasFullTime ? calcHandlingTimeBonusFullTime : calcHandlingTimeBonus;
               const rows = isThomasFullTime
                 ? [["≤ 30 h", "$40"], ["30 – 32 h", "$32"], ["32 – 34 h", "$24"], ["34 – 36 h", "$16"], ["36 – 38.5 h", "$8"], ["> 38.5 h", "$0"]]
@@ -785,7 +787,7 @@ export default function OperationsDashboard() {
                     </tbody>
                   </table>
                 </div>
-                {visibleAgents.filter((ag) => ag.id === THOMAS_AGENT_ID).map((ag) => {
+                {visibleAgents.map((ag) => {
                   const current = amazonPerformance.find((p) => p.agentId === ag.id);
                   return (
                     <AmazonQuizCard
@@ -866,7 +868,7 @@ export default function OperationsDashboard() {
             <header className="section-header"><h2>Settings</h2></header>
             <div className="card">
               <h3 style={{ marginBottom: "1rem" }}>Agent Names</h3>
-              {agents.map((ag) => (
+              {visibleAgents.map((ag) => (
                 <div key={ag.id} className="form-group" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}>
                     <label>{ag.name}</label>
