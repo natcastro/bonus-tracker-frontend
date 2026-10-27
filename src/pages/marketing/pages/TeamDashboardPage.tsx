@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { formatDateHuman } from "../theme";
 import StatusPill from "../components/StatusPill";
+import DeadlineBadge from "../components/DeadlineBadge";
 import { useMarketing } from "../context";
 import { getPrivateTasks } from "../../../services/api";
 import type { PrivateTask } from "../types";
-import { stageLabel, todoStageLabel, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate } from "../types";
+import { stageLabel, todoStageLabel, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate, currentActiveStages } from "../types";
 import type { StageKey } from "../types";
 
 interface DeliveryEntry {
@@ -26,6 +27,7 @@ interface DisenoStats {
   onTimePct: number;
   completedCount: number;
   inProgress: number; // briefs + To Do + Solicitudes assigned to them that are still open
+  open: { key: string; label: string; stage: string; deadline: string | null; kind: "brief" | "todo" | "request"; linkTo: string }[];
 }
 
 // Converts a fractional day count (e.g. 2.35) into a human "2d 8h" / "3h 24m" label —
@@ -125,13 +127,26 @@ export default function TeamDashboardPage() {
         });
       }
       const mine = (e: string | null) => !!e && e.toLowerCase() === email.toLowerCase();
-      const inProgress = published.filter(b => b.status === "in_progress" && mine(b.assignedDisenoEmail)).length
-        + todoTasks.filter(t => t.status === "in_progress" && mine(t.assignedDisenoEmail)).length
-        + requests.filter(r => r.status === "in_progress" && mine(r.assignedDisenoEmail)).length;
+      // What they have open right now, with the stage it is at and its deadline (so open work is visible, not only deliveries).
+      const open: DisenoStats["open"] = [
+        ...published.filter(b => b.status === "in_progress" && mine(b.assignedDisenoEmail)).map(b => {
+          const st = currentActiveStages(b)[0];
+          return { key: `b${b.id}`, label: b.reference, stage: st ? stageLabel(st.key) : "En proceso", deadline: st?.deadline ?? null, kind: "brief" as const, linkTo: `/marketing/brief/${b.id}` };
+        }),
+        ...todoTasks.filter(t => t.status === "in_progress" && mine(t.assignedDisenoEmail)).map(t => {
+          const st = t.stages.find(x => x.key === t.currentStage);
+          return { key: `t${t.id}`, label: t.title, stage: todoStageLabel(t.currentStage), deadline: st?.deadline ?? null, kind: "todo" as const, linkTo: `/marketing/todo/${t.id}` };
+        }),
+        ...requests.filter(r => r.status === "in_progress" && mine(r.assignedDisenoEmail)).map(r => {
+          const st = r.stages.find(x => x.key === r.currentStage);
+          return { key: `r${r.id}`, label: r.title, stage: requestStageLabel(r.currentStage), deadline: st?.deadline ?? null, kind: "request" as const, linkTo: `/marketing/request/${r.id}` };
+        }),
+      ];
+      const inProgress = open.length;
       const completedCount = entries.length;
       const onTime = entries.filter(e => !e.late).length;
       const avgDays = completedCount > 0 ? entries.reduce((s, e) => s + e.turnaroundDays, 0) / completedCount : null;
-      return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount, inProgress };
+      return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount, inProgress, open };
     }).sort((a, b) => {
       if (a.avgDays === null && b.avgDays === null) return 0;
       if (a.avgDays === null) return 1;
@@ -361,6 +376,24 @@ export default function TeamDashboardPage() {
                 );
               })}
             </div>
+
+            {/* Open work right now: stage and deadline */}
+            <p style={{ fontWeight: 700, fontSize: 11.5, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
+              En curso ({selected.open.length})
+            </p>
+            {selected.open.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: MT.text3, margin: "0 0 1rem" }}>Nada abierto ahora.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${MT.border}`, borderRadius: 8, marginBottom: "1.1rem" }}>
+                {selected.open.map((o, i) => (
+                  <div key={o.key} onClick={() => { if (!(authedUser?.role === "video" && o.kind === "brief")) navigate(o.linkTo); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.6rem 0.8rem", cursor: "pointer", borderTop: i === 0 ? "none" : `1px solid ${MT.border}` }}>
+                    <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: MT.text1 }}>{o.label}</span>
+                    <span style={{ fontSize: 11.5, color: MT.text2 }}>{o.stage}</span>
+                    {o.deadline && <DeadlineBadge deadline={o.deadline} compact />}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* The actual deliveries behind the chart above — not just a count. */}
             <p style={{ fontWeight: 700, fontSize: 11.5, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
