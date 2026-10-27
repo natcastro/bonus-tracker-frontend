@@ -6,7 +6,7 @@ import StatusPill from "../components/StatusPill";
 import { useMarketing } from "../context";
 import { getPrivateTasks } from "../../../services/api";
 import type { PrivateTask } from "../types";
-import { stageLabel, todoStageLabel, daysBetweenIso, todayIsoBogota, stageLate } from "../types";
+import { stageLabel, todoStageLabel, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate } from "../types";
 import type { StageKey } from "../types";
 
 interface DeliveryEntry {
@@ -14,7 +14,7 @@ interface DeliveryEntry {
   late: boolean;
   turnaroundDays: number;
   reference: string;
-  kind: "brief" | "todo";
+  kind: "brief" | "todo" | "request";
   linkTo: string;
 }
 
@@ -25,6 +25,7 @@ interface DisenoStats {
   avgDays: number | null;
   onTimePct: number;
   completedCount: number;
+  inProgress: number; // briefs + To Do + Solicitudes assigned to them that are still open
 }
 
 // Converts a fractional day count (e.g. 2.35) into a human "2d 8h" / "3h 24m" label —
@@ -64,7 +65,7 @@ export function subtractDaysIso(iso: string, days: number): string {
 }
 
 export default function TeamDashboardPage() {
-  const { briefs, todoTasks, disenoEmailList, videoEmailList, disenoDisplayName, authedUser } = useMarketing();
+  const { briefs, todoTasks, requests, disenoEmailList, videoEmailList, disenoDisplayName, authedUser } = useMarketing();
   // Video people's private tasks are visible only to them and to the admin (Laura).
   const [videoPrivate, setVideoPrivate] = useState<{ email: string; tasks: PrivateTask[] }[]>([]);
   useEffect(() => {
@@ -111,10 +112,26 @@ export default function TeamDashboardPage() {
           });
         });
       }
+      // Solicitudes (the public request form) are Diseño / Video work too — they used to be left out of these numbers.
+      for (const r of requests) {
+        if (!r.assignedDisenoEmail || r.assignedDisenoEmail.toLowerCase() !== email.toLowerCase()) continue;
+        r.stages.forEach((s, i) => {
+          if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
+          const start = (i > 0 ? r.stages[i - 1].completedAt : r.createdAt.slice(0, 10)) ?? r.createdAt.slice(0, 10);
+          entries.push({
+            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+            reference: `${r.title} — ${requestStageLabel(s.key)}`, kind: "request", linkTo: `/marketing/request/${r.id}`,
+          });
+        });
+      }
+      const mine = (e: string | null) => !!e && e.toLowerCase() === email.toLowerCase();
+      const inProgress = published.filter(b => b.status === "in_progress" && mine(b.assignedDisenoEmail)).length
+        + todoTasks.filter(t => t.status === "in_progress" && mine(t.assignedDisenoEmail)).length
+        + requests.filter(r => r.status === "in_progress" && mine(r.assignedDisenoEmail)).length;
       const completedCount = entries.length;
       const onTime = entries.filter(e => !e.late).length;
       const avgDays = completedCount > 0 ? entries.reduce((s, e) => s + e.turnaroundDays, 0) / completedCount : null;
-      return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount };
+      return { email, name: disenoDisplayName(email), entries, avgDays, onTimePct: completedCount > 0 ? Math.round((100 * onTime) / completedCount) : 100, completedCount, inProgress };
     }).sort((a, b) => {
       if (a.avgDays === null && b.avgDays === null) return 0;
       if (a.avgDays === null) return 1;
@@ -128,7 +145,7 @@ export default function TeamDashboardPage() {
       }
       return diff;
     });
-  }, [published, todoTasks, disenoEmailList, videoEmailList, disenoDisplayName]);
+  }, [published, todoTasks, requests, disenoEmailList, videoEmailList, disenoDisplayName]);
 
   const selected = disenoStats.find(d => d.email === selectedEmail) ?? null;
   // The date range only scopes the selected person's own chart/list — the team-wide stats below
@@ -164,7 +181,7 @@ export default function TeamDashboardPage() {
   // variant-mode brief, each applicable variant's own completed stages flatten in alongside
   // everyone else's, so the on-time charts/delay counts don't need a separate code path.
   const doneStages = useMemo(() => {
-    const list: { completedAt: string; late: boolean; role: "laura" | "diseno"; stageKey: StageKey }[] = [];
+    const list: { completedAt: string; late: boolean; role: "laura" | "diseno"; stageKey: StageKey | null }[] = [];
     for (const b of published) {
       const allStages = b.variants ? b.variants.filter(v => v.applicable).flatMap(v => v.stages) : b.stages;
       for (const s of allStages) {
@@ -172,8 +189,16 @@ export default function TeamDashboardPage() {
         list.push({ completedAt: s.completedAt, late: stageLate(s), role: s.role, stageKey: s.key });
       }
     }
+    // To Do tasks and Solicitudes: their Diseño / Video deliveries count in the team totals too (not in the per-stage
+    // breakdown below, which is about the brief pipeline's own stages).
+    for (const t of todoTasks) for (const s of t.stages) {
+      if (s.role === "diseno" && s.status === "done" && s.completedAt) list.push({ completedAt: s.completedAt, late: stageLate(s), role: "diseno", stageKey: null });
+    }
+    for (const r of requests) for (const s of r.stages) {
+      if (s.role === "diseno" && s.status === "done" && s.completedAt) list.push({ completedAt: s.completedAt, late: stageLate(s), role: "diseno", stageKey: null });
+    }
     return list;
-  }, [published]);
+  }, [published, todoTasks, requests]);
 
   const totalDone = doneStages.length;
   const totalOnTime = doneStages.filter(s => !s.late).length;
@@ -195,6 +220,7 @@ export default function TeamDashboardPage() {
   const byStage = useMemo(() => {
     const map = new Map<StageKey, { total: number; late: number }>();
     doneStages.forEach(s => {
+      if (!s.stageKey) return;
       const cur = map.get(s.stageKey) ?? { total: 0, late: 0 };
       cur.total++;
       if (s.late) cur.late++;
@@ -267,7 +293,7 @@ export default function TeamDashboardPage() {
               <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 6, maxWidth: "100%", overflowWrap: "anywhere" }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
               <span style={{ fontSize: 24, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>AHT promedio</span>
-              <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4, textAlign: "center" }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo</span>
+              <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4, textAlign: "center" }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo{d.inProgress > 0 ? ` · ${d.inProgress} en curso` : ""}</span>
             </button>
           ))}
         </div>
