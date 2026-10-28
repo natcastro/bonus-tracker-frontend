@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import { useMarketing } from "../context";
 import { getPrivateTasks } from "../../../services/api";
 import type { PrivateTask } from "../types";
-import { stageLabel, todoStageLabel, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate, currentActiveStages } from "../types";
+import { stageLabel, todoStageLabel, todoFullName, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate, currentActiveStages } from "../types";
 import type { StageKey } from "../types";
 
 interface DeliveryEntry {
@@ -111,7 +111,7 @@ export default function TeamDashboardPage() {
           const start = (i > 0 ? t.stages[i - 1].completedAt : t.createdAt.slice(0, 10)) ?? t.createdAt.slice(0, 10);
           entries.push({
             completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
-            reference: `${t.title} — ${todoStageLabel(s.key)}`, kind: "todo", linkTo: `/marketing/todo/${t.id}`,
+            reference: `${todoFullName(t)} — ${todoStageLabel(s.key)}`, kind: "todo", linkTo: `/marketing/todo/${t.id}`,
           });
         });
       }
@@ -136,7 +136,7 @@ export default function TeamDashboardPage() {
         }),
         ...todoTasks.filter(t => t.status === "in_progress" && mine(t.assignedDisenoEmail)).map(t => {
           const st = t.stages.find(x => x.key === t.currentStage);
-          return { key: `t${t.id}`, label: t.title, stage: todoStageLabel(t.currentStage), deadline: st?.deadline ?? null, kind: "todo" as const, linkTo: `/marketing/todo/${t.id}` };
+          return { key: `t${t.id}`, label: todoFullName(t), stage: todoStageLabel(t.currentStage), deadline: st?.deadline ?? null, kind: "todo" as const, linkTo: `/marketing/todo/${t.id}` };
         }),
         ...requests.filter(r => r.status === "in_progress" && mine(r.assignedDisenoEmail)).map(r => {
           const st = r.stages.find(x => x.key === r.currentStage);

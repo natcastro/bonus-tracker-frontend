@@ -13,7 +13,7 @@ import type { MarketingNotifyEmails, MarketingNotifySlot, DisenoNotifySlot } fro
 import { useHubAccess } from "../../auth/HubAccessContext";
 import { formatDateHuman } from "./theme";
 import type { BriefVariant, MarketingBrief, MarketingNotification, MarketingRequest, MarketingRole, MarketingUser, PrivateTask, PublicationPlatform, StageKey, TodoTask, VariantKey } from "./types";
-import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, VARIANT_DEFS, variantLabel, variantLabels, variantsTakenFor, variantsInOrder, ADAPTATION_PROPOSAL_DAYS, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
+import { STAGE_DEFS, stageLabel, addWorkDaysIso, todayIso, isPastDeadline, TODO_STAGE_DEFS, TODO_APPROVABLE_STAGES, todoStageLabel, todoFullName, VARIANT_DEFS, variantLabel, variantLabels, variantsTakenFor, variantsInOrder, ADAPTATION_PROPOSAL_DAYS, REQUEST_STAGE_DEFS, requestStageLabel } from "./types";
 
 // Fallback recipients, used only until the marketing_notify_emails table has been seeded.
 const DEFAULT_NOTIFY_EMAILS: MarketingNotifyEmails = {
@@ -96,7 +96,7 @@ interface MarketingCtx {
 
   // Carol's quick-turnaround To Do tasks — separate, shorter pipeline than Laura's briefs.
   todoTasks: TodoTask[];
-  createTodoTask: (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => Promise<void>;
+  createTodoTask: (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string, categoryLabel?: string) => Promise<void>;
   advanceTodoTask: (id: number, link: string | undefined, note?: string) => Promise<void>;
   approveTodoTask: (id: number, note?: string) => Promise<void>;
   deleteTodoTask: (id: number) => Promise<void>;
@@ -232,7 +232,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     link: null, completedAt: null, status: "pending" as const,
   }));
 
-  const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string) => {
+  const createTodoTask = async (taskType: string, title: string, description: string, assignedDisenoEmail: string, emailNote?: string, categoryLabel?: string) => {
     // Video tasks go only to people with the Video role (and nobody from Video gets the other kinds).
     const toVideo = videoEmailList.includes(assignedDisenoEmail.toLowerCase());
     if (taskType === "Video" && !toVideo) throw new Error("Las tareas de Video solo se pueden asignar a personas con el rol Video.");
@@ -240,16 +240,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
     const stages = buildTodoStages(today);
     const created = await apiCreateTodoTask({
-      taskType, title, description, assignedDisenoEmail, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
+      taskType, title, description, assignedDisenoEmail, categoryLabel: categoryLabel ?? null, currentStage: "proposal", status: "in_progress", stages, completedAt: null,
     });
     // Karol or Laura can assign To Do tasks — the notices name whoever actually did it.
     const assigner = authedUser?.role === "laura" ? "Laura" : "Karol";
-    await notify(null, `${assigner} asignó una nueva tarea to do: ${title}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
+    const fullName = todoFullName({ categoryLabel, taskType, title });
+    await notify(null, `${assigner} asignó una nueva tarea to do: ${fullName}.${emailNote ? ` Nota: ${emailNote}` : ""}`);
     const emailBody = [description && `Descripción: ${description}`, emailNote && `Nota de ${assigner}: ${emailNote}`].filter(Boolean).join(" — ") || undefined;
     await sendMarketingEmail(
       assignedDisenoEmail,
-      `Nueva tarea (To Do) — ${title}`,
-      emailHtml({ intro: `${assigner} te asignó una nueva tarea rápida.`, reference: title, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody, link: appUrl(`/marketing/todo/${created.id}`) }),
+      `Nueva tarea (To Do) — ${fullName}`,
+      emailHtml({ intro: `${assigner} te asignó una nueva tarea rápida.`, reference: fullName, nextTask: todoStageLabel("proposal"), deadline: stages[0].deadline, note: emailBody, link: appUrl(`/marketing/todo/${created.id}`) }),
     );
     await reload();
   };
@@ -283,18 +284,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       if (recipient) {
         await sendMarketingEmail(
           recipient,
-          `Tu turno — ${task.title}`,
+          `Tu turno — ${todoFullName(task)}`,
           emailHtml({
-            intro: `Se avanzó la tarea "${task.title}". Te toca continuar.`,
-            reference: task.title, nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline,
+            intro: `Se avanzó la tarea "${todoFullName(task)}". Te toca continuar.`,
+            reference: todoFullName(task), nextTask: todoStageLabel(nextStage.key), deadline: nextDeadline,
             note: [note, stage.role === "carol" && link ? `Enlace con comentarios de ajuste: ${link}` : ""].filter(Boolean).join(" — ") || undefined,
             link: appUrl(`/marketing/todo/${task.id}`),
           }),
         );
       }
-      await notify(null, `Avanzó la tarea to do "${task.title}" a ${todoStageLabel(nextStage.key)}.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
+      await notify(null, `Avanzó la tarea to do "${todoFullName(task)}" a ${todoStageLabel(nextStage.key)}.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
     } else {
-      await notify(null, `Tarea to do completada: ${task.title}.${isLate ? " (tarde)" : ""}`);
+      await notify(null, `Tarea to do completada: ${todoFullName(task)}.${isLate ? " (tarde)" : ""}`);
     }
     await reload();
   };
@@ -318,13 +319,13 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     await updateTodoTask(id, { stages: newStages, currentStage: "completed", status: "completed", completedAt: today });
     await sendMarketingEmail(
       task.assignedDisenoEmail,
-      `Aprobada — ${task.title}`,
+      `Aprobada — ${todoFullName(task)}`,
       emailHtml({
-        intro: `Karol aprobó "${task.title}" en ${todoStageLabel(stage.key)}. No hacen falta más ajustes.`,
-        reference: task.title, note, link: appUrl(`/marketing/todo/${task.id}`),
+        intro: `Karol aprobó "${todoFullName(task)}" en ${todoStageLabel(stage.key)}. No hacen falta más ajustes.`,
+        reference: todoFullName(task), note, link: appUrl(`/marketing/todo/${task.id}`),
       }),
     );
-    await notify(null, `Karol aprobó la tarea to do "${task.title}" en ${todoStageLabel(stage.key)} — sin más rondas.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
+    await notify(null, `Karol aprobó la tarea to do "${todoFullName(task)}" en ${todoStageLabel(stage.key)} — sin más rondas.${isLate ? " (tarde)" : ""}${note ? ` Nota: ${note}` : ""}`);
     await reload();
   };
 

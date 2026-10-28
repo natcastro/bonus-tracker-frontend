@@ -9,6 +9,7 @@ import DisenoAssigneePicker from "./DisenoAssigneePicker";
 export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
   const { createTodoTask, disenoEmailList, videoEmailList, disenoDisplayName, disenoCountry } = useMarketing();
   const [cat, setCatState] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
+  const [taskName, setTaskName] = useState("");
   const [description, setDescription] = useState("");
   // Switching between Video and the other categories changes who can receive the task, so the pick is cleared.
   const setCat = (next: TaskCategoryState) => { if ((next.category === "videos") !== (cat.category === "videos")) setAssignedEmail(""); setCatState(next); };
@@ -24,14 +25,17 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
       return;
     }
     if (!assignedEmail) { setError(cat.category === "videos" ? "Asigna la tarea a alguien de Video." : "Asigna la tarea a alguien de Diseño."); return; }
-    const title = taskCategoryTitle(cat);
+    // The creator names the task; the kind of piece (Video · Instagram · Story, Post…) is kept apart and shown in front of it.
+    const categoryLabel = taskCategoryTitle(cat);
+    const title = taskName.trim();
+    if (!title) { setError("Ponle un nombre a la tarea (por ejemplo: Promo gel gratis — historias)."); return; }
     const detailsBlock = taskCategoryDetailsBlock(cat);
     const fullDescription = [detailsBlock, description.trim()].filter(Boolean).join("\n—\n");
     const taskType = cat.category === "videos" ? "Video" : (cat.selectedType ?? "");
     setSaving(true);
     setError("");
     try {
-      await createTodoTask(taskType, title, fullDescription, assignedEmail, emailNote.trim() || undefined);
+      await createTodoTask(taskType, title, fullDescription, assignedEmail, emailNote.trim() || undefined, cat.category === "videos" ? categoryLabel : (cat.selectedType === "Otro" ? "Otro" : categoryLabel));
       onClose();
     } catch (err: any) {
       setError(err?.message ?? "No se pudo crear la tarea.");
@@ -52,6 +56,15 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <TaskCategoryFields state={cat} onChange={setCat} />
+
+          <div>
+            <label style={labelStyle}>Nombre de la tarea</label>
+            <input
+              style={inputStyle} value={taskName} onChange={e => setTaskName(e.target.value)} maxLength={90} required
+              placeholder="Ej. Promo gel gratis — historias"
+            />
+            <p style={{ fontSize: 11.5, color: MT.text3, margin: "5px 0 0" }}>Con este nombre se guarda y se ve la tarea. La categoría que elegiste arriba aparece al frente.</p>
+          </div>
 
           {cat.category !== "videos" && (
           <div>

@@ -1739,7 +1739,7 @@ export async function deletePrivateTask(id: number): Promise<void> {
 function mapTodoTask(r: any): TodoTask {
   return {
     id: r.id, taskType: r.task_type, title: r.title, description: r.description ?? "", assignedDisenoEmail: r.assigned_diseno_email,
-    currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
+    categoryLabel: r.category_label ?? null, currentStage: r.current_stage, status: r.status, stages: Array.isArray(r.stages) ? r.stages : [],
     createdAt: r.created_at, completedAt: r.completed_at,
   };
 }
@@ -1753,9 +1753,14 @@ export async function getTodoTasks(): Promise<TodoTask[]> {
 export async function createTodoTask(b: Omit<TodoTask, "id" | "createdAt">): Promise<TodoTask> {
   const { data, error } = await supabase.from("marketing_todo_tasks").insert({
     task_type: b.taskType, title: b.title, description: b.description, assigned_diseno_email: b.assignedDisenoEmail,
+    category_label: b.categoryLabel ?? null,
     current_stage: b.currentStage, status: b.status, stages: b.stages, completed_at: b.completedAt,
   }).select().single();
-  if (error) throw error;
+  if (error) {
+    // supabase/todo-category-label.sql adds the category column; until it is run new tasks can't be saved with a name + category.
+    if (/category_label/.test(error.message ?? "")) throw new Error("Falta correr el SQL todo-category-label.sql en Supabase para guardar el nombre y la categoría de la tarea.");
+    throw error;
+  }
   return mapTodoTask(data);
 }
 

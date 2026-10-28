@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
 import { useMarketing } from "../context";
 import NewItemModal from "../components/NewItemModal";
+import TodoCategoryChip from "../components/TodoCategoryChip";
 import DeadlineBadge from "../components/DeadlineBadge";
 import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
 import { stageLabel, todoStageLabel, requestStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
@@ -404,7 +405,7 @@ export default function MyTasksPage() {
                       {todoStageLabel(stage.key)}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{t.title}</div>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={t} /></div>{t.title}</div>
                   {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
                 </button>
               );

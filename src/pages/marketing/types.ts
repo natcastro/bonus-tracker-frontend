@@ -363,6 +363,16 @@ export interface TodoStage {
 }
 
 // Karol's review stages where she can approve outright instead of sending the task around again.
+// The kind of a To Do task, shown in front of its name. Older tasks only have taskType (or a generic title).
+export function todoCategoryOf(t: { categoryLabel?: string | null; taskType: string; title: string }): string {
+  return (t.categoryLabel ?? (t.taskType === "Video" ? t.title : t.taskType)).replace(/\s+—\s+/g, " · ");
+}
+// Plain-text version for emails, notifications and lists: "Video · Instagram · Story — Promo gel gratis".
+export function todoFullName(t: { categoryLabel?: string | null; taskType: string; title: string }): string {
+  const cat = todoCategoryOf(t);
+  return !cat || cat === t.title.replace(/\s+—\s+/g, " · ") || cat === "Otro" ? t.title : `${cat} — ${t.title}`;
+}
+
 export const TODO_APPROVABLE_STAGES: TodoStageKey[] = ["review", "finalReview"];
 
 export const TODO_STAGE_DEFS: { key: TodoStageKey; label: string; role: "diseno" | "carol"; gapDays: number }[] = [
@@ -385,6 +395,9 @@ export interface TodoTask {
   title: string;
   description: string;
   assignedDisenoEmail: string;
+  // What kind of piece it is ("Video — Instagram — Story", "Post redes sociales cuadrado…"). `title` is the name the
+  // creator gave the task, so tasks of the same kind no longer look identical. null on tasks made before this existed.
+  categoryLabel?: string | null;
   currentStage: TodoStageKey | "completed";
   status: "in_progress" | "completed";
   stages: TodoStage[];

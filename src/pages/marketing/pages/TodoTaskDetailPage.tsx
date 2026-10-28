@@ -4,9 +4,10 @@ import { MT, formatDateHuman, formatRelative } from "../theme";
 import { useMarketing } from "../context";
 import DeadlineBadge from "../components/DeadlineBadge";
 import Avatar from "../components/Avatar";
+import TodoCategoryChip from "../components/TodoCategoryChip";
 import StatusPill from "../components/StatusPill";
 import { TrashIcon } from "../../../components/icons";
-import { todoStageLabel, normalizeUrl, TODO_APPROVABLE_STAGES, stageLate } from "../types";
+import { todoStageLabel, todoFullName, normalizeUrl, TODO_APPROVABLE_STAGES, stageLate } from "../types";
 import { uploadTodoTaskFile } from "../../../services/api";
 
 export default function TodoTaskDetailPage() {
@@ -52,7 +53,7 @@ export default function TodoTaskDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`¿Eliminar la tarea "${task.title}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar la tarea "${todoFullName(task)}"? Esta acción no se puede deshacer.`)) return;
     await deleteTodoTask(task.id);
     navigate("/marketing/todo");
   };
@@ -105,7 +106,7 @@ export default function TodoTaskDetailPage() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: MT.text1 }}>{task.title}</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: MT.text1 }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={task} /></div>{task.title}</h1>
           <p style={{ margin: "0.3rem 0 0", fontSize: 13, color: MT.text2 }}>
             Asignada a {disenoDisplayName(task.assignedDisenoEmail)} · {task.status === "completed" ? "Completada" : todoStageLabel(task.currentStage)}
           </p>
