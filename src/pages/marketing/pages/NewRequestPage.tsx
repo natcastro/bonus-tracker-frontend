@@ -20,6 +20,7 @@ export default function NewRequestPage() {
   const [cat, setCatState] = useState<TaskCategoryState>(EMPTY_TASK_CATEGORY_STATE);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
+  const [requestName, setRequestName] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState(todayIso());
   const [assignedDisenoEmail, setAssignedDisenoEmail] = useState("");
@@ -55,6 +56,7 @@ export default function NewRequestPage() {
       return;
     }
     if (cat.category !== "videos" && !description.trim()) { setError("Explica qué necesitas."); return; }
+    if (!requestName.trim()) { setError("Ponle un nombre a la solicitud (por ejemplo: Promo gel gratis — historias)."); return; }
     if (!assignedDisenoEmail) { setError("Selecciona a quién se le hace la solicitud."); return; }
     setBusy(true); setError("");
     try {
@@ -62,14 +64,16 @@ export default function NewRequestPage() {
       const attachments: string[] = [];
       for (const f of files) attachments.push(await uploadMarketingRequestFile(email, f));
       setUploading(false);
-      const title = taskCategoryTitle(cat);
+      // The requester names the request; the kind of piece is kept apart and shown next to the name.
+      const categoryLabel = cat.category !== "videos" && cat.selectedType === "Otro" ? "Otro" : taskCategoryTitle(cat);
+      const title = requestName.trim();
       const taskType = cat.category === "videos" ? "Video" : (cat.selectedType ?? "");
       const identityBlock = `Nombre: ${nombre.trim()} ${apellido.trim()}`;
       const detailsBlock = taskCategoryDetailsBlock(cat);
       const fullDescription = [identityBlock, detailsBlock, description.trim()].filter(Boolean).join("\n—\n");
       const id = await createRequest({
         taskType, title, description: fullDescription, attachments, sharedWithEmails: [],
-        deadline, assignedDisenoEmail,
+        deadline, assignedDisenoEmail, categoryLabel,
       });
       setCreatedId(id);
     } catch (err: any) {
@@ -140,6 +144,10 @@ export default function NewRequestPage() {
           <textarea style={{ ...fieldStyle, marginBottom: 14, resize: "vertical" }} rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe lo que necesitas: medidas, textos, colores, referencias..." />
             </>
           )}
+
+          <label style={labelStyle}>Nombre de la solicitud</label>
+          <input style={{ ...fieldStyle, marginBottom: 4 }} value={requestName} onChange={e => setRequestName(e.target.value)} maxLength={90} placeholder="Ej. Promo gel gratis — historias" />
+          <p style={{ fontSize: 11.5, color: MT.text3, margin: "0 0 14px" }}>Con este nombre se guarda y se ve tu solicitud, junto a la categoría que elegiste.</p>
 
           <label style={labelStyle}>¿Para cuándo necesitas esto? (fecha límite)</label>
           <input type="date" style={{ ...fieldStyle, marginBottom: 14 }} value={deadline} onChange={e => setDeadline(e.target.value)} />

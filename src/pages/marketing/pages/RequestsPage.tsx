@@ -1,3 +1,4 @@
+import TodoCategoryChip from "../components/TodoCategoryChip";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT, formatDateHuman, ROLE_CFG } from "../theme";
@@ -108,7 +109,7 @@ export default function RequestsPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1 }}>{r.title}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1, minWidth: 0 }}>{r.title}<TodoCategoryChip task={r} /></span>
                   <span style={{ fontSize: 11.5, color: MT.text3, minWidth: 140 }}>{r.requesterEmail}</span>
                   <span style={{ fontSize: 11.5, color: MT.text3, minWidth: 90 }}>{r.assignedDisenoEmail ? disenoDisplayName(r.assignedDisenoEmail) : "Sin asignar"}</span>
                   <StatusPill

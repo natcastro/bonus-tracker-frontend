@@ -123,7 +123,7 @@ export default function TeamDashboardPage() {
           const start = (i > 0 ? r.stages[i - 1].completedAt : r.createdAt.slice(0, 10)) ?? r.createdAt.slice(0, 10);
           entries.push({
             completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
-            reference: `${r.title} — ${requestStageLabel(s.key)}`, kind: "request", linkTo: `/marketing/request/${r.id}`,
+            reference: `${todoFullName(r)} — ${requestStageLabel(s.key)}`, kind: "request", linkTo: `/marketing/request/${r.id}`,
           });
         });
       }
@@ -140,7 +140,7 @@ export default function TeamDashboardPage() {
         }),
         ...requests.filter(r => r.status === "in_progress" && mine(r.assignedDisenoEmail)).map(r => {
           const st = r.stages.find(x => x.key === r.currentStage);
-          return { key: `r${r.id}`, label: r.title, stage: requestStageLabel(r.currentStage), deadline: st?.deadline ?? null, kind: "request" as const, linkTo: `/marketing/request/${r.id}` };
+          return { key: `r${r.id}`, label: todoFullName(r), stage: requestStageLabel(r.currentStage), deadline: st?.deadline ?? null, kind: "request" as const, linkTo: `/marketing/request/${r.id}` };
         }),
       ];
       const inProgress = open.length;

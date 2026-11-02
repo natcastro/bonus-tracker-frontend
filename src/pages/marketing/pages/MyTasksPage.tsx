@@ -446,7 +446,7 @@ export default function MyTasksPage() {
                       {requestStageLabel(stage.key)}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{r.title}</div>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={r} /></div>{r.title}</div>
                   {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
                 </button>
               );

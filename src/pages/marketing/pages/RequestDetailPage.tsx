@@ -1,3 +1,4 @@
+import TodoCategoryChip from "../components/TodoCategoryChip";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MT, formatDateHuman, ROLE_CFG } from "../theme";
@@ -111,7 +112,7 @@ export default function RequestDetailPage() {
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "1.25rem 1.25rem 3rem", fontFamily: MT.font }}>
         {header}
 
-        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: MT.text1 }}>{request.title}</h1>
+        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
         <p style={{ margin: "0 0 1.25rem", fontSize: 12.5, color: MT.text3 }}>
           Pedida el {formatDateHuman(request.createdAt.slice(0, 10))}
           {request.revisionRounds > 0 && <> · {request.revisionRounds} ronda{request.revisionRounds !== 1 ? "s" : ""} de cambios</>}
@@ -203,7 +204,7 @@ export default function RequestDetailPage() {
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{request.title}</h1>
+        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
         <StatusPill
           solid
           color={request.status === "completed" ? MT.primary : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}

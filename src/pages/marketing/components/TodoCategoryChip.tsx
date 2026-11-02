@@ -9,7 +9,7 @@ export default function TodoCategoryChip({ task }: { task: { categoryLabel?: str
   return (
     <span title={cat} style={{
       display: "inline-block", maxWidth: "100%", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.02em", color: MT.clay, background: MT.claySoft,
-      borderRadius: 999, padding: "2px 9px", marginRight: 8, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      borderRadius: 999, padding: "2px 9px", marginLeft: 8, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
     }}>{cat}</span>
   );
 }

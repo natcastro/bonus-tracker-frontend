@@ -1790,7 +1790,7 @@ export async function deleteTodoTask(id: number): Promise<void> {
 
 function mapMarketingRequest(r: any): MarketingRequest {
   return {
-    id: r.id, requesterEmail: r.requester_email, taskType: r.task_type ?? r.title, title: r.title, description: r.description ?? "",
+    id: r.id, requesterEmail: r.requester_email, taskType: r.task_type ?? r.title, title: r.title, categoryLabel: r.category_label ?? null, description: r.description ?? "",
     attachments: Array.isArray(r.attachments) ? r.attachments : [],
     sharedWithEmails: Array.isArray(r.shared_with_emails) ? r.shared_with_emails : [],
     assignedDisenoEmail: r.assigned_diseno_email ?? null, carolNotifiedAt: r.carol_notified_at ?? null,
@@ -1815,11 +1815,14 @@ export async function getMarketingRequests(forEmail?: string): Promise<Marketing
 
 export async function createMarketingRequest(r: Omit<MarketingRequest, "id" | "createdAt">): Promise<MarketingRequest> {
   const { data, error } = await supabase.from("marketing_requests").insert({
-    requester_email: r.requesterEmail, task_type: r.taskType, title: r.title, description: r.description, attachments: r.attachments,
+    requester_email: r.requesterEmail, task_type: r.taskType, title: r.title, category_label: r.categoryLabel ?? null, description: r.description, attachments: r.attachments,
     shared_with_emails: r.sharedWithEmails, assigned_diseno_email: r.assignedDisenoEmail, carol_notified_at: r.carolNotifiedAt,
     current_stage: r.currentStage, status: r.status, stages: r.stages, revision_rounds: r.revisionRounds, completed_at: r.completedAt,
   }).select().single();
-  if (error) throw error;
+  if (error) {
+    if (/category_label/.test(error.message ?? "")) throw new Error("Falta correr el SQL de nombres y categorías en Supabase para guardar el nombre de la solicitud.");
+    throw error;
+  }
   return mapMarketingRequest(data);
 }
 

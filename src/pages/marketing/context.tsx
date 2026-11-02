@@ -117,7 +117,7 @@ interface MarketingCtx {
   requests: MarketingRequest[];
   createRequest: (opts: {
     taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
-    deadline: string; assignedDisenoEmail?: string;
+    deadline: string; assignedDisenoEmail?: string; categoryLabel?: string;
   }) => Promise<number>;
   assignRequest: (requestId: number, email: string) => Promise<void>;
   editRequest: (requestId: number, changes: { title: string; description: string }) => Promise<void>;
@@ -372,7 +372,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // notification email can link straight to it.
   const createRequest = async (opts: {
     taskType: string; title: string; description: string; attachments: string[]; sharedWithEmails: string[];
-    deadline: string; assignedDisenoEmail?: string;
+    deadline: string; assignedDisenoEmail?: string; categoryLabel?: string;
   }): Promise<number> => {
     if (!myEmail) throw new Error("Debes iniciar sesión con tu correo corporativo.");
     if (opts.assignedDisenoEmail) {
@@ -384,7 +384,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const assignedDisenoEmail = opts.assignedDisenoEmail ?? null;
     const carolNotifiedAt = assignedDisenoEmail ? null : new Date().toISOString();
     const created = await apiCreateMarketingRequest({
-      requesterEmail: myEmail, taskType: opts.taskType, title: opts.title, description: opts.description,
+      requesterEmail: myEmail, taskType: opts.taskType, title: opts.title, categoryLabel: opts.categoryLabel ?? null, description: opts.description,
       attachments: opts.attachments, sharedWithEmails: opts.sharedWithEmails,
       currentStage: "delivery", status: "in_progress",
       stages, revisionRounds: 0, completedAt: null, assignedDisenoEmail, carolNotifiedAt,
@@ -394,7 +394,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const safeTitle = opts.title.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
     await sendMarketingEmail(
       myEmail,
-      `Recibimos tu solicitud — ${opts.title}`,
+      `Recibimos tu solicitud — ${todoFullName({ categoryLabel: opts.categoryLabel, taskType: opts.taskType, title: opts.title })}`,
       emailHtml({
         intro: "Tu solicitud fue enviada y Diseño ya fue notificado. Te escribiremos de nuevo cuando haya una entrega lista para que la revises, y desde ese correo podrás aprobarla o pedir ajustes.",
         reference: safeTitle, nextTask: "Entrega de Diseño", deadline: stages[0].deadline, link: appUrl(`/marketing/request/${created.id}`),

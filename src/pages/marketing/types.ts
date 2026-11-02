@@ -450,6 +450,8 @@ export interface MarketingRequest {
   // itself, or the custom text typed in when taskType is "Otro".
   taskType: string;
   title: string;
+  // The kind of piece, kept apart from `title` (the name the requester gave it). null on older requests.
+  categoryLabel?: string | null;
   description: string;
   attachments: string[];
   // Other company emails explicitly invited to view/track this request — read-only, they don't

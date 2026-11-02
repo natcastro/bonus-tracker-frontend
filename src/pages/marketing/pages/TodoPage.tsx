@@ -72,7 +72,7 @@ export default function TodoPage() {
   const bird = moodBird(onTimePct);
 
   const filtered = useMemo(() => items
-    .filter(i => !search || (i.kind === "todo" ? todoFullName(i.task) : i.title).toLowerCase().includes(search.toLowerCase()))
+    .filter(i => !search || todoFullName(i.kind === "todo" ? i.task : i.request).toLowerCase().includes(search.toLowerCase()))
     .filter(i => statusFilter === "all" || i.status === statusFilter)
     .filter(i => typeFilter === "all" || i.kind === typeFilter)
     .filter(i => {
@@ -181,7 +181,7 @@ export default function TodoPage() {
                   <span style={{ width: 32, height: 32, borderRadius: 8, background: `${isTodo ? MT.clay : MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {isTodo ? <PaletteIcon size={16} color={MT.clay} /> : <LinkIcon size={16} color={MT.violet} />}
                   </span>
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1, minWidth: 0 }}>{item.kind === "todo" && <TodoCategoryChip task={item.task} />}{item.title}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1, minWidth: 0 }}>{item.title}<TodoCategoryChip task={item.kind === "todo" ? item.task : item.request} /></span>
                   <span style={{ fontSize: 11.5, color: MT.text3, minWidth: 90 }}>
                     {isTodo ? disenoDisplayName(item.assignedDisenoEmail) : (item.assignedDisenoEmail ? disenoDisplayName(item.assignedDisenoEmail) : "Sin asignar")}
                   </span>
