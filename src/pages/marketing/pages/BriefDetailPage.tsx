@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MT, formatDateHuman, formatRelative, ROLE_CFG } from "../theme";
 import { useMarketing } from "../context";
@@ -69,6 +69,20 @@ export default function BriefDetailPage() {
   // null = "untouched, use the default (just the currently selected variant)" — kept distinct
   // from an explicit empty array (every checkbox unchecked), which must block submission.
   const [coSubmitKeys, setCoSubmitKeys] = useState<VariantKey[] | null>(null);
+
+  // When the variant being worked on completes, jump to the next unfinished one automatically.
+  const prevStatuses = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const vs = variantsInOrder(brief?.variants?.filter(v => v.applicable) ?? []);
+    let justFinished: VariantKey | null = null;
+    for (const v of vs) {
+      if (prevStatuses.current[v.key] && prevStatuses.current[v.key] !== "completed" && v.status === "completed") justFinished = v.key;
+      prevStatuses.current[v.key] = v.status;
+    }
+    if (!justFinished) return;
+    const next = vs.find(v => v.status !== "completed");
+    if (next) { setSelectedVariantKey(next.key); setCoSubmitKeys(null); }
+  }, [brief?.variants]);
 
   if (!brief) {
     return (
@@ -250,52 +264,9 @@ export default function BriefDetailPage() {
     </div>
   );
 
-  const content = (
-    <>
-      {showAssignPanel && (
-        brief.assignedDisenoEmail && !showReassign ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.6rem 1rem", marginBottom: "1rem" }}>
-            <span style={{ fontSize: 12.5, color: MT.text2 }}>Asignado a <strong style={{ color: MT.text1 }}>{disenoDisplayName(brief.assignedDisenoEmail)}</strong></span>
-            <button onClick={() => setShowReassign(true)} style={{
-              fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-              background: "none", border: "none", color: MT.info, padding: 0,
-            }}>Reasignar</button>
-          </div>
-        ) : (
-          <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
-            <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
-              {brief.assignedDisenoEmail ? "Reasignar a Diseño" : "Asignar a Diseño"}
-            </p>
-            <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
-              {brief.assignedDisenoEmail
-                ? "Por si alguien no puede seguir con esta tarea — elige a quién más se le asigna."
-                : ASSIGN_HELP_TEXT}
-            </p>
-            {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {disenoEmailList.map(email => {
-                const isCurrent = brief.assignedDisenoEmail === email;
-                return (
-                  <button key={email} disabled={busy || isCurrent} onClick={() => run(async () => { await assignBrief(brief.id, email); setShowReassign(false); })} style={{
-                    fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy || isCurrent ? "not-allowed" : "pointer",
-                    background: isCurrent ? MT.primarySoft : MT.surfaceAlt, color: isCurrent ? MT.primary : MT.text1,
-                    border: `1px solid ${isCurrent ? MT.primary : MT.border}`, borderRadius: 8, padding: "9px 14px",
-                  }}>{isCurrent && "✓ "}{disenoDisplayName(email)}</button>
-                );
-              })}
-              {brief.assignedDisenoEmail && (
-                <button onClick={() => setShowReassign(false)} style={{
-                  fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  background: "none", border: "none", color: MT.text2, padding: "9px 4px",
-                }}>Cancelar</button>
-              )}
-            </div>
-          </div>
-        )
-      )}
-
-      {/* Completed briefs lead with their publication links — that's what people come here for */}
-      {brief.status === "completed" && (
+  // Completed briefs show their banner + publication links at the END, once every variant is done.
+  const showCompletedSection = brief.status === "completed" && (!isVariantMode || applicableVariants.every(v => v.status === "completed"));
+  const completedSection = showCompletedSection && (
         <div style={{ marginBottom: "1.25rem" }}>
           <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", marginBottom: "1rem" }}>
             <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
@@ -368,7 +339,52 @@ export default function BriefDetailPage() {
             );
           })()}
         </div>
+  );
+
+  const content = (
+    <>
+      {showAssignPanel && (
+        brief.assignedDisenoEmail && !showReassign ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: MT.surfaceAlt, borderRadius: MT.radiusLg, padding: "0.6rem 1rem", marginBottom: "1rem" }}>
+            <span style={{ fontSize: 12.5, color: MT.text2 }}>Asignado a <strong style={{ color: MT.text1 }}>{disenoDisplayName(brief.assignedDisenoEmail)}</strong></span>
+            <button onClick={() => setShowReassign(true)} style={{
+              fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              background: "none", border: "none", color: MT.info, padding: 0,
+            }}>Reasignar</button>
+          </div>
+        ) : (
+          <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
+            <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
+              {brief.assignedDisenoEmail ? "Reasignar a Diseño" : "Asignar a Diseño"}
+            </p>
+            <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
+              {brief.assignedDisenoEmail
+                ? "Por si alguien no puede seguir con esta tarea — elige a quién más se le asigna."
+                : ASSIGN_HELP_TEXT}
+            </p>
+            {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {disenoEmailList.map(email => {
+                const isCurrent = brief.assignedDisenoEmail === email;
+                return (
+                  <button key={email} disabled={busy || isCurrent} onClick={() => run(async () => { await assignBrief(brief.id, email); setShowReassign(false); })} style={{
+                    fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy || isCurrent ? "not-allowed" : "pointer",
+                    background: isCurrent ? MT.primarySoft : MT.surfaceAlt, color: isCurrent ? MT.primary : MT.text1,
+                    border: `1px solid ${isCurrent ? MT.primary : MT.border}`, borderRadius: 8, padding: "9px 14px",
+                  }}>{isCurrent && "✓ "}{disenoDisplayName(email)}</button>
+                );
+              })}
+              {brief.assignedDisenoEmail && (
+                <button onClick={() => setShowReassign(false)} style={{
+                  fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  background: "none", border: "none", color: MT.text2, padding: "9px 4px",
+                }}>Cancelar</button>
+              )}
+            </div>
+          </div>
+        )
       )}
+
 
       {variantStatusHeader}
 
@@ -632,6 +648,8 @@ export default function BriefDetailPage() {
       )}
       </>
       )}
+
+      {completedSection && <div style={{ marginTop: "1.25rem" }}>{completedSection}</div>}
     </>
   );
 
