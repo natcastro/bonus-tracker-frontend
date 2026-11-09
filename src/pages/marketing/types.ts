@@ -257,20 +257,127 @@ export function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Adds `days` counted from the given date, skipping Saturdays and Sundays entirely — the
-// design team only works Monday through Friday, so weekends never count toward the gap and a
-// deadline never lands on one.
-export function addWorkDaysIso(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00");
-  let remaining = days;
-  while (remaining > 0) {
-    d.setDate(d.getDate() + 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) remaining--;
-  }
+// ── Working days: Monday–Friday, minus Colombian public holidays ───────────────────────────
+// Pure calendar math through UTC getters/setters, so it never depends on the viewer's timezone.
+
+const holidayCache = new Map<number, Set<string>>();
+
+function utcDate(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function isoOf(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function plusDays(d: Date, n: number): Date {
+  const r = new Date(d.getTime());
+  r.setUTCDate(r.getUTCDate() + n);
+  return r;
+}
+
+// Law 51 of 1983 ("Ley Emiliani"): these holidays move to the following Monday (stay put if already a Monday).
+function toNextMonday(d: Date): Date {
+  const dow = d.getUTCDay();
+  return dow === 1 ? d : plusDays(d, dow === 0 ? 1 : 8 - dow);
+}
+
+function easterSunday(year: number): Date {
+  // Anonymous Gregorian algorithm
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function colombianHolidays(year: number): Set<string> {
+  const cached = holidayCache.get(year);
+  if (cached) return cached;
+  const set = new Set<string>();
+  const fixed = (m: number, d: number) => set.add(isoOf(new Date(Date.UTC(year, m - 1, d))));
+  const moved = (m: number, d: number) => set.add(isoOf(toNextMonday(new Date(Date.UTC(year, m - 1, d)))));
+  // Fixed-date holidays
+  fixed(1, 1); fixed(5, 1); fixed(7, 20); fixed(8, 7); fixed(12, 8); fixed(12, 25);
+  // Moved to Monday
+  moved(1, 6); moved(3, 19); moved(6, 29); moved(8, 15); moved(10, 12); moved(11, 1); moved(11, 11);
+  // Easter-based
+  const easter = easterSunday(year);
+  set.add(isoOf(plusDays(easter, -3))); // Jueves Santo
+  set.add(isoOf(plusDays(easter, -2))); // Viernes Santo
+  set.add(isoOf(plusDays(easter, 43))); // Ascensión (moved to Monday)
+  set.add(isoOf(plusDays(easter, 64))); // Corpus Christi (moved to Monday)
+  set.add(isoOf(plusDays(easter, 71))); // Sagrado Corazón (moved to Monday)
+  holidayCache.set(year, set);
+  return set;
+}
+
+export function isColombianHoliday(iso: string): boolean {
+  return colombianHolidays(Number(iso.slice(0, 4))).has(iso.slice(0, 10));
+}
+
+// A working day is Monday–Friday and not a Colombian public holiday.
+export function isWorkDayIso(iso: string): boolean {
+  const dow = utcDate(iso).getUTCDay();
+  return dow !== 0 && dow !== 6 && !isColombianHoliday(iso);
+}
+
+// Adds `days` working days to the given date, skipping Saturdays, Sundays and Colombian holidays —
+// the design team only works on working days, so those never count toward the gap and a
+// deadline never lands on one.
+export function addWorkDaysIso(iso: string, days: number): string {
+  let d = utcDate(iso);
+  let remaining = days;
+  while (remaining > 0) {
+    d = plusDays(d, 1);
+    if (isWorkDayIso(isoOf(d))) remaining--;
+  }
+  return isoOf(d);
+}
+
+// Working days elapsed after `fromIso` up to and including `toIso` (the inverse of addWorkDaysIso).
+// Negative when `toIso` is before `fromIso`.
+export function workDaysBetweenIso(fromIso: string, toIso: string): number {
+  const sign = toIso >= fromIso ? 1 : -1;
+  const [lo, hi] = sign === 1 ? [fromIso, toIso] : [toIso, fromIso];
+  let d = utcDate(lo);
+  const end = utcDate(hi);
+  let count = 0;
+  while (d < end) {
+    d = plusDays(d, 1);
+    if (isWorkDayIso(isoOf(d))) count++;
+  }
+  return sign * count;
+}
+
+// Milliseconds between two instants that fall on working days only — whole Saturdays, Sundays and
+// Colombian holidays (Bogotá time, UTC-5, no DST) are removed. Always returns a non-negative value.
+export function workMsBetween(aMs: number, bMs: number): number {
+  const lo = Math.min(aMs, bMs), hi = Math.max(aMs, bMs);
+  const DAY = 86_400_000;
+  const dayIso = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(ms));
+  let total = hi - lo;
+  let d = utcDate(dayIso(lo));
+  const last = dayIso(hi);
+  for (;;) {
+    const iso = isoOf(d);
+    if (!isWorkDayIso(iso)) {
+      const start = new Date(`${iso}T00:00:00-05:00`).getTime();
+      const overlap = Math.min(hi, start + DAY) - Math.max(lo, start);
+      if (overlap > 0) total -= overlap;
+    }
+    if (iso >= last) break;
+    d = plusDays(d, 1);
+  }
+  return Math.max(0, total);
+}
+
+// Calendar-day difference. Kept for callers that need real elapsed days; deadlines and
+// turnaround use the working-day helpers above.
 export function daysBetweenIso(fromIso: string, toIso: string): number {
   const a = new Date(fromIso + "T00:00:00").getTime();
   const b = new Date(toIso + "T00:00:00").getTime();

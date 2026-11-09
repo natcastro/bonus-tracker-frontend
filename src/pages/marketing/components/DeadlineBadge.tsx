@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MT } from "../theme";
-import { deadlineTimestamp, daysBetweenIso, todayIsoBogota } from "../types";
+import { deadlineTimestamp, daysBetweenIso, todayIsoBogota, workMsBetween } from "../types";
 
 const WEEKDAY_FMT = new Intl.DateTimeFormat("es-CO", { weekday: "long", timeZone: "America/Bogota" });
 const DAY_MONTH_FMT = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" });
@@ -45,8 +45,10 @@ export default function DeadlineBadge({ deadline, compact }: { deadline: string 
   }
 
   const target = deadlineTimestamp(deadline);
-  const diffMs = target - now;
-  const overdue = diffMs <= 0;
+  const rawDiffMs = target - now;
+  const overdue = rawDiffMs <= 0;
+  // Countdown ignores weekends and Colombian holidays; the sign still says overdue vs. remaining.
+  const diffMs = (overdue ? -1 : 1) * workMsBetween(now, target);
   const urgent = !overdue && diffMs <= 24 * 3_600_000;
   const diffDays = daysBetweenIso(todayIsoBogota(), deadline);
 

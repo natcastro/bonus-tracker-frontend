@@ -7,7 +7,7 @@ import DeadlineBadge from "../components/DeadlineBadge";
 import { useMarketing } from "../context";
 import { getPrivateTasks } from "../../../services/api";
 import type { PrivateTask } from "../types";
-import { stageLabel, todoStageLabel, todoFullName, requestStageLabel, daysBetweenIso, todayIsoBogota, stageLate, currentActiveStages } from "../types";
+import { stageLabel, todoStageLabel, todoFullName, requestStageLabel, workDaysBetweenIso, todayIsoBogota, stageLate, currentActiveStages } from "../types";
 import type { StageKey } from "../types";
 
 interface DeliveryEntry {
@@ -98,7 +98,7 @@ export default function TeamDashboardPage() {
             const start = (i > 0 ? stages[i - 1].completedAt : b.startDate) ?? b.startDate;
             entries.push({
               // a brief with several variants counts as late only through its first variant
-              completedAt: s.completedAt, late: setIdx === 0 && stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+              completedAt: s.completedAt, late: setIdx === 0 && stageLate(s), turnaroundDays: Math.max(0, workDaysBetweenIso(start, s.completedAt)),
               reference: `${b.reference} — ${stageLabel(s.key)}`, kind: "brief", linkTo: `/marketing/brief/${b.id}`,
             });
           });
@@ -110,7 +110,7 @@ export default function TeamDashboardPage() {
           if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
           const start = (i > 0 ? t.stages[i - 1].completedAt : t.createdAt.slice(0, 10)) ?? t.createdAt.slice(0, 10);
           entries.push({
-            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, workDaysBetweenIso(start, s.completedAt)),
             reference: `${todoFullName(t)} — ${todoStageLabel(s.key)}`, kind: "todo", linkTo: `/marketing/todo/${t.id}`,
           });
         });
@@ -122,7 +122,7 @@ export default function TeamDashboardPage() {
           if (s.role !== "diseno" || s.status !== "done" || !s.completedAt) return;
           const start = (i > 0 ? r.stages[i - 1].completedAt : r.createdAt.slice(0, 10)) ?? r.createdAt.slice(0, 10);
           entries.push({
-            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, daysBetweenIso(start, s.completedAt)),
+            completedAt: s.completedAt, late: stageLate(s), turnaroundDays: Math.max(0, workDaysBetweenIso(start, s.completedAt)),
             reference: `${todoFullName(r)} — ${requestStageLabel(s.key)}`, kind: "request", linkTo: `/marketing/request/${r.id}`,
           });
         });
