@@ -193,6 +193,31 @@ export default function StyleGuide() {
           </div>
         </Section>
 
+        <Section label="Iconos pequeños" title="Briefs como icono, no como ilustración">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.75rem" }}>
+            {([["briefDoc", "A", "Documento"], ["clipboard", "B", "Lista"], ["folder", "C", "Carpeta"], ["stack", "D", "Capas"], ["presentation", "E", "Presentación"], ["compass", "F", "Estrategia"]] as [IllustrationKind, string, string][]).map(([k, a, b]) => (
+              <div key={k} className="fx-card" style={{ border: "1px solid var(--ink)", padding: "1.1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1.5rem", transition: "background-color 0.18s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ width: 40, height: 40, border: "1px solid var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><Illustration kind={k} size={26} /></span>
+                  <span className="eyebrow">Revisión 1</span>
+                </div>
+                <div><div className="fx-title" style={{ fontWeight: 600, fontSize: "1.1rem", letterSpacing: "-0.02em" }}>C-031 / C-082</div><div style={{ fontSize: "0.8rem", color: "var(--ink-3)" }}>Opción {a} · {b}</div></div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section label="Opciones" title="Reemplazo del megáfono (Briefs)">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "0.75rem" }}>
+            {([["briefDoc", "A", "Documento de brief"], ["clipboard", "B", "Lista de verificación"], ["folder", "C", "Carpeta de proyecto"], ["stack", "D", "Capas de campaña"], ["presentation", "E", "Presentación"], ["compass", "F", "Estrategia"]] as [IllustrationKind, string, string][]).map(([k, a, b]) => (
+              <div key={k} className="fx-card" style={{ border: "1px solid var(--ink)", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem", transition: "background-color 0.18s" }}>
+                <div><div className="eyebrow">Opción {a}</div><div className="fx-title" style={{ fontWeight: 600, fontSize: "1.1rem", letterSpacing: "-0.02em" }}>{b}</div></div>
+                <div style={{ display: "flex", justifyContent: "center" }}><Illustration kind={k} size={120} /></div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
         <Section label="Ilustraciones" title="Líneas finas, un punto relleno">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "0.75rem" }}>
             {([["megaphone", "Campañas", "Briefs y lanzamientos"], ["chart", "Resultados", "Métricas del ciclo"], ["funnel", "Embudo", "Leads y conversión"], ["calendar", "Planeación", "Calendario de contenido"], ["post", "Contenido", "Posts y reels"], ["mail", "Mensajes", "Correo y secuencias"], ["canvas", "Diseño", "Piezas creativas"], ["target", "Metas", "Objetivos del equipo"], ["dots", "FTC USA", "Disco de puntos"], ["layers", "Marketing", "Capas"], ["grid", "FTC México", "Rejilla"], ["line", "Management", "Serpentina"], ["rings", "HR", "Anillos"]] as [IllustrationKind, string, string][]).map(([k, a, b]) => (

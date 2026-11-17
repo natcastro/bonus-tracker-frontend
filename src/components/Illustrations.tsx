@@ -172,7 +172,72 @@ export function Rings({ size = 84, color = "currentColor" }: P) {
   );
 }
 
+
+// ── Candidate replacements for the megaphone (Briefs) — shown in /styleguide before choosing ──
+export function BriefDoc({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <path d="M26 10h34l16 16v64H26Z" /><path d="M60 10v16h16" />
+      <path d="M36 40h30M36 50h30M36 60h18" />
+      <rect x={36} y={70} width={14} height={9} fill={color} />
+      <path d="M72 62l14-14 6 6-14 14-8 2Z" />
+    </svg>
+  );
+}
+export function Clipboard({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <rect x={20} y={16} width={60} height={74} />
+      <rect x={36} y={8} width={28} height={14} fill="var(--paper, #fff)" />
+      {[38, 56, 74].map((y, i) => (
+        <g key={y}><rect x={30} y={y - 5} width={9} height={9} fill={i === 0 ? color : "none"} /><path d={`M46 ${y}h26`} /></g>
+      ))}
+    </svg>
+  );
+}
+export function Folder({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <path d="M12 26h28l8 10h40v46H12Z" />
+      <path d="M12 44h76" />
+      <rect x={24} y={54} width={20} height={4} fill={color} />
+      <path d="M24 66h40M24 74h28" />
+    </svg>
+  );
+}
+export function Stack({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <path d="M50 14L88 32 50 50 12 32Z" />
+      <path d="M12 46l38 18 38-18" />
+      <path d="M12 60l38 18 38-18" />
+      <circle cx={50} cy={32} r={3} fill={color} />
+    </svg>
+  );
+}
+export function Presentation({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <path d="M12 16h76M18 16v50h64V16" />
+      <path d="M28 56V44M42 56V34M56 56V40M70 56V28" />
+      <rect x={66} y={26} width={8} height={2} fill={color} />
+      <path d="M50 66v14M38 90l12-10 12 10" />
+    </svg>
+  );
+}
+export function Compass({ size = 84, color = "currentColor" }: P) {
+  return (
+    <svg {...svg(size, color)}>
+      <circle cx={50} cy={50} r={36} /><circle cx={50} cy={50} r={28} />
+      <path d="M50 14v6M50 80v6M14 50h6M80 50h6" />
+      <path d="M62 38L54 54 38 62l8-16Z" fill={color} />
+      <circle cx={50} cy={50} r={2} fill="var(--paper, #fff)" stroke="none" />
+    </svg>
+  );
+}
+
 export const ILLUSTRATIONS = {
+  briefDoc: BriefDoc, clipboard: Clipboard, folder: Folder, stack: Stack, presentation: Presentation, compass: Compass,
   dots: DotDisc, layers: Layers, grid: DotGrid, line: Serpentine, rings: Rings,
   megaphone: Megaphone, chart: GrowthChart, funnel: Funnel, calendar: CalendarCheck,
   post: SocialPost, target: Bullseye, mail: Envelope, canvas: Canvas,

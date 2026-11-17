@@ -335,7 +335,7 @@ export default function MyTasksPage() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{ color: color, display: "flex" }}><Illustration kind="megaphone" size={88} color="currentColor" /></span>
+                  <span style={{ width: 40, height: 40, border: `1px solid ${MT.text1}`, color: MT.text1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Illustration kind="briefDoc" size={26} color="currentColor" /></span>
                   <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
                     {stageLabel(stage.key)}
                   </span>
