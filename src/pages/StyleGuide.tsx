@@ -33,7 +33,7 @@ const ROWS = [
 function Section({ label, title, children }: { label: string; title: string; children: ReactNode }) {
   return (
     <section style={{ borderTop: "1px solid var(--ink)", paddingTop: "1rem", marginTop: "4rem" }}>
-      <div className="eyebrow" style={{ marginBottom: "0.5rem" }}>[ {label} ]</div>
+      <div className="eyebrow" style={{ marginBottom: "0.5rem" }}>{label}</div>
       <h2 style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "-0.035em", marginBottom: "1.5rem" }}>{title}</h2>
       {children}
     </section>
@@ -64,7 +64,7 @@ export default function StyleGuide() {
 
       <main className="content-area" style={{ maxWidth: 1080 }}>
         <div style={{ padding: "3rem 0 0" }}>
-          <div className="eyebrow" style={{ marginBottom: "0.9rem" }}>[ Dirección visual · v0.1 ]</div>
+          <div className="eyebrow" style={{ marginBottom: "0.9rem" }}>Dirección visual · v0.1</div>
           <h1 style={{ fontSize: "clamp(2.25rem, 6vw, 4rem)", fontWeight: 600, letterSpacing: "-0.05em", lineHeight: 1, maxWidth: 760 }}>
             Un solo lenguaje para todo el Hub
           </h1>

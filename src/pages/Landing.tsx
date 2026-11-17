@@ -119,7 +119,7 @@ export default function Landing() {
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem", position: "relative", zIndex: 1 }}>
           <img src={fcSymbol} alt="" aria-hidden style={{ height: 44, marginBottom: "1.25rem" }} />
-          <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>[ Forma tu Cuerpo ]</div>
+          <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>Forma tu Cuerpo</div>
           <h1 style={{
             fontSize: "3.25rem",
             fontWeight: 600,
@@ -230,7 +230,7 @@ export default function Landing() {
         </button>
 
         <div style={{ textAlign: "center", marginBottom: "2.5rem", width: "100%" }}>
-          <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>[ FTC USA ]</div>
+          <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>FTC USA</div>
           <h2 style={{ fontSize: "2.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0 }}>
             Selecciona tu área
           </h2>
@@ -306,7 +306,7 @@ export default function Landing() {
       </button>
 
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-        <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>[ Operational Tools ]</div>
+        <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>Operational Tools</div>
         <h2 style={{ fontSize: "2.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0 }}>
           Herramientas internas
         </h2>

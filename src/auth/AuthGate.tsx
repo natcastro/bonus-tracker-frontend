@@ -52,7 +52,7 @@ function LoginScreen() {
       minHeight: "100vh", background: "var(--paper)", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", padding: "2rem",
     }}>
-      <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>[ Forma tu Cuerpo ]</div>
+      <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>Forma tu Cuerpo</div>
       <h1 style={{ fontSize: "3.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.045em", lineHeight: 1, margin: "0 0 2rem" }}>FTC Hub</h1>
       <button
         onClick={() => {
