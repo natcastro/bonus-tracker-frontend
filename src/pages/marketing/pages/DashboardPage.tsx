@@ -9,6 +9,7 @@ import StatusPill from "../components/StatusPill";
 import { SearchIcon } from "../../../components/icons";
 import { stageLabel, todayIso, isPastDeadline, currentActiveStages, stageLate, variantsInOrder } from "../types";
 import type { MarketingBrief, MarketingRole, MarketingStage } from "../types";
+import Mascot from "../../../components/Mascot";
 import { moodBunny } from "../../../components/moodBunny";
 import DisenoFilterButton from "../components/DisenoFilterButton";
 import { lateExplanation } from "../lateInfo";
@@ -148,14 +149,14 @@ export default function DashboardPage() {
       }}
     >
       <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div style={{ fontSize: 16.5, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 16.5, fontWeight: 600, color }}>{value}</div>
     </div>
   );
 
   const segButton = (active: boolean, onClick: () => void, label: React.ReactNode, key: string) => (
     <button key={key} onClick={onClick} style={{
       fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-      padding: "5px 11px", borderRadius: 7, whiteSpace: "nowrap",
+      padding: "5px 11px", borderRadius: 0, whiteSpace: "nowrap",
       border: `1px solid ${active ? MT.primary : MT.border}`,
       background: active ? MT.primarySoft : MT.surface,
       color: active ? MT.primary : MT.text2,
@@ -167,10 +168,10 @@ export default function DashboardPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Briefs</h1>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: MT.text1 }}>Briefs</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Flujo de briefs de producto — Laura ↔ Diseño</p>
         </div>
-        <img className="ftc-mascot" src={bunny.src} alt={bunny.label} title={`${onTimePct}% a tiempo — ${bunny.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
+        <Mascot src={bunny.src} label={bunny.label} pct={onTimePct} rig={bunny.rig} />
       </div>
 
       {/* KPI strip */}
@@ -187,10 +188,10 @@ export default function DashboardPage() {
 
 
       {delaysOpen && (
-        <div onClick={() => setDelaysOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+        <div className="modal-layer" onClick={() => setDelaysOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div onClick={e => e.stopPropagation()} style={{ background: MT.surface, borderRadius: MT.radiusLg, maxWidth: 720, width: "100%", maxHeight: "85vh", overflow: "auto", padding: "1.25rem 1.4rem", boxShadow: MT.shadowLg, fontFamily: MT.font }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: MT.text1 }}>Historial de retrasos — Diseño</h2>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: MT.text1 }}>Historial de retrasos — Diseño</h2>
               <button onClick={() => setDelaysOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: MT.text2 }} aria-label="Cerrar">×</button>
             </div>
             <p style={{ margin: "0 0 12px", fontSize: 12.5, color: MT.text2 }}>Entregas de Diseño marcadas como tardías (briefs en proceso y completados este mes). Hora en Colombia.</p>
@@ -199,9 +200,9 @@ export default function DashboardPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {delayRows.map(({ brief, stage, variant }) => (
-                  <div key={`${brief.id}-${variant ?? ""}-${stage.key}`} style={{ border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.danger}`, borderRadius: 8, padding: "0.65rem 0.85rem" }}>
+                  <div key={`${brief.id}-${variant ?? ""}-${stage.key}`} style={{ border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.danger}`, borderRadius: 0, padding: "0.65rem 0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 800, fontSize: 13, color: MT.text1 }}>{brief.reference}{variant ? ` · ${variant}` : ""} — {stage.label}</span>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: MT.text1 }}>{brief.reference}{variant ? ` · ${variant}` : ""} — {stage.label}</span>
                       <button onClick={() => navigate(`/marketing/brief/${brief.id}`)} style={{ fontFamily: MT.font, fontSize: 12, fontWeight: 700, color: MT.primary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Ver brief →</button>
                     </div>
                     <div style={{ fontSize: 12.5, color: MT.text1, marginTop: 4, lineHeight: 1.5 }}>
@@ -212,7 +213,7 @@ export default function DashboardPage() {
               </div>
             )}
             <div style={{ marginTop: 14, textAlign: "right" }}>
-              <button onClick={() => { setDelaysOpen(false); focusGroups(["overdue"], "in_progress"); }} style={{ fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "6px 12px", borderRadius: 7, border: `1px solid ${MT.border}`, background: MT.surface, color: MT.text2 }}>Ver briefs atrasados en proceso</button>
+              <button onClick={() => { setDelaysOpen(false); focusGroups(["overdue"], "in_progress"); }} style={{ fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "6px 12px", borderRadius: 0, border: `1px solid ${MT.border}`, background: MT.surface, color: MT.text2 }}>Ver briefs atrasados en proceso</button>
             </div>
           </div>
         </div>
@@ -228,7 +229,7 @@ export default function DashboardPage() {
             value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar referencia..."
             style={{
               fontFamily: MT.font, fontSize: 12.5, padding: "7px 11px 7px 30px", width: "100%",
-              border: `1px solid ${MT.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box",
+              border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
             }}
           />
         </div>
@@ -247,10 +248,10 @@ export default function DashboardPage() {
           />
         </div>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
-          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
         }} />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Hasta" style={{
-          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
         }} />
       </div>
 
@@ -279,7 +280,7 @@ export default function DashboardPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                           <span style={{ fontSize: 10, color: MT.text3, width: 10, display: "inline-block" }}>{isCollapsed ? "▸" : "▾"}</span>
                           <span style={{ width: 8, height: 8, borderRadius: 999, background: g.color, flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, fontWeight: 800, color: g.color }}>{g.label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: g.color }}>{g.label}</span>
                           <span style={{ fontSize: 11, color: MT.text3, fontWeight: 600 }}>({g.rows.length})</span>
                         </div>
                       </td>

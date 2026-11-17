@@ -8,8 +8,8 @@ export default function TodoCategoryChip({ task }: { task: { categoryLabel?: str
   if (!cat || cat === "Otro" || cat === task.title.replace(/\s+—\s+/g, " · ")) return null;
   return (
     <span title={cat} style={{
-      display: "inline-block", maxWidth: "100%", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.02em", color: MT.clay, background: MT.claySoft,
-      borderRadius: 999, padding: "2px 9px", marginLeft: 8, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      display: "inline-block", maxWidth: "100%", fontSize: 12, fontWeight: 500, color: MT.clay, background: MT.claySoft,
+      borderRadius: 999, padding: "2px 11px", marginLeft: 8, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
     }}>{cat}</span>
   );
 }

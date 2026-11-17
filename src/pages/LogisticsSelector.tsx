@@ -4,8 +4,8 @@ import { PackageIcon, HubIcon } from "../components/icons";
 
 const T = {
   bg: "#FFFFFF",
-  text1: "#0F172A",
-  text2: "#6B7280",
+  text1: "#1F1E1C",
+  text2: "#6F6E67",
   border: "#EEEEEE",
   font: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`,
 };
@@ -20,7 +20,7 @@ function OptionCard({
       onClick={onClick}
       style={{
         background: "#fff", border: `1px solid ${T.border}`, borderLeft: `3px solid ${color}`,
-        borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+        borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
         width: 300, display: "flex", flexDirection: "column", gap: "0.9rem",
         boxShadow: "0 1px 2px rgba(17,24,39,0.04)", transition: "box-shadow 0.2s, transform 0.15s",
         fontFamily: T.font,
@@ -36,7 +36,7 @@ function OptionCard({
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <span style={{
-          width: 42, height: 42, borderRadius: 8, background: color + "12",
+          width: 42, height: 42, borderRadius: 0, background: color + "12",
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>{icon}</span>
         <span style={{
@@ -107,12 +107,12 @@ export default function LogisticsSelector() {
           onClick={() => navigate("/logistics/current")}
         />
         <OptionCard
-          icon={<HubIcon color="#4F46E5" />}
+          icon={<HubIcon color="#1F1E1C" />}
           title="Logistics Hub"
           subtitle="Nuevo sistema de gestión de órdenes: TikTok, Amazon y Shopify en un solo lugar."
           tag="Prototipo UI"
-          tagColor="#4F46E5"
-          color="#4F46E5"
+          tagColor="#1F1E1C"
+          color="#1F1E1C"
           onClick={() => navigate("/logistics/hub/home")}
         />
       </div>

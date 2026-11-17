@@ -116,7 +116,7 @@ export default function CycleReview({ store, c, cy, mode, onBack }: { store: HrS
               </div>
             )}
             {bonusVal !== null && bonusVal > 0 && (
-              <p style={{ fontSize: "0.82rem", margin: "0.5rem 0 0", color: "#334155" }}>{formatMoney(bonusVal, c.currency)} = <strong>{amountInWords(bonusVal, c.currency)}</strong> — revisa que sea el monto correcto.</p>
+              <p style={{ fontSize: "0.82rem", margin: "0.5rem 0 0", color: "#3A3936" }}>{formatMoney(bonusVal, c.currency)} = <strong>{amountInWords(bonusVal, c.currency)}</strong> — revisa que sea el monto correcto.</p>
             )}
             {bonusErr && <p className="error-msg">{bonusErr}</p>}
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.75rem 0 0" }}>

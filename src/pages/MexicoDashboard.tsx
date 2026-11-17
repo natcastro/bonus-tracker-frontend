@@ -28,7 +28,7 @@ const TAB_LABELS: Record<string, string> = {
 };
 
 const DOW_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const AGENT_COLORS = ["#16a34a", "#0891b2", "#7c3aed", "#dc2626", "#d97706", "#db2777"];
+const AGENT_COLORS = ["#16a34a", "#0891b2", "#1F1E1C", "#dc2626", "#d97706", "#db2777"];
 const SCHED_START = 7;
 const SCHED_END = 22;
 const PX_HR = 54;
@@ -116,7 +116,7 @@ function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month
             onKeyDown={(e) => e.key === "Enter" && save()}
           />
         ) : (
-          <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+          <span style={{ fontSize: "0.85rem", color: "#6F6E67" }}>
             {agGoal ? `MXN $${agGoal.goalAmount.toLocaleString("es-MX")}` : "—"}
           </span>
         )}
@@ -125,12 +125,12 @@ function AgentGoalRow({ agent, agGoal, actual, pct, bonus, pctColor, year, month
       <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: pctColor }}>
         {pct !== null ? `${pct.toFixed(1)}%` : "—"}
       </td>
-      <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: bonus > 0 ? "#16a34a" : "#64748b" }}>
+      <td style={{ padding: "0.6rem 0.75rem", fontWeight: 700, color: bonus > 0 ? "#16a34a" : "#6F6E67" }}>
         {pct !== null ? `MXN $${bonus.toLocaleString("es-MX")}` : "—"}
       </td>
       <td style={{ padding: "0.6rem 0.75rem" }}>
         {saved && <span style={{ color: "#16a34a", fontSize: "0.8rem" }}>✓ Guardado</span>}
-        {saving && <span style={{ color: "#64748b", fontSize: "0.8rem" }}>Guardando...</span>}
+        {saving && <span style={{ color: "#6F6E67", fontSize: "0.8rem" }}>Guardando...</span>}
       </td>
     </tr>
   );
@@ -552,9 +552,9 @@ export default function MexicoDashboard() {
 
             {/* DB error banner */}
             {dbError && (
-              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 0, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
                 <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: "0.4rem" }}>⚠️ Error de base de datos — corre este SQL en Supabase:</div>
-                <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: "0 0 0.4rem", whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 4 }}>{`CREATE TABLE IF NOT EXISTS mex_attendance_days (
+                <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: "0 0 0.4rem", whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 0 }}>{`CREATE TABLE IF NOT EXISTS mex_attendance_days (
   id BIGSERIAL PRIMARY KEY,
   agent_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -586,15 +586,15 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 const absentCount = agDays.filter((d) => d.status === "absent").length;
                 const lateCount = agDays.filter((d) => d.status === "late").length;
                 return (
-                  <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 0", borderBottom: "1px solid #f1f5f9", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <div key={ag.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 0", borderBottom: "1px solid #F4F4F1", flexWrap: "wrap", gap: "0.5rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                       <button className="btn btn-secondary" style={{ fontWeight: 600 }} onClick={() => { setCalendarAgent(ag); setNoteDay(null); }}>
                         {ag.name}
                       </button>
                       <div style={{ display: "flex", gap: "0.4rem", fontSize: "0.78rem" }}>
-                        {presentCount > 0 && <span style={{ background: "#dcfce7", color: "#16a34a", border: "1px solid #16a34a", borderRadius: 4, padding: "1px 6px" }}>✓ {presentCount}</span>}
-                        {lateCount > 0 && <span style={{ background: "#fef3c7", color: "#d97706", border: "1px solid #d97706", borderRadius: 4, padding: "1px 6px" }}>⏰ {lateCount}</span>}
-                        {absentCount > 0 && <span style={{ background: "#fee2e2", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 4, padding: "1px 6px" }}>✗ {absentCount}</span>}
+                        {presentCount > 0 && <span style={{ background: "#dcfce7", color: "#16a34a", border: "1px solid #16a34a", borderRadius: 0, padding: "1px 6px" }}>✓ {presentCount}</span>}
+                        {lateCount > 0 && <span style={{ background: "#fef3c7", color: "#d97706", border: "1px solid #d97706", borderRadius: 0, padding: "1px 6px" }}>⏰ {lateCount}</span>}
+                        {absentCount > 0 && <span style={{ background: "#fee2e2", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 0, padding: "1px 6px" }}>✗ {absentCount}</span>}
                       </div>
                     </div>
                     {bonus !== null && (
@@ -626,11 +626,11 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     </div>
 
                     {/* Legend */}
-                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.85rem", fontSize: "0.74rem", color: "#64748b" }}>
+                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.85rem", fontSize: "0.74rem", color: "#6F6E67" }}>
                       <span>Clic para cambiar estado:</span>
                       {Object.entries(STATUS_COLOR).map(([s, c]) => (
                         <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                          <span style={{ width: 13, height: 13, backgroundColor: c.bg, border: `2px solid ${c.border}`, borderRadius: 3 }} />
+                          <span style={{ width: 13, height: 13, backgroundColor: c.bg, border: `2px solid ${c.border}`, borderRadius: 0 }} />
                           {s === "present" ? "Presente" : s === "absent" ? "Falta" : s === "late" ? "Tarde" : "Justificada"}
                         </span>
                       ))}
@@ -639,7 +639,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     {/* Calendar grid */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4 }}>
                       {DOW_LABELS.map((l) => (
-                        <div key={l} style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", paddingBottom: 4 }}>{l}</div>
+                        <div key={l} style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, color: "#A3A29B", paddingBottom: 4 }}>{l}</div>
                       ))}
                       {monthGrid.map((week) =>
                         week.map((day, di) => {
@@ -647,13 +647,13 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                           const ds = toDateStr(day);
                           const rec = agDays.find((d) => d.date === ds);
                           const sc = rec ? STATUS_COLOR[rec.status] : null;
-                          const bg = sc ? sc.bg : "#f1f5f9";
-                          const bc = sc ? sc.border : "#cbd5e1";
+                          const bg = sc ? sc.bg : "#F4F4F1";
+                          const bc = sc ? sc.border : "#D6D5CE";
                           return (
                             <div
                               key={ds}
                               onClick={() => handleDayClick(ag.id, day)}
-                              style={{ aspectRatio: "1", backgroundColor: bg, border: `2px solid ${bc}`, borderRadius: 7, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: sc ? bc : "#64748b", userSelect: "none", transition: "transform 0.07s", lineHeight: 1.1 }}
+                              style={{ aspectRatio: "1", backgroundColor: bg, border: `2px solid ${bc}`, borderRadius: 0, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: sc ? bc : "#6F6E67", userSelect: "none", transition: "transform 0.07s", lineHeight: 1.1 }}
                               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
                               onMouseUp={(e) => (e.currentTarget.style.transform = "")}
                               onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
@@ -681,7 +681,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             </>
                           ) : (
                             <>
-                              <span style={{ flex: 1, color: "#64748b" }}>{d.note || <em style={{ color: "#94a3b8" }}>Sin nota</em>}</span>
+                              <span style={{ flex: 1, color: "#6F6E67" }}>{d.note || <em style={{ color: "#A3A29B" }}>Sin nota</em>}</span>
                               {isAdmin && <button className="btn btn-secondary btn-sm" onClick={() => setNoteDay({ agentId: d.agentId, date: d.date, note: d.note })}>✏️</button>}
                             </>
                           )}
@@ -702,7 +702,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
             <header className="section-header"><h2>Horarios — {MONTHS[month - 1]} {year}</h2></header>
 
             {dbError && (
-              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.75rem", fontSize: "0.8rem", color: "#dc2626" }}>
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 0, padding: "0.6rem 0.9rem", marginBottom: "0.75rem", fontSize: "0.8rem", color: "#dc2626" }}>
                 ⚠️ {dbError} — <strong>corre en Supabase:</strong> <code>ALTER TABLE mex_schedule_events DISABLE ROW LEVEL SECURITY;</code>
               </div>
             )}
@@ -710,8 +710,8 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
             <div style={{ position: "relative" }}>
               {/* Floating lives count overlay */}
               {livesCountOpen && (
-                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "0.85rem 1rem", minWidth: 180, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
-                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Turnos por agente</div>
+                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.85rem 1rem", minWidth: 180, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
+                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#6F6E67", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Turnos por agente</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                     {agents.map((ag, i) => {
                       const count = scheduleEvents.filter((s) => s.agentId === ag.id).length;
@@ -727,8 +727,8 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                       );
                     })}
                   </div>
-                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
-                    Total: <strong style={{ color: "#0f172a" }}>{scheduleEvents.length}</strong>
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid #F4F4F1", fontSize: "0.72rem", color: "#A3A29B" }}>
+                    Total: <strong style={{ color: "#1F1E1C" }}>{scheduleEvents.length}</strong>
                   </div>
                 </div>
               )}
@@ -740,7 +740,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     <button
                       onClick={() => setLivesCountOpen((o) => !o)}
                       title="Ver resumen de turnos por agente"
-                      style={{ background: livesCountOpen ? "#f0fdf4" : "white", border: `1px solid ${livesCountOpen ? "#15803d" : "#e2e8f0"}`, borderRadius: 7, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#15803d" : "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                      style={{ background: livesCountOpen ? "#f0fdf4" : "white", border: `1px solid ${livesCountOpen ? "#15803d" : "#E8E7E2"}`, borderRadius: 0, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#15803d" : "#6F6E67", display: "flex", alignItems: "center", gap: "0.3rem" }}
                     >
                       📋 {livesCountOpen ? "▲" : "▼"}
                     </button>
@@ -759,7 +759,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                 <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
                   {agents.map((ag, i) => (
                     <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
-                      <span style={{ width: 12, height: 12, borderRadius: 3, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
+                      <span style={{ width: 12, height: 12, borderRadius: 0, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
                       {ag.name}
                     </span>
                   ))}
@@ -793,7 +793,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                       {/* Hour labels */}
                       <div>
                         {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                          <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
+                          <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #F4F4F1" : "none" }}>
                             {String(SCHED_START + i).padStart(2, "0")}:00
                           </div>
                         ))}
@@ -807,7 +807,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                         return (
                           <div
                             key={colIdx}
-                            style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#f0fdf4" : "transparent", cursor: day && isAdmin ? "crosshair" : "default" }}
+                            style={{ position: "relative", borderLeft: "1px solid #F4F4F1", background: isToday ? "#f0fdf4" : "transparent", cursor: day && isAdmin ? "crosshair" : "default" }}
                             onClick={day && isAdmin ? (e) => {
                               if ((e.target as HTMLElement).closest("[data-ev]")) return;
                               const rect = e.currentTarget.getBoundingClientRect();
@@ -825,7 +825,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             } : undefined}
                           >
                             {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                              <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
+                              <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #F4F4F1" : "none", height: PX_HR }} />
                             ))}
                             {colEvs.map((ev) => {
                               const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
@@ -838,7 +838,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                   data-ev="1"
                                   onDoubleClick={isAdmin ? async (e) => { e.stopPropagation(); try { await deleteMexScheduleEvent(ev.id); await load(); } catch (e: any) { setDbError("Error al borrar turno: " + (e?.message ?? e)); } } : undefined}
                                   title={isAdmin ? "Doble clic para eliminar" : undefined}
-                                  style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
+                                  style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 0, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                                 >
                                   <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{allAgents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                   <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>
@@ -938,15 +938,15 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   {/* Goal input row */}
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginBottom: metaAmount > 0 ? "1.25rem" : 0 }}>
                     <div>
-                      <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Meta del mes</div>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#A3A29B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Meta del mes</div>
                       {isAdmin ? (
                         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#64748b" }}>MXN $</span>
+                          <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#6F6E67" }}>MXN $</span>
                           <input
                             type="number" min="0" placeholder="ej. 266000"
                             value={monthlyGoalDraft || (metaAmount > 0 ? String(metaAmount) : "")}
                             onChange={(e) => setMonthlyGoalDraft(e.target.value)}
-                            style={{ width: 130, padding: "0.3rem 0.6rem", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: "0.9rem" }}
+                            style={{ width: 130, padding: "0.3rem 0.6rem", border: "1.5px solid var(--border)", borderRadius: 0, fontSize: "0.9rem" }}
                           />
                           <button className="btn btn-primary btn-sm" disabled={savingGoal} onClick={async () => {
                             const v = Number(monthlyGoalDraft);
@@ -969,26 +969,26 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                           }}>{savingGoal ? "..." : "Guardar y sincronizar"}</button>
                         </div>
                       ) : (
-                        <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>
+                        <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#1F1E1C" }}>
                           {metaAmount > 0 ? `MXN $${metaAmount.toLocaleString("es-MX")}` : "—"}
                         </div>
                       )}
                     </div>
                     {metaAmount > 0 && (
                       <>
-                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div style={{ width: 1, height: 40, background: "#E8E7E2" }} />
                         <div>
-                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Total lives</div>
-                          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>{totalLives}</div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#A3A29B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Total lives</div>
+                          <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#1F1E1C" }}>{totalLives}</div>
                         </div>
-                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div style={{ width: 1, height: 40, background: "#E8E7E2" }} />
                         <div>
-                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Ventas totales</div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#A3A29B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Ventas totales</div>
                           <div style={{ fontSize: "1.3rem", fontWeight: 800, color: totalSales >= metaAmount ? "#16a34a" : "#dc2626" }}>MXN ${totalSales.toLocaleString("es-MX")}</div>
                         </div>
-                        <div style={{ width: 1, height: 40, background: "#e2e8f0" }} />
+                        <div style={{ width: 1, height: 40, background: "#E8E7E2" }} />
                         <div>
-                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Cumplimiento</div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#A3A29B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Cumplimiento</div>
                           <div style={{ fontSize: "1.3rem", fontWeight: 800, color: totalSales >= metaAmount ? "#16a34a" : "#dc2626" }}>{((totalSales / metaAmount) * 100).toFixed(1)}%</div>
                         </div>
                       </>
@@ -1018,7 +1018,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                             const cumplimiento = propMeta > 0 ? (agSales / propMeta) * 100 : null;
                             const color = AGENT_COLORS[i % AGENT_COLORS.length];
                             return (
-                              <tr key={ag.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <tr key={ag.id} style={{ borderBottom: "1px solid #F4F4F1" }}>
                                 <td style={{ padding: "0.5rem 0.75rem" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                     <span style={{ width: 9, height: 9, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -1030,11 +1030,11 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                                   <span style={{ background: color + "18", color, fontWeight: 700, borderRadius: 100, padding: "2px 10px", fontSize: "0.78rem" }}>{pctLives.toFixed(1)}%</span>
                                 </td>
                                 <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 700 }}>MXN ${Math.round(propMeta).toLocaleString("es-MX")}</td>
-                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", color: cumplimiento !== null && cumplimiento >= 100 ? "#16a34a" : "#64748b" }}>MXN ${agSales.toLocaleString("es-MX")}</td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", color: cumplimiento !== null && cumplimiento >= 100 ? "#16a34a" : "#6F6E67" }}>MXN ${agSales.toLocaleString("es-MX")}</td>
                                 <td style={{ padding: "0.5rem 0.75rem", textAlign: "center" }}>
                                   {cumplimiento !== null ? (
                                     <span style={{ fontWeight: 800, color: cumplimiento >= 100 ? "#16a34a" : cumplimiento >= 70 ? "#d97706" : "#dc2626" }}>{cumplimiento.toFixed(1)}%</span>
-                                  ) : <span style={{ color: "#94a3b8" }}>—</span>}
+                                  ) : <span style={{ color: "#A3A29B" }}>—</span>}
                                 </td>
                               </tr>
                             );
@@ -1074,7 +1074,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     const actual = sales.filter((s) => s.agentId === ag.id).reduce((sum, s) => sum + s.salesAmount, 0);
                     const pct = agGoal && agGoal.goalAmount > 0 ? (actual / agGoal.goalAmount) * 100 : null;
                     const bonus = pct !== null ? calcGoalBonus(agGoal!.goalAmount, actual) : 0;
-                    const pctColor = pct === null ? "#64748b" : pct >= 140 ? "#f59e0b" : pct >= 100 ? "#16a34a" : "#ef4444";
+                    const pctColor = pct === null ? "#6F6E67" : pct >= 140 ? "#f59e0b" : pct >= 100 ? "#16a34a" : "#ef4444";
                     return (
                       <AgentGoalRow
                         key={ag.id}
@@ -1129,7 +1129,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                         <td style={{ textAlign: "center" }}>{s.quantity}</td>
                         <td style={{ maxWidth: 180 }}>
                           {s.skus ? s.skus.split("|").map((sku, i) => (
-                            <span key={i} style={{ display: "inline-block", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.76rem", fontFamily: "monospace", marginRight: "0.25rem", marginBottom: "0.15rem" }}>{sku.trim()}</span>
+                            <span key={i} style={{ display: "inline-block", background: "#F4F4F1", border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.1rem 0.4rem", fontSize: "0.76rem", fontFamily: "monospace", marginRight: "0.25rem", marginBottom: "0.15rem" }}>{sku.trim()}</span>
                           )) : "—"}
                         </td>
                         <td>
@@ -1193,14 +1193,14 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                         />
                         {saleForm.skus.length > 1 && (
                           <button type="button" onClick={() => setSaleForm({ ...saleForm, skus: saleForm.skus.filter((_, j) => j !== i) })}
-                            style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", cursor: "pointer", color: "var(--text-muted)", padding: "0.3rem 0.6rem", lineHeight: 1 }}>
+                            style={{ background: "none", border: "1px solid var(--border)", borderRadius: 0, cursor: "pointer", color: "var(--text-muted)", padding: "0.3rem 0.6rem", lineHeight: 1 }}>
                             ×
                           </button>
                         )}
                       </div>
                     ))}
                     <button type="button" onClick={() => setSaleForm({ ...saleForm, skus: [...saleForm.skus, ""] })}
-                      style={{ alignSelf: "flex-start", background: "none", border: "1px dashed var(--border)", borderRadius: "4px", cursor: "pointer", color: "#059669", padding: "0.3rem 0.75rem", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      style={{ alignSelf: "flex-start", background: "none", border: "1px dashed var(--border)", borderRadius: 0, cursor: "pointer", color: "#059669", padding: "0.3rem 0.75rem", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                       <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>+</span> Agregar SKU
                     </button>
                   </div>
@@ -1227,7 +1227,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                       <div style={{
                         background: "#fef9c3",
                         border: "1px solid #fde047",
-                        borderRadius: "6px",
+                        borderRadius: 0,
                         padding: "0.6rem 0.9rem",
                         marginBottom: "1rem",
                         fontSize: "0.82rem",
@@ -1269,7 +1269,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                               <td style={{ maxWidth: "220px" }}>
                                 {s.skus
                                   ? s.skus.split("|").map((sku, i) => (
-                                      <span key={i} style={{ display: "inline-block", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "4px", padding: "0.1rem 0.45rem", fontSize: "0.78rem", fontFamily: "monospace", marginRight: "0.3rem", marginBottom: "0.2rem" }}>{sku.trim()}</span>
+                                      <span key={i} style={{ display: "inline-block", background: "#F4F4F1", border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.1rem 0.45rem", fontSize: "0.78rem", fontFamily: "monospace", marginRight: "0.3rem", marginBottom: "0.2rem" }}>{sku.trim()}</span>
                                     ))
                                   : "—"}
                               </td>
@@ -1292,7 +1292,7 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
 
               {/* Columna derecha: tabla de tiers (fija al hacer scroll) */}
               <div style={{ position: "sticky", top: "1rem" }}>
-                <div className="card" style={{ background: "#f9fafb" }}>
+                <div className="card" style={{ background: "#FAFAF8" }}>
                   <h3 style={{ marginBottom: "0.75rem" }}>Tabla de Bonos por Live</h3>
                   <table className="data-table">
                     <thead><tr><th>Ventas en el Live</th><th>Bono</th></tr></thead>
@@ -1322,14 +1322,14 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                   <div className="modal-header">
                     <h3>✏️ Editar venta — {editSale.date}</h3>
                   </div>
-                  <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#64748b" }}>
+                  <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#6F6E67" }}>
                     Quita los SKUs cancelados e ingresa el monto reembolsado de cada uno. El total se ajustará automáticamente.
                   </p>
 
                   {/* SKU list */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1rem" }}>
                     {editSkus.map((sku, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: 8, border: "1.5px solid", borderColor: editRefunds[i] !== undefined ? "#fca5a5" : "#e2e8f0", background: editRefunds[i] !== undefined ? "#fef2f2" : "#f8fafc" }}>
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", borderRadius: 0, border: "1.5px solid", borderColor: editRefunds[i] !== undefined ? "#fca5a5" : "#E8E7E2", background: editRefunds[i] !== undefined ? "#fef2f2" : "#FAFAF8" }}>
                         <span style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.88rem", flex: 1 }}>{sku}</span>
                         {editRefunds[i] !== undefined ? (
                           <>
@@ -1337,10 +1337,10 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                               type="number" min="0" placeholder="Reembolso MXN $"
                               value={editRefunds[i]}
                               onChange={(e) => setEditRefunds((r) => ({ ...r, [i]: e.target.value }))}
-                              style={{ width: 130, padding: "0.25rem 0.5rem", border: "1px solid #fca5a5", borderRadius: 6, fontSize: "0.85rem" }}
+                              style={{ width: 130, padding: "0.25rem 0.5rem", border: "1px solid #fca5a5", borderRadius: 0, fontSize: "0.85rem" }}
                             />
                             <button type="button" onClick={() => setEditRefunds((r) => { const n = { ...r }; delete n[i]; return n; })}
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "1rem" }}>↩</button>
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#A3A29B", fontSize: "1rem" }}>↩</button>
                           </>
                         ) : (
                           <button type="button" onClick={() => setEditRefunds((r) => ({ ...r, [i]: "" }))}
@@ -1359,12 +1359,12 @@ CREATE TABLE IF NOT EXISTS mex_schedule_events (
                     const cancelledSkus = Object.keys(editRefunds).length;
                     const newQty = Math.max(0, editSale.quantity - cancelledSkus);
                     return (
-                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
+                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 0, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
                         <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                          <div><span style={{ color: "#64748b" }}>Reembolso total: </span><strong style={{ color: "#dc2626" }}>MXN ${totalRefund.toLocaleString("es-MX")}</strong></div>
-                          <div><span style={{ color: "#64748b" }}>Nuevo total: </span><strong style={{ color: "#16a34a" }}>MXN ${newAmount.toLocaleString("es-MX")}</strong></div>
-                          <div><span style={{ color: "#64748b" }}>Artículos: </span><strong>{newQty}</strong></div>
-                          <div><span style={{ color: "#64748b" }}>Bono nuevo: </span><strong style={{ color: "#16a34a" }}>MXN ${calcLiveSaleBonus(newAmount).toFixed(2)}</strong></div>
+                          <div><span style={{ color: "#6F6E67" }}>Reembolso total: </span><strong style={{ color: "#dc2626" }}>MXN ${totalRefund.toLocaleString("es-MX")}</strong></div>
+                          <div><span style={{ color: "#6F6E67" }}>Nuevo total: </span><strong style={{ color: "#16a34a" }}>MXN ${newAmount.toLocaleString("es-MX")}</strong></div>
+                          <div><span style={{ color: "#6F6E67" }}>Artículos: </span><strong>{newQty}</strong></div>
+                          <div><span style={{ color: "#6F6E67" }}>Bono nuevo: </span><strong style={{ color: "#16a34a" }}>MXN ${calcLiveSaleBonus(newAmount).toFixed(2)}</strong></div>
                         </div>
                       </div>
                     );

@@ -50,7 +50,7 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)" }} />
       <div style={{
         position: "relative", width: 440, maxWidth: "92vw", background: HT.surface,
@@ -89,7 +89,7 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
             placeholder="TT-45900"
             style={{
               width: "100%", fontFamily: HT.mono, fontSize: 13.5, padding: "10px 12px",
-              border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+              border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
             }}
           />
         </div>
@@ -105,13 +105,13 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
             placeholder="Empieza a escribir el nombre o SKU…"
             style={{
               width: "100%", fontFamily: HT.font, fontSize: 13.5, padding: "10px 12px",
-              border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+              border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
             }}
           />
           {showSuggestions && suggestions.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-              background: HT.surface, border: `1px solid ${HT.border}`, borderRadius: 8,
+              background: HT.surface, border: `1px solid ${HT.border}`, borderRadius: 0,
               boxShadow: HT.shadowLg, zIndex: 10, overflow: "hidden",
             }}>
               {suggestions.map((p) => (
@@ -138,7 +138,7 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
               placeholder="FTC-…"
               style={{
                 width: "100%", fontFamily: HT.mono, fontSize: 13, padding: "10px 12px",
-                border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
@@ -148,7 +148,7 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
               type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
               style={{
                 width: "100%", fontFamily: HT.font, fontSize: 13.5, padding: "10px 12px",
-                border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
@@ -158,14 +158,14 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
               type="date" value={date} onChange={(e) => setDate(e.target.value)}
               style={{
                 width: "100%", fontFamily: HT.font, fontSize: 13, padding: "10px 12px",
-                border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
         </div>
 
         {error && (
-          <div style={{ fontSize: 12.5, color: HT.danger, background: HT.dangerSoft, borderRadius: 8, padding: "8px 12px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, color: HT.danger, background: HT.dangerSoft, borderRadius: 0, padding: "8px 12px", marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -178,7 +178,7 @@ export default function ManualOrderModal({ onClose }: { onClose: () => void }) {
           <button onClick={save} disabled={!canSave} style={{
             fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: canSave ? "pointer" : "not-allowed",
             background: canSave ? HT.primary : HT.surfaceAlt, color: canSave ? "#fff" : HT.text3,
-            border: "none", borderRadius: 8, padding: "10px 18px",
+            border: "none", borderRadius: 0, padding: "10px 18px",
           }}>Agregar orden</button>
         </div>
       </div>

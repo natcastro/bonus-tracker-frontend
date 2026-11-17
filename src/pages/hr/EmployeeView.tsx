@@ -163,7 +163,7 @@ function CycleEditor({ store, c, cy }: { store: HrStore; c: Contractor; cy: Cycl
                     const future = d > store.todayIso;
                     const off = locked || future || !!e?.approved;
                     return (
-                      <tr key={d} style={{ opacity: future ? 0.45 : 1, background: isWeekend(d) ? "#f8fafc" : undefined }}>
+                      <tr key={d} style={{ opacity: future ? 0.45 : 1, background: isWeekend(d) ? "#FAFAF8" : undefined }}>
                         <td style={{ whiteSpace: "nowrap" }}>{weekdayLabel(d)}</td>
                         <td><input className="form-control" type="number" min="0" max="24" step="0.25" disabled={off} value={e?.hours || ""} placeholder="0"
                           onChange={ev => store.updateDay(cy.id, d, { hours: Math.min(24, Number(ev.target.value) || 0) })} /></td>

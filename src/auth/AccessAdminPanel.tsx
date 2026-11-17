@@ -77,22 +77,22 @@ function EntryForm({
   };
 
   return (
-    <div style={{ background: "#F8F9FA", border: "1px solid #E5E7EB", borderRadius: 10, padding: "1rem", marginBottom: "0.75rem" }}>
-      <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Correo</label>
+    <div style={{ background: "#F8F9FA", border: "1px solid #E8E7E2", borderRadius: 0, padding: "1rem", marginBottom: "0.75rem" }}>
+      <label style={{ fontSize: 12, fontWeight: 700, color: "#3A3936", display: "block", marginBottom: 4 }}>Correo</label>
       <input
         type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={!!initial}
         placeholder="nombre@formatucuerpo.com" autoFocus={!initial}
         className="form-control" style={{ marginBottom: "0.75rem" }}
       />
 
-      <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Apodo / nombre para mostrar (opcional)</label>
+      <label style={{ fontSize: 12, fontWeight: 700, color: "#3A3936", display: "block", marginBottom: 4 }}>Apodo / nombre para mostrar (opcional)</label>
       <input
         type="text" value={nickname} onChange={e => setNickname(e.target.value)}
         placeholder="Ej. Juanita"
         className="form-control" style={{ marginBottom: "0.75rem" }}
       />
 
-      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8, cursor: "pointer" }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#3A3936", marginBottom: 8, cursor: "pointer" }}>
         <input type="checkbox" checked={allAccess} onChange={e => setAllAccess(e.target.checked)} />
         Acceso a todo (administrador de FTC Hub)
       </label>
@@ -101,7 +101,7 @@ function EntryForm({
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.75rem" }}>
             {TEAM_OPTIONS.map(t => (
-              <label key={t.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#374151", cursor: "pointer" }}>
+              <label key={t.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#3A3936", cursor: "pointer" }}>
                 <input type="checkbox" checked={teams.includes(t.key)} onChange={() => toggleTeam(t.key)} />
                 {t.label}
               </label>
@@ -110,8 +110,8 @@ function EntryForm({
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.75rem" }}>
             {ROLE_TEAMS.map(rt => (
-              <div key={rt.key} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "0.5rem 0.7rem" }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{rt.label}</div>
+              <div key={rt.key} style={{ border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.5rem 0.7rem" }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#3A3936", marginBottom: 6 }}>{rt.label}</div>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
                   {(["", "staff", "admin", ...(rt.extraRoles?.map(r => r.value) ?? [])] as RoleValue[]).map(r => {
                     const label = r === "" ? "Sin acceso" : r === "staff" ? rt.staffLabel : r === "admin" ? rt.adminLabel : rt.extraRoles?.find(x => x.value === r)?.label ?? r;
@@ -123,9 +123,9 @@ function EntryForm({
                         onClick={() => setRoles(prev => ({ ...prev, [rt.key]: r }))}
                         style={{
                           fontSize: 11.5, fontWeight: 600, padding: "0.3rem 0.6rem", borderRadius: 999, cursor: "pointer",
-                          border: `1px solid ${active ? "#374151" : "#E5E7EB"}`,
-                          background: active ? "#374151" : "#fff",
-                          color: active ? "#fff" : "#6B7280",
+                          border: `1px solid ${active ? "#3A3936" : "#E8E7E2"}`,
+                          background: active ? "#3A3936" : "#fff",
+                          color: active ? "#fff" : "#6F6E67",
                         }}
                       >
                         {label}
@@ -139,7 +139,7 @@ function EntryForm({
         </>
       )}
 
-      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#374151", marginBottom: "0.75rem", cursor: "pointer" }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#3A3936", marginBottom: "0.75rem", cursor: "pointer" }}>
         <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} />
         Puede administrar accesos (ve este panel)
       </label>
@@ -171,7 +171,7 @@ function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart
   const changeRole = (r: TeamRole) => { setRole(r); setPersonEmail(""); };
 
   return (
-    <div style={{ background: "#FFF7ED", border: "1px solid #FDE0B0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
+    <div style={{ background: "#FFF7ED", border: "1px solid #FDE0B0", borderRadius: 0, padding: "1rem", marginBottom: "1rem" }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: "#7C2D12", marginBottom: 8 }}>👀 Ver el Hub como otra persona</div>
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
         <select
@@ -191,9 +191,9 @@ function ViewAsPicker({ entries, onStart }: { entries: HubAccessEntry[]; onStart
                 onClick={() => changeRole(r)}
                 style={{
                   fontSize: 11.5, fontWeight: 600, padding: "0.3rem 0.6rem", borderRadius: 999, cursor: "pointer",
-                  border: `1px solid ${role === r ? "#7C2D12" : "#E5E7EB"}`,
+                  border: `1px solid ${role === r ? "#7C2D12" : "#E8E7E2"}`,
                   background: role === r ? "#7C2D12" : "#fff",
-                  color: role === r ? "#fff" : "#6B7280",
+                  color: role === r ? "#fff" : "#6F6E67",
                 }}
               >
                 {r === "staff" ? roleTeam.staffLabel : r === "admin" ? roleTeam.adminLabel : roleTeam.extraRoles?.find(x => x.value === r)?.label}
@@ -232,8 +232,8 @@ const ROLE_SHORT: Record<string, string> = { admin: "Admin", staff: "Staff", car
 const HR_ROLE_SHORT: Record<string, string> = { admin: "Jefe de HR", staff: "Contratista", supervisor: "Supervisor", accounting: "Contabilidad" };
 const MKT_ROLE_SHORT: Record<string, string> = { admin: "Laura", staff: "Diseño", carol: "Karol", video: "Video" };
 const TEAM_COLOR: Record<string, string> = {
-  OPS: "#2563eb", APT: "#7c3aed", TKLIVES: "#db2777", CSQUALITY: "#0891b2", MGMT: "#475569",
-  LOGISTICS: "#b45309", DEVOLUCIONES: "#b45309", MEX: "#15803d", MARKETING: "#3E6B45", HR: "#0f766e", ALL: "#111827",
+  OPS: "#2563eb", APT: "#1F1E1C", TKLIVES: "#db2777", CSQUALITY: "#0891b2", MGMT: "#57564F",
+  LOGISTICS: "#b45309", DEVOLUCIONES: "#b45309", MEX: "#15803d", MARKETING: "#3E6B45", HR: "#0f766e", ALL: "#1F1E1C",
 };
 const pillOf = (t: string): { key: string; text: string } => {
   if (t === "ALL") return { key: "ALL", text: "Todo" };
@@ -252,38 +252,38 @@ const ACC_CSS = `
 @media (prefers-reduced-motion: reduce) { .acc-modal { animation: none; } }
 .acc-head { padding: 1.2rem 1.5rem .9rem; border-bottom: 1px solid #eef0f3; }
 .acc-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.acc-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
-.acc-title small { font-weight: 600; color: #94a3b8; margin-left: 8px; font-size: .8rem; }
-.acc-x { background: none; border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 20px; cursor: pointer; color: #64748b; transition: background .15s; }
-.acc-x:hover { background: #f1f5f9; }
+.acc-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #1F1E1C; letter-spacing: -.01em; }
+.acc-title small { font-weight: 600; color: #A3A29B; margin-left: 8px; font-size: .8rem; }
+.acc-x { background: none; border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 20px; cursor: pointer; color: #6F6E67; transition: background .15s; }
+.acc-x:hover { background: #F4F4F1; }
 .acc-bar { display: flex; gap: 8px; margin-top: .9rem; flex-wrap: wrap; }
-.acc-search { flex: 1 1 240px; min-width: 0; padding: .55rem .8rem .55rem 2.1rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: .88rem; background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 10px 50% no-repeat; outline: none; transition: border-color .15s, box-shadow .15s; }
+.acc-search { flex: 1 1 240px; min-width: 0; padding: .55rem .8rem .55rem 2.1rem; border: 1px solid #E8E7E2; border-radius: 10px; font-size: .88rem; background: #FAFAF8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 10px 50% no-repeat; outline: none; transition: border-color .15s, box-shadow .15s; }
 .acc-search:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,.15); background-color: #fff; }
-.acc-btn { border: 1px solid #e2e8f0; background: #fff; color: #0f172a; padding: .5rem .85rem; border-radius: 10px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
-.acc-btn:hover { background: #f8fafc; } .acc-btn:active { transform: scale(.97); }
-.acc-btn--dark { background: #111827; color: #fff; border-color: #111827; } .acc-btn--dark:hover { background: #1f2937; }
+.acc-btn { border: 1px solid #E8E7E2; background: #fff; color: #1F1E1C; padding: .5rem .85rem; border-radius: 10px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
+.acc-btn:hover { background: #FAFAF8; } .acc-btn:active { transform: scale(.97); }
+.acc-btn--dark { background: #1F1E1C; color: #fff; border-color: #1F1E1C; } .acc-btn--dark:hover { background: #1f2937; }
 .acc-chips { display: flex; gap: 6px; margin-top: .8rem; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
-.acc-chip { flex: none; border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 999px; padding: .28rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.acc-chip { flex: none; border: 1px solid #E8E7E2; background: #fff; color: #57564F; border-radius: 999px; padding: .28rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
 .acc-chip b { font-weight: 700; opacity: .55; margin-left: 4px; }
-.acc-chip:hover { background: #f8fafc; }
-.acc-chip[aria-pressed="true"] { background: #111827; border-color: #111827; color: #fff; }
+.acc-chip:hover { background: #FAFAF8; }
+.acc-chip[aria-pressed="true"] { background: #1F1E1C; border-color: #1F1E1C; color: #fff; }
 .acc-body { padding: 1rem 1.5rem 1.4rem; overflow-y: auto; flex: 1; }
 .acc-list { display: flex; flex-direction: column; }
-.acc-row { display: flex; align-items: center; gap: 12px; padding: .7rem .4rem; border-bottom: 1px solid #f1f5f9; border-radius: 10px; transition: background .15s; }
-.acc-row:hover { background: #f8fafc; }
+.acc-row { display: flex; align-items: center; gap: 12px; padding: .7rem .4rem; border-bottom: 1px solid #F4F4F1; border-radius: 10px; transition: background .15s; }
+.acc-row:hover { background: #FAFAF8; }
 .acc-av { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: .78rem; font-weight: 800; }
 .acc-main { flex: 1; min-width: 0; }
-.acc-name { font-weight: 700; font-size: .92rem; color: #0f172a; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.acc-mail { font-size: .78rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-name { font-weight: 700; font-size: .92rem; color: #1F1E1C; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.acc-mail { font-size: .78rem; color: #A3A29B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc-pills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
 .acc-pill { font-size: .7rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
-.acc-adm { font-size: .64rem; font-weight: 800; letter-spacing: .04em; color: #6d28d9; background: #f1ebfe; border-radius: 999px; padding: .1rem .5rem; }
+.acc-adm { font-size: .64rem; font-weight: 800; letter-spacing: .04em; color: #1F1E1C; background: #F4F4F1; border-radius: 999px; padding: .1rem .5rem; }
 .acc-act { display: flex; gap: 4px; flex: none; opacity: .0; transition: opacity .15s; }
 .acc-row:hover .acc-act, .acc-row:focus-within .acc-act { opacity: 1; }
 @media (hover: none) { .acc-act { opacity: 1; } }
-.acc-link { background: none; border: none; padding: .35rem .6rem; border-radius: 8px; font-size: .8rem; font-weight: 700; cursor: pointer; color: #334155; transition: background .15s; }
+.acc-link { background: none; border: none; padding: .35rem .6rem; border-radius: 8px; font-size: .8rem; font-weight: 700; cursor: pointer; color: #3A3936; transition: background .15s; }
 .acc-link:hover { background: #eef2f7; } .acc-link--bad { color: #b91c1c; } .acc-link--bad:hover { background: #fef2f2; }
-.acc-empty { text-align: center; color: #94a3b8; font-size: .9rem; padding: 2.2rem 0; }
+.acc-empty { text-align: center; color: #A3A29B; font-size: .9rem; padding: 2.2rem 0; }
 @media (max-width: 560px) { .acc-head, .acc-body { padding-left: 1rem; padding-right: 1rem; } .acc-act { opacity: 1; } }
 `;
 
@@ -341,7 +341,7 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1.5rem" }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1.5rem" }}>
       <style>{ACC_CSS}</style>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)" }} />
       <div className="acc-modal" role="dialog" aria-label="Accesos a FTC Hub">
@@ -385,8 +385,8 @@ export default function AccessAdminPanel({ onClose }: { onClose: () => void }) {
                     <div className="acc-name">{e.nickname || e.email}{e.isAdmin && <span className="acc-adm">ADMIN</span>}</div>
                     {e.nickname && <div className="acc-mail">{e.email}</div>}
                     <div className="acc-pills">
-                      {e.teams.length === 0 && <span className="acc-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>Sin equipos</span>}
-                      {e.teams.map(t => { const p = pillOf(t); const c = TEAM_COLOR[p.key] ?? "#475569"; return <span key={t} className="acc-pill" style={{ background: `${c}14`, color: c }}>{p.text}</span>; })}
+                      {e.teams.length === 0 && <span className="acc-pill" style={{ background: "#F4F4F1", color: "#6F6E67" }}>Sin equipos</span>}
+                      {e.teams.map(t => { const p = pillOf(t); const c = TEAM_COLOR[p.key] ?? "#57564F"; return <span key={t} className="acc-pill" style={{ background: `${c}14`, color: c }}>{p.text}</span>; })}
                     </div>
                   </div>
                   <div className="acc-act">

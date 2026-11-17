@@ -52,11 +52,11 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MT.font }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(17,24,39,0.35)" }} />
       <div style={{
         position: "relative", width: 420, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", background: MT.surface,
@@ -109,8 +109,8 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
           </div>
         )}
 
-        {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px", marginTop: 14 }}>{error}</div>}
-        {saved && !error && <div style={{ fontSize: 12.5, color: MT.primary, background: MT.primarySoft, borderRadius: 8, padding: "8px 12px", marginTop: 14 }}>✓ Guardado</div>}
+        {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 0, padding: "8px 12px", marginTop: 14 }}>{error}</div>}
+        {saved && !error && <div style={{ fontSize: 12.5, color: MT.primary, background: MT.primarySoft, borderRadius: 0, padding: "8px 12px", marginTop: 14 }}>✓ Guardado</div>}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button type="button" onClick={onClose} style={{
@@ -119,7 +119,7 @@ export default function MarketingSettingsPanel({ onClose }: { onClose: () => voi
           }}>Cerrar</button>
           <button type="button" disabled={saving} onClick={save} style={{
             fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
           }}>{saving ? "Guardando..." : "Guardar"}</button>
         </div>
       </div>

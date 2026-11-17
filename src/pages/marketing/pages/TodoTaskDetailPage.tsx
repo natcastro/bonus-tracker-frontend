@@ -42,7 +42,7 @@ export default function TodoTaskDetailPage() {
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
 
   const run = async (fn: () => Promise<void>) => {
@@ -73,7 +73,7 @@ export default function TodoTaskDetailPage() {
 
   const isImg = (u: string) => /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(u);
   const Attachment = ({ url }: { url: string }) => isImg(url)
-    ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Comentarios de ajuste" style={{ display: "block", maxWidth: "100%", maxHeight: 260, borderRadius: 8, marginTop: 6, border: `1px solid ${MT.border}` }} /></a>
+    ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Comentarios de ajuste" style={{ display: "block", maxWidth: "100%", maxHeight: 260, borderRadius: 0, marginTop: 6, border: `1px solid ${MT.border}` }} /></a>
     : <a href={normalizeUrl(url)} target="_blank" rel="noreferrer" style={{ color: MT.clay, fontWeight: 600, wordBreak: "break-all" }}>{url}</a>;
   // What Karol last asked for (her most recent finished review stage) — shown to Diseño right where they act.
   const lastFeedback = [...task.stages].filter(s => s.role === "carol" && s.status === "done" && !s.skipped && (s.note || s.link)).pop();
@@ -89,7 +89,7 @@ export default function TodoTaskDetailPage() {
           <strong>{s.role === "carol" ? "Karol" : who(s.by, s.role)}</strong>{" "}
           {s.decision === "approved" ? <>aprobó sin cambios en <strong>{s.label}</strong></> : <>completó <strong>{s.label}</strong></>}
           {stageLate(s) && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: MT.danger, background: `${MT.danger}18`, borderRadius: 999, padding: "1px 7px" }}>⚠ tarde</span>}
-          {s.note && <div style={{ marginTop: 3, color: MT.text1, background: MT.surfaceAlt, borderRadius: 6, padding: "6px 9px", whiteSpace: "pre-wrap" }}>{s.note}</div>}
+          {s.note && <div style={{ marginTop: 3, color: MT.text1, background: MT.surfaceAlt, borderRadius: 0, padding: "6px 9px", whiteSpace: "pre-wrap" }}>{s.note}</div>}
           {s.link && <div style={{ marginTop: 4 }}><Attachment url={s.link} /></div>}
         </>
       ),
@@ -106,7 +106,7 @@ export default function TodoTaskDetailPage() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: MT.text1 }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={task} /></div>{task.title}</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: MT.text1 }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={task} /></div>{task.title}</h1>
           <p style={{ margin: "0.3rem 0 0", fontSize: 13, color: MT.text2 }}>
             Asignada a {disenoDisplayName(task.assignedDisenoEmail)} · {task.status === "completed" ? "Completada" : todoStageLabel(task.currentStage)}
           </p>
@@ -134,7 +134,7 @@ export default function TodoTaskDetailPage() {
               <div key={s.key} style={{
                 display: "flex", alignItems: "center", padding: "0.6rem 0.75rem", gap: 10,
                 background: isCurrent ? MT.claySoft : MT.surfaceAlt,
-                border: isCurrent ? `1px solid ${MT.clay}50` : "1px solid transparent", borderRadius: 8,
+                border: isCurrent ? `1px solid ${MT.clay}50` : "1px solid transparent", borderRadius: 0,
               }}>
                 <Avatar role={s.role} size={18} />
                 <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
@@ -173,7 +173,7 @@ export default function TodoTaskDetailPage() {
 
       {task.status === "in_progress" && lastFeedback && (
         <div style={{ background: MT.claySoft, border: `1px solid ${MT.clay}50`, borderRadius: MT.radiusLg, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 12, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Comentarios de Karol — {lastFeedback.label}</p>
+          <p style={{ fontWeight: 600, fontSize: 12, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Comentarios de Karol — {lastFeedback.label}</p>
           {lastFeedback.note && <div style={{ fontSize: 13, color: MT.text1, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{lastFeedback.note}</div>}
           {lastFeedback.link && <div style={{ marginTop: 6, fontSize: 13 }}><Attachment url={lastFeedback.link} /></div>}
         </div>
@@ -181,7 +181,7 @@ export default function TodoTaskDetailPage() {
 
       {task.status === "completed" ? (
         <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
-          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Tarea completada</p>
+          <p style={{ margin: 0, fontWeight: 600, color: MT.primary, fontSize: 14 }}>✓ Tarea completada</p>
           <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrada el {formatDateHuman(task.completedAt)}</p>
         </div>
       ) : !canAct ? (
@@ -190,7 +190,7 @@ export default function TodoTaskDetailPage() {
         </div>
       ) : (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Tu turno — {todoStageLabel(task.currentStage)}</p>
+          <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Tu turno — {todoStageLabel(task.currentStage)}</p>
           {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
 
           <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 }}>
@@ -208,7 +208,7 @@ export default function TodoTaskDetailPage() {
             {uploading && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
           </div>
           {link && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(link) && (
-            <img src={link} alt={isReview ? "Comentario de ajuste" : "Entrega"} style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
+            <img src={link} alt={isReview ? "Comentario de ajuste" : "Entrega"} style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 0, marginBottom: 12, display: "block" }} />
           )}
           {uploadError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{uploadError}</p>}
 
@@ -227,11 +227,11 @@ export default function TodoTaskDetailPage() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <button disabled={busy} onClick={() => run(() => advanceTodoTask(task.id, link.trim() || undefined, note.trim() || undefined))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                  background: MT.clay, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
                 }}>{busy ? "Enviando..." : "Solicitar ajustes / continuar"}</button>
                 <button disabled={busy} onClick={() => run(() => approveTodoTask(task.id, note.trim() || undefined))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
+                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 0, padding: "10px 18px",
                 }}>✓ Aprobar sin cambios</button>
               </div>
               <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
@@ -244,7 +244,7 @@ export default function TodoTaskDetailPage() {
               onClick={() => run(() => advanceTodoTask(task.id, needsLink ? link.trim() : undefined, note.trim() || undefined))}
               style={{
                 fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
               }}
             >{busy ? "Enviando..." : task.currentStage === "approved" ? "Aprobar y cerrar" : "Subir y continuar"}</button>
           )}

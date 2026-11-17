@@ -45,7 +45,7 @@ export default function NewRequestPage() {
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
   const labelStyle: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 };
 
@@ -89,7 +89,7 @@ export default function NewRequestPage() {
         <div style={{ maxWidth: 520, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
           <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "2rem", boxShadow: MT.shadow, textAlign: "center" }}>
             <div style={{ fontSize: 34, marginBottom: 10 }}>✅</div>
-            <h1 style={{ margin: "0 0 10px", fontSize: 19, fontWeight: 800, color: MT.text1 }}>Tu solicitud ha sido enviada</h1>
+            <h1 style={{ margin: "0 0 10px", fontSize: 19, fontWeight: 600, color: MT.text1 }}>Tu solicitud ha sido enviada</h1>
             <p style={{ margin: "0 0 14px", fontSize: 13.5, color: MT.text2, lineHeight: 1.6 }}>
               Diseño ya fue notificado y empezará a trabajar en ella. Te estaremos escribiendo por correo
               con cada avance, siempre con un enlace para que puedas hacer seguimiento al progreso y
@@ -102,7 +102,7 @@ export default function NewRequestPage() {
             </p>
             <button onClick={() => navigate(`/marketing/request/${createdId}`)} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", width: "100%",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 20px", width: "100%",
             }}>Ver el seguimiento de mi solicitud</button>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default function NewRequestPage() {
   return (
     <div style={{ minHeight: "100vh", background: MT.bg, fontFamily: MT.font }}>
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
-        <h1 style={{ margin: "0 0 4px", fontSize: 21, fontWeight: 800, color: MT.text1 }}>Nueva solicitud a Diseño</h1>
+        <h1 style={{ margin: "0 0 4px", fontSize: 21, fontWeight: 600, color: MT.text1 }}>Nueva solicitud a Diseño</h1>
         <p style={{ margin: "0 0 1.5rem", fontSize: 13, color: MT.text2 }}>
           Cuenta qué necesitas y Diseño te la entrega — podrás revisarla y aprobarla desde esta misma página.
         </p>
@@ -172,7 +172,7 @@ export default function NewRequestPage() {
 
           <button onClick={submit} disabled={busy} style={{
             fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", width: "100%",
+            background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 20px", width: "100%",
           }}>{uploading ? "Subiendo archivos..." : busy ? "Creando..." : "Enviar solicitud"}</button>
         </div>
       </div>

@@ -178,7 +178,7 @@ function SearchBar({ value, onChange }: { value: string; onChange: (v: string) =
         placeholder="Buscar artículo, orden, tracking…"
         style={{
           fontFamily: T.font, fontSize: 13, width: "100%", boxSizing: "border-box",
-          padding: "8px 30px 8px 32px", borderRadius: 10,
+          padding: "8px 30px 8px 32px", borderRadius: 0,
           border: `1px solid ${T.sep}`, background: T.surface,
           color: T.p1, outline: "none",
         }} />
@@ -217,7 +217,7 @@ function SettingsModal({ stores, onSave, onClose }: {
       backdropFilter: "blur(4px)",
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        background: T.surface, borderRadius: 20, padding: "28px 28px 24px",
+        background: T.surface, borderRadius: 0, padding: "28px 28px 24px",
         width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
         maxHeight: "80vh", overflowY: "auto",
       }}>
@@ -234,7 +234,7 @@ function SettingsModal({ stores, onSave, onClose }: {
             return (
               <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{
-                  width: 28, height: 28, borderRadius: 8, background: color,
+                  width: 28, height: 28, borderRadius: 0, background: color,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: T.font, fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0,
                 }}>{i + 1}</div>
@@ -244,7 +244,7 @@ function SettingsModal({ stores, onSave, onClose }: {
                   placeholder={`Tienda ${i + 1}`}
                   style={{
                     fontFamily: T.font, fontSize: 13, flex: 1,
-                    padding: "8px 12px", borderRadius: 9,
+                    padding: "8px 12px", borderRadius: 0,
                     border: `1.5px solid ${T.sep}`, borderLeft: `3px solid ${color}`,
                     color: T.p1, outline: "none", boxSizing: "border-box",
                   }}
@@ -265,18 +265,18 @@ function SettingsModal({ stores, onSave, onClose }: {
 
         <button onClick={addStore} style={{
           fontFamily: T.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-          width: "100%", padding: "9px", borderRadius: 10, marginBottom: 20,
+          width: "100%", padding: "9px", borderRadius: 0, marginBottom: 20,
           border: `1.5px dashed ${T.sep}`, background: "transparent", color: T.blue,
         }}>+ Agregar tienda</button>
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onClose} style={{
             fontFamily: T.font, fontSize: 14, fontWeight: 500, cursor: "pointer", flex: 1,
-            padding: "10px", borderRadius: 12, border: `1px solid ${T.sep}`, background: T.bg, color: T.p2,
+            padding: "10px", borderRadius: 0, border: `1px solid ${T.sep}`, background: T.bg, color: T.p2,
           }}>Cancelar</button>
           <button onClick={() => onSave(draft.filter(s => s.name.trim()))} style={{
             fontFamily: T.font, fontSize: 14, fontWeight: 600, cursor: "pointer", flex: 2,
-            padding: "10px", borderRadius: 12, border: "none", background: T.blue, color: "#fff",
+            padding: "10px", borderRadius: 0, border: "none", background: T.blue, color: "#fff",
           }}>Guardar</button>
         </div>
       </div>
@@ -306,13 +306,13 @@ function ShipForm({ initial, title, stores, onSave, onCancel, saving, err }: {
   const [f, setF] = useState<FormState>(initial);
   const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
     fontFamily: T.font, fontSize: 14, width: "100%", boxSizing: "border-box",
-    padding: "9px 12px", borderRadius: 10, border: `1px solid ${T.sep}`,
+    padding: "9px 12px", borderRadius: 0, border: `1px solid ${T.sep}`,
     color: T.p1, outline: "none", background: T.surface, ...extra,
   });
 
   return (
     <div style={{
-      background: T.surface, borderRadius: 18, padding: "20px 20px 16px",
+      background: T.surface, borderRadius: 0, padding: "20px 20px 16px",
       boxShadow: T.shadowMd, marginBottom: 14, border: `1px solid ${T.sep}`,
     }}>
       <div style={{ fontFamily: T.font, fontSize: 15, fontWeight: 600, color: T.p1, marginBottom: 18 }}>{title}</div>
@@ -398,11 +398,11 @@ function ShipForm({ initial, title, stores, onSave, onCancel, saving, err }: {
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" onClick={onCancel} style={{
           fontFamily: T.font, fontSize: 14, fontWeight: 500, cursor: "pointer", flex: 1,
-          padding: "10px", borderRadius: 12, border: `1px solid ${T.sep}`, background: T.bg, color: T.p2,
+          padding: "10px", borderRadius: 0, border: `1px solid ${T.sep}`, background: T.bg, color: T.p2,
         }}>Cancelar</button>
         <button onClick={() => onSave(f)} type="button" disabled={saving} style={{
           fontFamily: T.font, fontSize: 14, fontWeight: 600, cursor: saving ? "wait" : "pointer", flex: 2,
-          padding: "10px", borderRadius: 12, border: "none", background: T.blue, color: "#fff",
+          padding: "10px", borderRadius: 0, border: "none", background: T.blue, color: "#fff",
           opacity: saving ? 0.6 : 1,
         }}>{saving ? "Guardando…" : "Guardar"}</button>
       </div>
@@ -426,7 +426,7 @@ function OrderCard({ order, storeName, stores, labelViewed, onLabelView, onDone,
 
   return (
     <div style={{
-      background: u.cardBg, borderRadius: 14, overflow: "hidden",
+      background: u.cardBg, borderRadius: 0, overflow: "hidden",
       boxShadow: urg === "critical" ? `0 2px 10px rgba(192,57,43,0.15), 0 6px 24px rgba(192,57,43,0.10)` : T.shadow,
       marginBottom: 10, display: "flex",
       outline: urg === "critical" ? `1px solid rgba(192,57,43,0.2)` : "none",
@@ -503,7 +503,7 @@ function OrderCard({ order, storeName, stores, labelViewed, onLabelView, onDone,
               fontFamily: T.font, fontSize: 12, fontWeight: 600, cursor: "pointer",
               background: labelViewed ? T.greenSoft : T.blueSoft,
               color: labelViewed ? "#1a7a3a" : T.blue,
-              borderRadius: 8, padding: "5px 11px", border: "none",
+              borderRadius: 0, padding: "5px 11px", border: "none",
             }}>{labelViewed ? "✓ Label visto" : "Ver Label"}</button>
           )}
           {!isDone && onDone && (() => {
@@ -515,7 +515,7 @@ function OrderCard({ order, storeName, stores, labelViewed, onLabelView, onDone,
                 background: needsLabel ? T.bg : T.green,
                 color: needsLabel ? T.p3 : "#fff",
                 border: needsLabel ? `1px solid ${T.sep}` : "none",
-                borderRadius: 8, padding: "5px 13px",
+                borderRadius: 0, padding: "5px 13px",
                 title: needsLabel ? "Ver el label primero" : undefined,
               } as React.CSSProperties}>
                 {needsLabel ? "Ver label primero" : "Completado"}
@@ -525,12 +525,12 @@ function OrderCard({ order, storeName, stores, labelViewed, onLabelView, onDone,
           {isDone && onUndo && (
             <button onClick={onUndo} style={{
               fontFamily: T.font, fontSize: 12, fontWeight: 500, cursor: "pointer",
-              background: T.bg, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 8, padding: "5px 11px",
+              background: T.bg, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 0, padding: "5px 11px",
             }}>Reabrir</button>
           )}
           <button onClick={onEdit} style={{
             fontFamily: T.font, fontSize: 12, fontWeight: 500, cursor: "pointer",
-            background: T.bg, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 8, padding: "5px 11px",
+            background: T.bg, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 0, padding: "5px 11px",
           }}>Editar</button>
           <button onClick={onDelete} style={{
             fontFamily: T.font, fontSize: 12, cursor: "pointer", marginLeft: "auto",
@@ -578,7 +578,7 @@ function KPIBanner({ orders, loading, activeKpi, onFilter }: {
   return (
     <div style={{ maxWidth: 1260, margin: "0 auto", padding: "16px 20px 0" }}>
       <div style={{
-        background: T.surface, borderRadius: 14, overflow: "hidden",
+        background: T.surface, borderRadius: 0, overflow: "hidden",
         boxShadow: T.shadow, display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
         border: `1px solid ${T.sep}`,
       }}>
@@ -625,7 +625,7 @@ function Empty({ text }: { text: string }) {
   return (
     <div style={{
       textAlign: "center", color: T.p3, padding: "40px 20px",
-      background: T.surface, borderRadius: 14, boxShadow: T.shadow,
+      background: T.surface, borderRadius: 0, boxShadow: T.shadow,
       fontFamily: T.font, fontSize: 13,
     }}>{text}</div>
   );
@@ -809,7 +809,7 @@ export default function LogisticsDashboard() {
           <div style={{ flex: 1 }}><SearchBar value={search} onChange={setSearch} /></div>
           <button onClick={toggleSort} style={{
             fontFamily: T.font, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
-            background: T.surface, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 8, padding: "7px 12px",
+            background: T.surface, color: T.p2, border: `1px solid ${T.sep}`, borderRadius: 0, padding: "7px 12px",
           }}>{sortAsc ? "↑ Antiguo" : "↓ Reciente"}</button>
         </div>
 
@@ -835,7 +835,7 @@ export default function LogisticsDashboard() {
         {/* Filter block (collapsible) */}
         {filtersOpen && (
         <div style={{
-          background: "rgba(0,0,0,0.025)", borderRadius: 12,
+          background: "rgba(0,0,0,0.025)", borderRadius: 0,
           padding: "12px 14px", marginBottom: 14, border: `1px solid ${T.sep}`,
         }}>
           {/* Filter header */}
@@ -886,13 +886,13 @@ export default function LogisticsDashboard() {
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <input type="date" value={dateFrom} onChange={e => setFrom(e.target.value)} style={{
                 fontFamily: T.font, fontSize: 12, flex: 1, padding: "5px 8px",
-                border: `1px solid ${dateFrom ? T.blue : T.sep}`, borderRadius: 8,
+                border: `1px solid ${dateFrom ? T.blue : T.sep}`, borderRadius: 0,
                 color: T.p1, background: T.surface, minWidth: 0, outline: "none",
               }} />
               <span style={{ color: T.p3, fontSize: 12, flexShrink: 0 }}>→</span>
               <input type="date" value={dateTo} onChange={e => setTo(e.target.value)} style={{
                 fontFamily: T.font, fontSize: 12, flex: 1, padding: "5px 8px",
-                border: `1px solid ${dateTo ? T.blue : T.sep}`, borderRadius: 8,
+                border: `1px solid ${dateTo ? T.blue : T.sep}`, borderRadius: 0,
                 color: T.p1, background: T.surface, minWidth: 0, outline: "none",
               }} />
             </div>

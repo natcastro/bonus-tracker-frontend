@@ -201,7 +201,7 @@ export default function BriefDetailPage() {
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
 
   const noteField = (
@@ -229,13 +229,13 @@ export default function BriefDetailPage() {
             <button key={def.key} onClick={() => { setSelectedVariantKey(def.key); setCoSubmitKeys(null); }} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
               fontFamily: MT.font, fontSize: 12.5, fontWeight: isSelected ? 800 : 600, cursor: "pointer",
-              padding: "0.55rem 0.5rem", borderRadius: 8, border: "none",
+              padding: "0.55rem 0.5rem", borderRadius: 0, border: "none",
               background: isSelected ? MT.primarySoft : "transparent",
               color: v.applicable ? (isSelected ? MT.primary : MT.text1) : MT.text3,
               marginBottom: 2,
             }}>
               {v.order && v.applicable
-                ? <span style={{ width: 18, height: 18, borderRadius: 999, background: variantDotColor(v), color: "#fff", fontSize: 10.5, fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}>{v.order}</span>
+                ? <span style={{ width: 18, height: 18, borderRadius: 999, background: variantDotColor(v), color: "#fff", fontSize: 10.5, fontWeight: 600, display: "grid", placeItems: "center", flexShrink: 0 }}>{v.order}</span>
                 : <span style={{ width: 8, height: 8, borderRadius: 999, background: variantDotColor(v), flexShrink: 0 }} />}
               <span style={{ flex: 1 }}>{def.label}</span>
               {v.waiting && <span style={{ fontSize: 10, fontWeight: 700, color: readyToStart(v) ? MT.primary : MT.text3 }}>{readyToStart(v) ? "listo para iniciar" : "en espera"}</span>}
@@ -249,7 +249,7 @@ export default function BriefDetailPage() {
   const variantStatusHeader = isVariantMode && activeVariant && (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: "0.75rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: MT.text1 }}>{variantLabel(activeVariant.key)}</h2>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: MT.text1 }}>{variantLabel(activeVariant.key)}</h2>
         <StatusPill solid color={activeVariant.status === "completed" ? MT.primary : MT.moss} label={activeVariant.waiting && readyToStart(activeVariant) ? "Listo para iniciar" : variantStatusLabel(activeVariant)} />
       </div>
       {activeVariant.applicable && activeVariant.status === "in_progress" && (myRole === "laura" || myRole === "carol") && (
@@ -269,7 +269,7 @@ export default function BriefDetailPage() {
   const completedSection = showCompletedSection && (
         <div style={{ marginBottom: "1.25rem" }}>
           <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center", marginBottom: "1rem" }}>
-            <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
+            <p style={{ margin: 0, fontWeight: 600, color: MT.primary, fontSize: 14 }}>✓ Brief completado</p>
             <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(brief.completedAt)}</p>
           </div>
 
@@ -279,7 +279,7 @@ export default function BriefDetailPage() {
             return (
               <div style={{ background: MT.surface, border: `2px solid ${brief.linksApprovedByKarol ? MT.primary : MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: 0 }}>Enlaces de publicación</p>
+                  <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: 0 }}>Enlaces de publicación</p>
                   <StatusPill
                     solid={brief.linksApprovedByKarol}
                     color={brief.linksApprovedByKarol ? MT.primary : allFilled ? MT.info : MT.text3}
@@ -311,7 +311,7 @@ export default function BriefDetailPage() {
                               finally { setSavingLink(null); }
                             }} style={{
                               fontFamily: MT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "0 14px", whiteSpace: "nowrap",
+                              background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "0 14px", whiteSpace: "nowrap",
                             }}>{savingLink === key ? "..." : "Guardar"}</button>
                           )}
                         </div>
@@ -329,7 +329,7 @@ export default function BriefDetailPage() {
                       finally { setApprovingLinks(false); }
                     }} style={{
                       fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-                      background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                      background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
                     }}>{approvingLinks ? "..." : "✓ Aprobar"}</button>
                   ) : (
                     <p style={{ fontSize: 12, color: MT.text3, margin: 0 }}>Todavía faltan enlaces — Diseño se encarga del resto.</p>
@@ -354,7 +354,7 @@ export default function BriefDetailPage() {
           </div>
         ) : (
           <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem" }}>
-            <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
+            <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>
               {brief.assignedDisenoEmail ? "Reasignar a Diseño" : "Asignar a Diseño"}
             </p>
             <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 12px" }}>
@@ -370,7 +370,7 @@ export default function BriefDetailPage() {
                   <button key={email} disabled={busy || isCurrent} onClick={() => run(async () => { await assignBrief(brief.id, email); setShowReassign(false); })} style={{
                     fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy || isCurrent ? "not-allowed" : "pointer",
                     background: isCurrent ? MT.primarySoft : MT.surfaceAlt, color: isCurrent ? MT.primary : MT.text1,
-                    border: `1px solid ${isCurrent ? MT.primary : MT.border}`, borderRadius: 8, padding: "9px 14px",
+                    border: `1px solid ${isCurrent ? MT.primary : MT.border}`, borderRadius: 0, padding: "9px 14px",
                   }}>{isCurrent && "✓ "}{disenoDisplayName(email)}</button>
                 );
               })}
@@ -403,7 +403,7 @@ export default function BriefDetailPage() {
             <div style={{ marginTop: 12 }}>
               <button disabled={busy} onClick={() => run(() => startWaitingVariant(brief.id, activeVariant.key))} style={{
                 fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "8px 16px",
+                background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 0, padding: "8px 16px",
               }}>▶ Iniciar esta variante ahora</button>
               <div style={{ fontSize: 11.5, color: MT.text3, marginTop: 6 }}>La anterior ya terminó, así que esta no empezará sola. Al iniciarla corre su plazo.</div>
             </div>
@@ -428,7 +428,7 @@ export default function BriefDetailPage() {
                 display: "flex", alignItems: "center", flexWrap: "wrap", padding: "0.6rem 0.75rem",
                 background: isCurrent ? MT.mossSoft : MT.surfaceAlt,
                 border: isCurrent ? `1px solid ${MT.moss}50` : "1px solid transparent",
-                borderRadius: 8, gap: 10,
+                borderRadius: 0, gap: 10,
               }}>
                 <Avatar role={s.role} size={18} />
                 <div style={{ fontSize: 12, color: MT.text1, fontWeight: 600, minWidth: 100 }}>{s.label}</div>
@@ -444,7 +444,7 @@ export default function BriefDetailPage() {
                   }}>⚠ tarde {lateOpen === s.key ? "▴" : "▾"}</button>
                 )}
                 {s.status === "done" && lateNow(s) && lateOpen === s.key && (
-                  <div style={{ flexBasis: "100%", order: 99, fontSize: 12, color: MT.text1, background: `${MT.danger}0F`, border: `1px solid ${MT.danger}30`, borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
+                  <div style={{ flexBasis: "100%", order: 99, fontSize: 12, color: MT.text1, background: `${MT.danger}0F`, border: `1px solid ${MT.danger}30`, borderRadius: 0, padding: "6px 10px", lineHeight: 1.5 }}>
                     {lateExplanation(s, briefNotifTimes)}
                   </div>
                 )}
@@ -453,11 +453,11 @@ export default function BriefDetailPage() {
                     <input
                       autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
                       placeholder="https://formatucuerpo.sharepoint.com/..."
-                      style={{ flex: 1, fontFamily: MT.font, fontSize: 12.5, padding: "5px 8px", border: `1px solid ${MT.border}`, borderRadius: 6, outline: "none" }}
+                      style={{ flex: 1, fontFamily: MT.font, fontSize: 12.5, padding: "5px 8px", border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none" }}
                     />
                     <button disabled={busy} onClick={saveEdit} style={{
                       fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
-                      background: MT.primary, color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px",
+                      background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "5px 10px",
                     }}>Guardar</button>
                     <button onClick={() => setEditingStage(null)} style={{
                       fontFamily: MT.font, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
@@ -510,7 +510,7 @@ export default function BriefDetailPage() {
           shown once at the bottom alongside publication links, not duplicated here. */}
       {!activeInProgress && isVariantMode ? (
         <div style={{ background: MT.primarySoft, border: `1px solid ${MT.primary}30`, borderRadius: MT.radiusLg, padding: "1rem", textAlign: "center" }}>
-          <p style={{ margin: 0, fontWeight: 800, color: MT.primary, fontSize: 14 }}>✓ Variante completada</p>
+          <p style={{ margin: 0, fontWeight: 600, color: MT.primary, fontSize: 14 }}>✓ Variante completada</p>
           <p style={{ margin: "0.3rem 0 0", fontSize: 12, color: MT.text2 }}>Cerrado el {formatDateHuman(activeCompletedAt)}</p>
         </div>
       ) : !activeInProgress ? null : !canAct ? (
@@ -527,7 +527,7 @@ export default function BriefDetailPage() {
         </div>
       ) : isPublish ? (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
+          <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — Confirmar publicación
           </p>
           {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
@@ -535,7 +535,7 @@ export default function BriefDetailPage() {
           {error && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
           <button disabled={busy} onClick={() => run(() => doConfirmPublish(noteInput.trim() || undefined))} style={{
             fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-            background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
           }}>✓ Confirmar que ya se publicó</button>
           <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
             Laura ya aprobó — esto cierra {isVariantMode ? "esta variante" : "el brief"} como completad{isVariantMode ? "a" : "o"}.
@@ -543,7 +543,7 @@ export default function BriefDetailPage() {
         </div>
       ) : (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
+          <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>
             Tu turno — {stageLabel(activeCurrentStage)}
           </p>
           {currentStage?.deadline && <div style={{ marginBottom: "1rem" }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
@@ -584,7 +584,7 @@ export default function BriefDetailPage() {
                 onClick={() => run(() => doSubmitDesign(linkInput.trim(), noteInput.trim() || undefined))}
                 style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                  background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
                 }}>{busy ? "Enviando..." : "Subir y continuar"}</button>
             </>
           )}
@@ -606,7 +606,7 @@ export default function BriefDetailPage() {
                 {uploadingReviewImage && <span style={{ fontSize: 12, color: MT.text3 }}>Subiendo…</span>}
               </div>
               {reviewLinkInput && /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(reviewLinkInput) && (
-                <img src={reviewLinkInput} alt="Comentario de ajuste" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, marginBottom: 12, display: "block" }} />
+                <img src={reviewLinkInput} alt="Comentario de ajuste" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 0, marginBottom: 12, display: "block" }} />
               )}
               {reviewImageError && <p style={{ color: MT.danger, fontSize: 12.5, marginBottom: 10 }}>{reviewImageError}</p>}
               {noteField}
@@ -615,20 +615,20 @@ export default function BriefDetailPage() {
                 {!isFinal && (
                   <button disabled={busy} onClick={() => run(() => doLauraReview("request_changes", { link: reviewLinkInput.trim() || undefined, note: noteInput.trim() || undefined }))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
                   }}>Solicitar ajustes / continuar</button>
                 )}
 
                 {isFinal && (
                   <button disabled={busy} onClick={() => run(() => doExtraRevision(noteInput.trim() || undefined))} style={{
                     fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                    background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                    background: MT.clay, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
                   }}>Solicitar revisión adicional</button>
                 )}
 
                 <button disabled={busy} onClick={() => run(() => doLauraReview("approve", { note: noteInput.trim() || undefined }))} style={{
                   fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 8, padding: "10px 18px",
+                  background: MT.surface, color: MT.primary, border: `1px solid ${MT.primary}`, borderRadius: 0, padding: "10px 18px",
                 }}>✓ Aprobar sin cambios</button>
               </div>
               <p style={{ fontSize: 11.5, color: MT.text3, marginTop: 10 }}>
@@ -662,7 +662,7 @@ export default function BriefDetailPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: "0.5rem" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{brief.reference}</h1>
+            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: MT.text1 }}>{brief.reference}</h1>
             <StatusPill
               solid
               color={brief.status === "completed" ? MT.primary : brief.status === "draft" ? MT.text3 : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
@@ -677,14 +677,14 @@ export default function BriefDetailPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {brief.shiftDays > 0 && (
-            <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 8, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
+            <div style={{ fontSize: 11.5, color: MT.warn, background: MT.warnSoft, borderRadius: 0, padding: "0.35rem 0.65rem", fontWeight: 600 }}>
               ⏱ Deadlines de Diseño desplazados +{brief.shiftDays} día{brief.shiftDays !== 1 ? "s" : ""} por revisiones de Laura
             </div>
           )}
           {(myRole === "laura" || myRole === "carol") && (
             <button onClick={handleDelete} disabled={busy} style={{
               fontFamily: MT.font, fontSize: 11.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-              background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 7, padding: "0.35rem 0.65rem",
+              background: MT.surface, color: MT.danger, border: `1px solid ${MT.danger}50`, borderRadius: 0, padding: "0.35rem 0.65rem",
               display: "flex", alignItems: "center", gap: 5,
             }}><TrashIcon size={14} color={MT.danger} /> Eliminar</button>
           )}
@@ -697,7 +697,7 @@ export default function BriefDetailPage() {
         <div style={{ background: MT.surface, border: `2px solid ${MT.info}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
           {brief.stages.find(s => s.key === "brief")?.by ? (
             <>
-              <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Brief de Karol — por revisar</p>
+              <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Brief de Karol — por revisar</p>
               <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
                 {myRole === "laura"
                   ? "Revisa el brief y publícalo: al publicarlo empieza el flujo normal y puedes asignarlo a Diseño."
@@ -707,7 +707,7 @@ export default function BriefDetailPage() {
             </>
           ) : (
             <>
-              <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
+              <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 6px" }}>Tarea pendiente (privada)</p>
               <p style={{ fontSize: 12, color: MT.text2, margin: "0 0 14px" }}>
                 Nadie más ha sido notificado todavía. Cuando la publiques empieza el flujo normal — si no asignas a nadie, se le avisa a Karol.
               </p>
@@ -727,7 +727,7 @@ export default function BriefDetailPage() {
                   finally { setSavingDraftLink(false); }
                 }} style={{
                   fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: savingDraftLink ? "not-allowed" : "pointer",
-                  background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "0 16px", whiteSpace: "nowrap",
+                  background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 0, padding: "0 16px", whiteSpace: "nowrap",
                 }}>{savingDraftLink ? "..." : "Guardar enlace"}</button>
               </div>
 
@@ -743,7 +743,7 @@ export default function BriefDetailPage() {
                 await publishBrief(brief.id, publishAssignEmail || undefined);
               })} style={{
                 fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
               }}>{busy ? "Publicando..." : "Publicar ahora"}</button>
             </>
           ) : (

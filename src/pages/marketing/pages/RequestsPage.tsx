@@ -26,7 +26,7 @@ function CopyLinkButton() {
     <button onClick={copy} style={{
       fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer",
       background: copied ? MT.primary : MT.surfaceAlt, color: copied ? "#fff" : MT.text1,
-      border: `1px solid ${copied ? MT.primary : MT.border}`, borderRadius: 8, padding: "9px 16px",
+      border: `1px solid ${copied ? MT.primary : MT.border}`, borderRadius: 0, padding: "9px 16px",
       display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
     }}>{copied ? "✓ Copiado" : "🔗 Copiar enlace para solicitudes"}</button>
   );
@@ -63,14 +63,14 @@ export default function RequestsPage() {
     catch (e: any) { setError(e?.message ?? "Ocurrió un error."); }
     finally { setBusy(false); }
   };
-  const fieldStyle: React.CSSProperties = { width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" };
+  const fieldStyle: React.CSSProperties = { width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px", border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box" };
 
   // Diseño can hand out the public link too, but the full list — and assigning/reassigning
   // requests from it — stays Laura/Karol's job.
   if (authedUser?.role === "diseno" || authedUser?.role === "video") {
     return (
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Solicitudes</h1>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: MT.text1 }}>Solicitudes</h1>
         <p style={{ margin: "0.4rem 0 1.25rem", fontSize: 12.5, color: MT.text2 }}>
           Comparte este enlace con quien necesite pedirte algo — no necesita rol en Marketing, solo su correo corporativo. Tus propias solicitudes asignadas aparecen en To Do.
         </p>
@@ -83,7 +83,7 @@ export default function RequestsPage() {
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem", gap: 10, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Solicitudes</h1>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: MT.text1 }}>Solicitudes</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>
             Comparte el enlace con quien necesite pedirle algo a Diseño — no necesita rol en Marketing, solo su correo corporativo.
           </p>
@@ -126,10 +126,10 @@ export default function RequestsPage() {
                         setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
                         setMenuFor(menuFor === r.id ? null : r.id);
                       }} style={{
-                        background: "none", border: "none", cursor: "pointer", fontSize: 20, lineHeight: 1, color: MT.text2, padding: "2px 8px", borderRadius: 6,
+                        background: "none", border: "none", cursor: "pointer", fontSize: 20, lineHeight: 1, color: MT.text2, padding: "2px 8px", borderRadius: 0,
                       }}>⋮</button>
                       {menuFor === r.id && (
-                        <div style={{ position: "fixed", right: menuPos.right, top: menuPos.top, zIndex: 1000, background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg, minWidth: 150, overflow: "hidden" }}>
+                        <div style={{ position: "fixed", right: menuPos.right, top: menuPos.top, zIndex: 1000, background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 0, boxShadow: MT.shadowLg, minWidth: 150, overflow: "hidden" }}>
                           {[
                             { label: "Editar", color: MT.text1, act: () => { setEditing(r); setEditTitle(r.title); setEditDesc(r.description); setError(""); } },
                             { label: "Reasignar", color: MT.text1, act: () => { setReassigning(r); setReassignEmail(""); setError(""); } },
@@ -158,26 +158,26 @@ export default function RequestsPage() {
       </div>
 
       {editing && (
-        <div onClick={() => setEditing(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+        <div className="modal-layer" onClick={() => setEditing(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div onClick={e => e.stopPropagation()} style={{ background: MT.surface, borderRadius: MT.radiusLg, maxWidth: 520, width: "100%", padding: "1.25rem 1.4rem", fontFamily: MT.font }}>
-            <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 800, color: MT.text1 }}>Editar solicitud</h2>
+            <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 600, color: MT.text1 }}>Editar solicitud</h2>
             <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2 }}>Título</label>
             <input style={{ ...fieldStyle, margin: "4px 0 10px" }} value={editTitle} onChange={e => setEditTitle(e.target.value)} />
             <label style={{ fontSize: 12, fontWeight: 700, color: MT.text2 }}>Qué se necesita</label>
             <textarea style={{ ...fieldStyle, margin: "4px 0 10px", minHeight: 110, resize: "vertical" }} value={editDesc} onChange={e => setEditDesc(e.target.value)} />
             {error && <p style={{ color: MT.danger, fontSize: 12.5, margin: "0 0 8px" }}>{error}</p>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setEditing(null)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none", border: `1px solid ${MT.border}`, borderRadius: 8, padding: "8px 14px", color: MT.text2 }}>Cancelar</button>
-              <button disabled={busy || !editTitle.trim()} onClick={() => run(() => editRequest(editing.id, { title: editTitle, description: editDesc }), () => setEditing(null))} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px" }}>{busy ? "..." : "Guardar"}</button>
+              <button onClick={() => setEditing(null)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none", border: `1px solid ${MT.border}`, borderRadius: 0, padding: "8px 14px", color: MT.text2 }}>Cancelar</button>
+              <button disabled={busy || !editTitle.trim()} onClick={() => run(() => editRequest(editing.id, { title: editTitle, description: editDesc }), () => setEditing(null))} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "8px 16px" }}>{busy ? "..." : "Guardar"}</button>
             </div>
           </div>
         </div>
       )}
 
       {reassigning && (
-        <div onClick={() => setReassigning(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+        <div className="modal-layer" onClick={() => setReassigning(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div onClick={e => e.stopPropagation()} style={{ background: MT.surface, borderRadius: MT.radiusLg, maxWidth: 440, width: "100%", padding: "1.25rem 1.4rem", fontFamily: MT.font }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: MT.text1 }}>Reasignar solicitud</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600, color: MT.text1 }}>Reasignar solicitud</h2>
             <p style={{ margin: "0 0 12px", fontSize: 12.5, color: MT.text2 }}>{reassigning.title} — actualmente: {reassigning.assignedDisenoEmail ? disenoDisplayName(reassigning.assignedDisenoEmail) : "Sin asignar"}</p>
             <select style={fieldStyle} value={reassignEmail} onChange={e => setReassignEmail(e.target.value)}>
               <option value="">Elige a quién asignar…</option>
@@ -185,8 +185,8 @@ export default function RequestsPage() {
             </select>
             {error && <p style={{ color: MT.danger, fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-              <button onClick={() => setReassigning(null)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none", border: `1px solid ${MT.border}`, borderRadius: 8, padding: "8px 14px", color: MT.text2 }}>Cancelar</button>
-              <button disabled={busy || !reassignEmail} onClick={() => run(() => assignRequest(reassigning.id, reassignEmail), () => setReassigning(null))} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px" }}>{busy ? "..." : "Reasignar"}</button>
+              <button onClick={() => setReassigning(null)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none", border: `1px solid ${MT.border}`, borderRadius: 0, padding: "8px 14px", color: MT.text2 }}>Cancelar</button>
+              <button disabled={busy || !reassignEmail} onClick={() => run(() => assignRequest(reassigning.id, reassignEmail), () => setReassigning(null))} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "8px 16px" }}>{busy ? "..." : "Reasignar"}</button>
             </div>
           </div>
         </div>

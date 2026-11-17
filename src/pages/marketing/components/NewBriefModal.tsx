@@ -56,7 +56,7 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
 
   const inputStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 };
 
@@ -87,14 +87,14 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
                 }}
               />
               {showSuggest && suggestions.length > 0 && (
-                <ul role="listbox" style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 5, margin: 0, padding: 4, listStyle: "none", background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 10, boxShadow: MT.shadowLg, maxHeight: 220, overflowY: "auto" }}>
+                <ul role="listbox" style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 5, margin: 0, padding: 4, listStyle: "none", background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 0, boxShadow: MT.shadowLg, maxHeight: 220, overflowY: "auto" }}>
                   {suggestions.map((r, i) => {
                     const n = variantsTakenFor(briefs, r).size;
                     return (
                       <li key={r} role="option" aria-selected={i === activeIdx}
                         onMouseDown={e => { e.preventDefault(); pickSku(r); }}
                         onMouseEnter={() => setActiveIdx(i)}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, color: MT.text1, background: i === activeIdx ? MT.surfaceAlt : "transparent" }}>
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 0, cursor: "pointer", fontSize: 13, color: MT.text1, background: i === activeIdx ? MT.surfaceAlt : "transparent" }}>
                         <span style={{ fontWeight: 600 }}>{r}</span>
                         {n > 0 && <span style={{ fontSize: 11, color: MT.text3 }}>{n} variante{n === 1 ? "" : "s"} con brief</span>}
                       </li>
@@ -141,7 +141,7 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
                         title={isTaken ? "Esta variante ya tiene un brief" : selected ? "Clic para quitarla" : undefined}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, textAlign: "left",
-                          fontFamily: MT.font, fontSize: 12.5, fontWeight: 600, padding: "9px 11px", borderRadius: 8,
+                          fontFamily: MT.font, fontSize: 12.5, fontWeight: 600, padding: "9px 11px", borderRadius: 0,
                           cursor: isTaken ? "not-allowed" : "pointer",
                           border: `1.5px solid ${selected ? MT.primary : isTaken ? "#86c79a" : MT.border}`,
                           background: selected ? MT.primarySoft : isTaken ? "#eef8f1" : MT.surface,
@@ -149,7 +149,7 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
                         }}>
                         <span>{v.label}</span>
                         {isTaken ? <span style={{ fontSize: 11, fontWeight: 700 }}>✓ ya tiene brief</span>
-                          : selected ? <span aria-label={`Orden ${pos}`} style={{ width: 20, height: 20, borderRadius: 999, background: MT.primary, color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{pos}</span> : null}
+                          : selected ? <span aria-label={`Orden ${pos}`} style={{ width: 20, height: 20, borderRadius: 999, background: MT.primary, color: "#fff", fontSize: 11, fontWeight: 600, display: "grid", placeItems: "center" }}>{pos}</span> : null}
                       </button>
                     );
                   })}
@@ -172,7 +172,7 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
             </p>
           )}
 
-          {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}
+          {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 0, padding: "8px 12px" }}>{error}</div>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
             <button type="button" onClick={onClose} style={{
@@ -181,7 +181,7 @@ export default function NewBriefModal({ onClose, forReview = false }: { onClose:
             }}>Cancelar</button>
             <button type="submit" disabled={saving} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
             }}>{saving ? "Creando..." : forReview ? "Enviar a Laura" : mode === "draft" ? "Crear tarea pendiente" : "Crear brief"}</button>
           </div>
         </form>

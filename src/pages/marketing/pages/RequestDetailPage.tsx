@@ -28,7 +28,7 @@ export default function RequestDetailPage() {
   const [error, setError] = useState("");
 
   const header = (
-    <div style={{ fontSize: 14, fontWeight: 800, color: MT.text1, letterSpacing: "-0.01em", marginBottom: "1.5rem" }}>
+    <div style={{ fontSize: 14, fontWeight: 600, color: MT.text1, letterSpacing: "-0.01em", marginBottom: "1.5rem" }}>
       FTC Hub — <span style={{ color: MT.primary }}>Marketing</span>
     </div>
   );
@@ -59,7 +59,7 @@ export default function RequestDetailPage() {
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
 
   const run = async (fn: () => Promise<void>) => {
@@ -112,14 +112,14 @@ export default function RequestDetailPage() {
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "1.25rem 1.25rem 3rem", fontFamily: MT.font }}>
         {header}
 
-        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
+        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 600, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
         <p style={{ margin: "0 0 1.25rem", fontSize: 12.5, color: MT.text3 }}>
           Pedida el {formatDateHuman(request.createdAt.slice(0, 10))}
           {request.revisionRounds > 0 && <> · {request.revisionRounds} ronda{request.revisionRounds !== 1 ? "s" : ""} de cambios</>}
         </p>
 
         <div style={{ background: banner.bg, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem" }}>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: banner.color }}>{banner.title}</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: banner.color }}>{banner.title}</p>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: MT.text2 }}>{banner.text}</p>
           {inDelivery && currentStage?.deadline && <div style={{ marginTop: 10 }}><DeadlineBadge deadline={currentStage.deadline} /></div>}
         </div>
@@ -142,18 +142,18 @@ export default function RequestDetailPage() {
         {/* The delivery — what the person actually came here for */}
         {deliveredLink && (inReview || request.status === "completed") && (
           <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem", boxShadow: MT.shadow }}>
-            <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: MT.text1 }}>{request.status === "completed" ? "Entrega final" : "Entrega de Diseño"}</p>
-            {isImageLink && <img src={deliveredLink} alt="Entrega" style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 10, display: "block", marginBottom: 12 }} />}
+            <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 600, color: MT.text1 }}>{request.status === "completed" ? "Entrega final" : "Entrega de Diseño"}</p>
+            {isImageLink && <img src={deliveredLink} alt="Entrega" style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 0, display: "block", marginBottom: 12 }} />}
             <a href={normalizeUrl(deliveredLink)} target="_blank" rel="noreferrer" style={{
               display: "inline-block", fontFamily: MT.font, fontSize: 14, fontWeight: 700, textDecoration: "none",
-              background: MT.primary, color: "#fff", borderRadius: 10, padding: "11px 20px",
+              background: MT.primary, color: "#fff", borderRadius: 0, padding: "11px 20px",
             }}>Ver entrega →</a>
           </div>
         )}
 
         {canReview && (
           <div style={{ background: MT.surface, border: `2px solid ${MT.violet}`, borderRadius: MT.radiusLg, padding: "1.1rem 1.25rem", marginBottom: "1.25rem" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 800, color: MT.text1 }}>¿Qué te parece?</p>
+            <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: MT.text1 }}>¿Qué te parece?</p>
             <p style={{ margin: "0 0 12px", fontSize: 12.5, color: MT.text2 }}>Si quieres cambios, cuéntanos qué ajustar para que Diseño lo tenga claro.</p>
             <textarea style={{ ...fieldStyle, marginBottom: 12, resize: "vertical" }} rows={3} value={noteInput}
               onChange={e => setNoteInput(e.target.value)} placeholder="Comentarios o cambios que necesitas…" />
@@ -161,14 +161,14 @@ export default function RequestDetailPage() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button disabled={busy} onClick={() => run(async () => { await requesterReview(request.id, "approve", { note: noteInput.trim() || undefined }); })} style={{
                 fontFamily: MT.font, fontSize: 14, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.primary, color: "#fff", border: "none", borderRadius: 10, padding: "11px 20px",
+                background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "11px 20px",
               }}>✓ Todo bien, aprobar</button>
               <button disabled={busy} onClick={() => {
                 if (!noteInput.trim()) { setError("Cuéntanos qué quieres cambiar para que Diseño pueda ajustarlo."); return; }
                 run(async () => { await requesterReview(request.id, "request_changes", { note: noteInput.trim() }); });
               }} style={{
                 fontFamily: MT.font, fontSize: 14, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-                background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 10, padding: "11px 20px",
+                background: MT.surface, color: MT.clay, border: `1px solid ${MT.clay}`, borderRadius: 0, padding: "11px 20px",
               }}>Pedir cambios</button>
             </div>
           </div>
@@ -204,7 +204,7 @@ export default function RequestDetailPage() {
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
+        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: MT.text1 }}>{request.title}<TodoCategoryChip task={request} /></h1>
         <StatusPill
           solid
           color={request.status === "completed" ? MT.primary : currentStage ? ROLE_CFG[currentStage.role].color : MT.text2}
@@ -218,7 +218,7 @@ export default function RequestDetailPage() {
       </p>
 
       <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1rem", marginBottom: "1rem", boxShadow: MT.shadow }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 800, color: MT.text1 }}>Qué se necesita</h3>
+        <h3 style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600, color: MT.text1 }}>Qué se necesita</h3>
         <p style={{ margin: "0 0 10px", fontSize: 13, color: MT.text2, whiteSpace: "pre-wrap" }}>{request.description}</p>
         {request.attachments.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -246,7 +246,7 @@ export default function RequestDetailPage() {
                 <div style={{
                   width: isCurrent ? 36 : 28, height: isCurrent ? 36 : 28, borderRadius: 999,
                   background: done || isCurrent ? MT.primarySoft : MT.surfaceAlt, color,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 13,
                   border: isCurrent ? `2px solid ${MT.primary}` : "1px solid transparent",
                 }}>{done ? "✓" : i + 1}</div>
                 <div style={{ fontSize: 11, fontWeight: isCurrent ? 800 : 600, color: isCurrent ? MT.text1 : MT.text3, marginTop: 5 }}>{s.label}</div>
@@ -257,7 +257,7 @@ export default function RequestDetailPage() {
           );
         })}
         {request.status === "completed" && (
-          <div style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, color: MT.primary, background: MT.primarySoft, padding: "0.25rem 0.6rem", borderRadius: 999 }}>✓ Completada</div>
+          <div style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 600, color: MT.primary, background: MT.primarySoft, padding: "0.25rem 0.6rem", borderRadius: 999 }}>✓ Completada</div>
         )}
       </div>
 
@@ -277,7 +277,7 @@ export default function RequestDetailPage() {
             </select>
             <button disabled={!assignEmail || busy} onClick={() => run(async () => { await assignRequest(request.id, assignEmail); setShowReassign(false); setAssignEmail(""); })} style={{
               fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", whiteSpace: "nowrap",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "0 16px", whiteSpace: "nowrap",
             }}>Asignar</button>
           </div>
         )
@@ -287,7 +287,7 @@ export default function RequestDetailPage() {
 
       {canDeliver && (
         <div style={{ background: MT.surface, border: `2px solid ${MT.clay}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Entregar</p>
+          <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Entregar</p>
           <label style={{ fontSize: 11.5, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 5 }}>Link o archivo de la entrega</label>
           <input style={{ ...fieldStyle, marginBottom: 8 }} value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://..." />
           <input type="file" style={{ ...fieldStyle, marginBottom: 12, padding: "6px" }} onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
@@ -297,14 +297,14 @@ export default function RequestDetailPage() {
             await submitRequestDelivery(request.id, normalizeUrl(linkInput.trim()), noteInput.trim() || undefined);
           })} style={{
             fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            background: MT.clay, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
           }}>{uploading ? "Subiendo..." : busy ? "Entregando..." : "Entregar"}</button>
         </div>
       )}
 
       {canReview && (
         <div style={{ background: MT.surface, border: `2px solid ${MT.violet}`, borderRadius: MT.radiusLg, padding: "1rem" }}>
-          <p style={{ fontWeight: 800, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Revisar entrega</p>
+          <p style={{ fontWeight: 600, fontSize: 13.5, color: MT.text1, margin: "0 0 10px" }}>Revisar entrega</p>
           {deliveredLink && (
             <a href={normalizeUrl(deliveredLink)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 700, color: MT.info, display: "block", marginBottom: 12 }}>Ver entrega →</a>
           )}
@@ -313,11 +313,11 @@ export default function RequestDetailPage() {
           <div style={{ display: "flex", gap: 8 }}>
             <button disabled={busy} onClick={() => run(async () => { await requesterReview(request.id, "approve", { note: noteInput.trim() || undefined }); })} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+              background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
             }}>✓ Aprobar</button>
             <button disabled={busy} onClick={() => run(async () => { await requesterReview(request.id, "request_changes", { note: noteInput.trim() || undefined }); })} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 8, padding: "10px 18px",
+              background: MT.surfaceAlt, color: MT.text1, border: `1px solid ${MT.border}`, borderRadius: 0, padding: "10px 18px",
             }}>Pedir cambios</button>
           </div>
         </div>

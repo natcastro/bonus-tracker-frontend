@@ -119,13 +119,13 @@ export default function ManagementDashboard() {
     return { agent: ag, attBonus, goalBonus, livesBonus, total };
   });
 
-  const TAB_COLOR: Record<TeamTab, string> = { usa: "#1e40af", ops: "#7c3aed", mex: "#15803d" };
+  const TAB_COLOR: Record<TeamTab, string> = { usa: "#1e40af", ops: "#1F1E1C", mex: "#15803d" };
   const color = TAB_COLOR[team];
 
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">FTC Hub — <span style={{ color: "#64748b" }}>Management</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#6F6E67" }}>Management</span></div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           {/* Team tabs */}
           {(["usa", "ops", "mex"] as TeamTab[]).map((t) => (

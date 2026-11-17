@@ -16,7 +16,7 @@ import { MONTHS } from "../services/mexBonus";
 
 const YEARS = ["2025", "2026", "2027", "2028"];
 const DOW_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const AGENT_COLORS = ["#1e40af", "#0891b2", "#7c3aed", "#dc2626", "#d97706", "#db2777"];
+const AGENT_COLORS = ["#1e40af", "#0891b2", "#1F1E1C", "#dc2626", "#d97706", "#db2777"];
 const SCHED_START = 7;
 const SCHED_END = 22;
 const PX_HR = 54;
@@ -602,9 +602,9 @@ export default function UsaDashboard() {
             </div>
 
             {livesError && (
-              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 0, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
                 <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: "0.4rem" }}>⚠️ Error — corre este SQL en Supabase:</div>
-                <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: 0, whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 4 }}>{`CREATE TABLE IF NOT EXISTS usa_live_schedules (
+                <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: 0, whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 0 }}>{`CREATE TABLE IF NOT EXISTS usa_live_schedules (
   id BIGSERIAL PRIMARY KEY,
   agent_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -633,7 +633,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
                 {agents.map((ag, i) => (
                   <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 3, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
+                    <span style={{ width: 12, height: 12, borderRadius: 0, background: AGENT_COLORS[i % AGENT_COLORS.length], display: "inline-block" }} />
                     {ag.name}
                   </span>
                 ))}
@@ -657,7 +657,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     {/* Hour labels */}
                     <div>
                       {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                        <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
+                        <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #F4F4F1" : "none" }}>
                           {String(SCHED_START + i).padStart(2, "0")}:00
                         </div>
                       ))}
@@ -668,9 +668,9 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       const ds = day ? toDateStr(day) : "";
                       const colEvs = day ? liveSchedules.filter((e) => e.date === ds) : [];
                       return (
-                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #f1f5f9" }}>
+                        <div key={colIdx} style={{ position: "relative", borderLeft: "1px solid #F4F4F1" }}>
                           {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                            <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
+                            <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #F4F4F1" : "none", height: PX_HR }} />
                           ))}
                           {colEvs.map((ev) => {
                             const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
@@ -682,7 +682,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                                 key={ev.id}
                                 onDoubleClick={async () => { try { await deleteUsaLiveSchedule(ev.id); await loadLives(); } catch (e: any) { setLivesError("Error al borrar: " + (e?.message ?? e)); } }}
                                 title="Doble clic para eliminar"
-                                style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
+                                style={{ position: "absolute", top: topPx, height: h, left: 2, right: 2, background: color + "22", border: `1.5px solid ${color}`, borderRadius: 0, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none" }}
                               >
                                 <div style={{ fontWeight: 700, color, lineHeight: 1.3 }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime}–{ev.endTime}</div>

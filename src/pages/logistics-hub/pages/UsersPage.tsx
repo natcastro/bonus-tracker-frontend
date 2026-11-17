@@ -15,7 +15,7 @@ const ROLE_COLOR: Record<HubRole, { fg: string; bg: string }> = {
   admin: { fg: HT.primaryDark, bg: HT.primarySoft },
   logistics: { fg: HT.info, bg: HT.infoSoft },
   Belier: { fg: "#2563EB", bg: "#EAF1FF" },
-  Norte: { fg: "#7C3AED", bg: "#F1EBFE" },
+  Norte: { fg: "#1F1E1C", bg: "#F4F4F1" },
   Plaza: { fg: "#DB2777", bg: "#FCE7F3" },
 };
 
@@ -58,14 +58,14 @@ function NewUserForm({ onClose }: { onClose: () => void }) {
           value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre"
           style={{
             flex: "1 1 180px", fontFamily: HT.font, fontSize: 13.5, padding: "10px 12px",
-            border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none",
+            border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none",
           }}
         />
         <input
           value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@formatucuerpo.com"
           style={{
             flex: "1 1 220px", fontFamily: HT.font, fontSize: 13.5, padding: "10px 12px",
-            border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none",
+            border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none",
           }}
         />
       </div>
@@ -92,7 +92,7 @@ function NewUserForm({ onClose }: { onClose: () => void }) {
         <button onClick={save} disabled={!canSave} style={{
           fontFamily: HT.font, fontSize: 13, fontWeight: 700, cursor: canSave ? "pointer" : "not-allowed",
           background: canSave ? HT.primary : HT.surfaceAlt, color: canSave ? "#fff" : HT.text3,
-          border: "none", borderRadius: 8, padding: "9px 18px",
+          border: "none", borderRadius: 0, padding: "9px 18px",
         }}>Crear usuario</button>
       </div>
     </div>
@@ -117,13 +117,13 @@ export default function UsersPage() {
         {!showForm && (
           <button onClick={() => setShowForm(true)} style={{
             fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            background: HT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+            background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
           }}>+ Nuevo usuario</button>
         )}
       </div>
 
       <div style={{
-        background: HT.warnSoft, border: `1px solid rgba(217,119,6,0.2)`, borderRadius: 10,
+        background: HT.warnSoft, border: `1px solid rgba(217,119,6,0.2)`, borderRadius: 0,
         padding: "10px 14px", marginBottom: 20, fontFamily: HT.font, fontSize: 12.5, color: HT.warn,
       }}>
         Prototipo — la autenticación real (login por usuario y permisos) se conecta en una fase posterior. Por ahora esto define el modelo de roles.
@@ -151,7 +151,7 @@ export default function UsersPage() {
             <RoleBadge role={u.role} />
             {u.name !== currentUser && (
               <button onClick={() => removeUser(u.id)} title="Eliminar" style={{
-                width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent",
+                width: 28, height: 28, borderRadius: 0, border: "none", background: "transparent",
                 color: HT.text3, cursor: "pointer", fontSize: 16,
               }}>×</button>
             )}

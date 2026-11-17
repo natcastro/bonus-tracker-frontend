@@ -26,7 +26,7 @@ export default function Timeline({ brief }: { brief: TimelinePipeline }) {
               <div style={{
                 width: size, height: size, borderRadius: 999, background: bg, color,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 800, fontSize: isCurrent ? 14 : 12,
+                fontWeight: 600, fontSize: isCurrent ? 14 : 12,
                 border: isCurrent ? `2px solid ${MT.primary}` : "1px solid transparent",
                 boxShadow: isCurrent ? `0 0 0 4px ${MT.primarySoft}` : "none",
                 transition: "all 0.15s",
@@ -45,7 +45,7 @@ export default function Timeline({ brief }: { brief: TimelinePipeline }) {
         );
       })}
       {brief.status === "completed" && (
-        <div style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 800, color: MT.primary, background: MT.primarySoft, padding: "0.25rem 0.6rem", borderRadius: 999 }}>
+        <div style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 600, color: MT.primary, background: MT.primarySoft, padding: "0.25rem 0.6rem", borderRadius: 999 }}>
           ✓ Completado
         </div>
       )}

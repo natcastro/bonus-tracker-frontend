@@ -35,13 +35,13 @@ export default function LoginPage({ errorMsg }: { errorMsg?: string }) {
       fontFamily: T.font,
     }}>
       <div style={{
-        background: T.surface, borderRadius: 20,
+        background: T.surface, borderRadius: 0,
         padding: "48px 40px", width: "100%", maxWidth: 380,
         boxShadow: T.shadow, textAlign: "center",
       }}>
         {/* Logo / título */}
         <div style={{
-          width: 60, height: 60, borderRadius: 14, background: "#1d1d1f",
+          width: 60, height: 60, borderRadius: 0, background: "#1d1d1f",
           display: "flex", alignItems: "center", justifyContent: "center",
           margin: "0 auto 20px", fontSize: 28,
         }}>💪</div>
@@ -57,7 +57,7 @@ export default function LoginPage({ errorMsg }: { errorMsg?: string }) {
         {errorMsg && (
           <div style={{
             background: "rgba(255,59,48,0.08)", border: "1px solid rgba(255,59,48,0.2)",
-            borderRadius: 10, padding: "12px 16px", marginBottom: 20,
+            borderRadius: 0, padding: "12px 16px", marginBottom: 20,
             fontSize: 13, color: T.red, lineHeight: 1.4,
           }}>
             {errorMsg}
@@ -72,7 +72,7 @@ export default function LoginPage({ errorMsg }: { errorMsg?: string }) {
             width: "100%", padding: "13px 20px",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
             background: loading ? T.bg : T.p1,
-            color: "#fff", border: "none", borderRadius: 12,
+            color: "#fff", border: "none", borderRadius: 0,
             fontSize: 15, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
             fontFamily: T.font, transition: "opacity 0.15s",
             opacity: loading ? 0.6 : 1,

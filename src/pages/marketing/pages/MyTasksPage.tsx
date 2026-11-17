@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MT } from "../theme";
+import { Illustration } from "../../../components/Illustrations";
 import { useMarketing } from "../context";
 import NewItemModal from "../components/NewItemModal";
 import TodoCategoryChip from "../components/TodoCategoryChip";
 import DeadlineBadge from "../components/DeadlineBadge";
-import { ClockIcon, LinkIcon, TrashIcon, PaletteIcon, PackageIcon } from "../../../components/icons";
+import {TrashIcon } from "../../../components/icons";
 import { stageLabel, todoStageLabel, requestStageLabel, isPastDeadline, PUBLICATION_PLATFORMS, currentActiveStages, variantLabel } from "../types";
 
 function formatDueIn(dueAt: string): { label: string; overdue: boolean } {
@@ -122,7 +123,7 @@ export default function MyTasksPage() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem", gap: 10, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: MT.text1, letterSpacing: "-0.02em" }}>Mis tareas</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: MT.text1, letterSpacing: "-0.02em" }}>Mis tareas</h1>
           <p style={{ margin: "0.3rem 0 0", fontSize: 13.5, color: MT.text2 }}>
             {myRole === "laura" ? "Revisiones y briefs que necesitan tu atención"
               : myRole === "carol" ? "Briefs esperando que asignes a alguien de Diseño"
@@ -131,7 +132,7 @@ export default function MyTasksPage() {
         </div>
         <button onClick={() => setShowNew(true)} style={{
           fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-          background: MT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+          background: MT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
         }}>+ Nuevo</button>
       </div>
 
@@ -165,7 +166,7 @@ export default function MyTasksPage() {
               return (
                 <div key={t.id} style={{
                   display: "flex", alignItems: "center", gap: 10, padding: "0.55rem 0.7rem",
-                  background: due.overdue ? MT.dangerSoft : MT.surfaceAlt, borderRadius: 8,
+                  background: due.overdue ? MT.dangerSoft : MT.surfaceAlt, borderRadius: 0,
                 }}>
                   <input type="checkbox" checked={false} onChange={() => togglePrivateTaskCompleted(t.id, true)} />
                   <span style={{ flex: 1, fontSize: 13, color: MT.text1 }}>{t.title}</span>
@@ -184,7 +185,7 @@ export default function MyTasksPage() {
             <summary style={{ fontSize: 11.5, color: MT.text3, cursor: "pointer" }}>{completedPrivateTasks.length} completada(s)</summary>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
               {completedPrivateTasks.map(t => (
-                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.5rem 0.7rem", background: MT.surfaceAlt, borderRadius: 8, opacity: 0.7 }}>
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.5rem 0.7rem", background: MT.surfaceAlt, borderRadius: 0, opacity: 0.7 }}>
                   <input type="checkbox" checked onChange={() => togglePrivateTaskCompleted(t.id, false)} />
                   <span style={{ flex: 1, fontSize: 13, color: MT.text2, textDecoration: "line-through" }}>{t.title}</span>
                   <button onClick={() => deletePrivateTask(t.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: MT.text3, display: "flex", padding: 2 }}>
@@ -203,7 +204,7 @@ export default function MyTasksPage() {
           <p style={{ fontWeight: 700, fontSize: 12, color: MT.text2, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>Enviados a Laura — esperando su revisión</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {sentToLaura.map(b => (
-              <button key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.info}`, borderRadius: 8, padding: "9px 14px", color: MT.text1 }}>{b.reference}</button>
+              <button key={b.id} onClick={() => navigate(`/marketing/brief/${b.id}`)} style={{ fontFamily: MT.font, fontSize: 13, fontWeight: 700, cursor: "pointer", background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.info}`, borderRadius: 0, padding: "9px 14px", color: MT.text1 }}>{b.reference}</button>
             ))}
           </div>
         </div>
@@ -217,31 +218,25 @@ export default function MyTasksPage() {
           <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
             {myDrafts.map(b => (
               <button
+                className="fx-card"
                 key={b.id}
                 onClick={() => navigate(`/marketing/brief/${b.id}`)}
                 style={{
-                  background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${MT.info}`,
-                  borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                  background: MT.surface, border: `1px solid ${MT.text1}`,
+                  borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
                   display: "flex", flexDirection: "column", gap: "0.9rem",
                   minWidth: 260, maxWidth: 340, flex: "1 1 260px",
-                  boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                  transition: "background-color 0.18s",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{
-                    width: 42, height: 42, borderRadius: 8, background: MT.info + "12",
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}>
-                    <ClockIcon size={20} color={MT.info} />
-                  </span>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MT.info }}>
+                  <span style={{ color: MT.info, display: "flex" }}><Illustration kind="canvas" size={88} color="currentColor" /></span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: MT.info }}>
                     Pendiente
                   </span>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                  <div className="fx-title" style={{ fontWeight: 600, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
                   {b.stages.find(s => s.key === "brief")?.by && <div style={{ fontSize: 11.5, fontWeight: 700, color: MT.clay, marginTop: 4 }}>De Karol — por revisar</div>}
                 </div>
                 {b.estimatedStartDate && <DeadlineBadge deadline={b.estimatedStartDate} />}
@@ -263,31 +258,25 @@ export default function MyTasksPage() {
               const color = allFilled ? MT.primary : MT.info;
               return (
                 <button
+                  className="fx-card"
                   key={b.id}
                   onClick={() => navigate(`/marketing/brief/${b.id}`)}
                   style={{
-                    background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
-                    borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                    background: MT.surface, border: `1px solid ${MT.text1}`,
+                    borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
                     display: "flex", flexDirection: "column", gap: "0.9rem",
                     minWidth: 260, maxWidth: 340, flex: "1 1 260px",
-                    boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                    transition: "background-color 0.18s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{
-                      width: 42, height: 42, borderRadius: 8, background: color + "12",
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>
-                      <LinkIcon size={20} color={color} />
-                    </span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                    <span style={{ color: color, display: "flex" }}><Illustration kind="post" size={88} color="currentColor" /></span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
                       {allFilled ? "Listo para aprobar" : "En progreso"}
                     </span>
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                    <div className="fx-title" style={{ fontWeight: 600, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
                   </div>
                   <span style={{
                     fontSize: 12.5, fontWeight: 700, color, background: color + "12",
@@ -314,9 +303,9 @@ export default function MyTasksPage() {
           <div style={{
             width: 56, height: 56, borderRadius: "50%", background: MT.primarySoft, color: MT.primary,
             display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem",
-            fontSize: 26, fontWeight: 800,
+            fontSize: 26, fontWeight: 600,
           }}>✓</div>
-          <div style={{ fontWeight: 800, fontSize: 17, color: MT.text1 }}>Estás al día</div>
+          <div style={{ fontWeight: 600, fontSize: 17, color: MT.text1 }}>Estás al día</div>
           <p style={{ margin: "0.4rem 0 0", fontSize: 13, color: MT.text2 }}>No tienes tareas pendientes en este momento.</p>
         </div>
       ) : (
@@ -332,34 +321,27 @@ export default function MyTasksPage() {
             const otherPendingCount = matching.length - 1;
             const overdue = !!stage.deadline && isPastDeadline(stage.deadline);
             const color = overdue ? MT.danger : myRole === "laura" ? MT.primary : myRole === "carol" ? MT.info : MT.clay;
-            const Icon = PackageIcon; // Briefs — distinct from To Do tasks' palette icon
             return (
               <button
+                className="fx-card"
                 key={b.id}
                 onClick={() => navigate(`/marketing/brief/${b.id}`)}
                 style={{
-                  background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
-                  borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                  background: MT.surface, border: `1px solid ${MT.text1}`,
+                  borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
                   display: "flex", flexDirection: "column", gap: "0.9rem",
                   minWidth: 260, maxWidth: 340, flex: "1 1 260px",
-                  boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                  transition: "background-color 0.18s",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{
-                    width: 42, height: 42, borderRadius: 8, background: color + "12",
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}>
-                    <Icon size={20} color={color} />
-                  </span>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                  <span style={{ color: color, display: "flex" }}><Illustration kind="megaphone" size={88} color="currentColor" /></span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
                     {stageLabel(stage.key)}
                   </span>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
+                  <div className="fx-title" style={{ fontWeight: 600, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}>{b.reference}</div>
                   {matchingVariant && (
                     <div style={{ fontSize: 12, color: MT.text2, marginTop: 2 }}>
                       {variantLabel(matchingVariant.key)}{otherPendingCount > 0 && ` · +${otherPendingCount} más`}
@@ -385,27 +367,24 @@ export default function MyTasksPage() {
               const color = overdue ? MT.danger : MT.clay;
               return (
                 <button
+                  className="fx-card"
                   key={t.id}
                   onClick={() => navigate(`/marketing/todo/${t.id}`)}
                   style={{
-                    background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
-                    borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                    background: MT.surface, border: `1px solid ${MT.text1}`,
+                    borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
                     display: "flex", flexDirection: "column", gap: "0.9rem",
                     minWidth: 260, maxWidth: 340, flex: "1 1 260px",
-                    boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                    transition: "background-color 0.18s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ width: 42, height: 42, borderRadius: 8, background: color + "12", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <PaletteIcon size={20} color={color} />
-                    </span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                    <span style={{ color, display: "flex" }}><Illustration kind="calendar" size={88} color="currentColor" /></span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
                       {todoStageLabel(stage.key)}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={t} /></div>{t.title}</div>
+                  <div className="fx-title" style={{ fontWeight: 600, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={t} /></div>{t.title}</div>
                   {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
                 </button>
               );
@@ -426,27 +405,24 @@ export default function MyTasksPage() {
               const color = overdue ? MT.danger : MT.violet;
               return (
                 <button
+                  className="fx-card"
                   key={r.id}
                   onClick={() => navigate(`/marketing/request/${r.id}`)}
                   style={{
-                    background: MT.surface, border: `1px solid ${MT.border}`, borderLeft: `3px solid ${color}`,
-                    borderRadius: 10, padding: "1.75rem", cursor: "pointer", textAlign: "left",
+                    background: MT.surface, border: `1px solid ${MT.text1}`,
+                    borderRadius: 0, padding: "1.75rem", cursor: "pointer", textAlign: "left",
                     display: "flex", flexDirection: "column", gap: "0.9rem",
                     minWidth: 260, maxWidth: 340, flex: "1 1 260px",
-                    boxShadow: MT.shadow, transition: "box-shadow 0.2s, transform 0.15s",
+                    transition: "background-color 0.18s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = MT.shadowLg; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = MT.shadow; e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ width: 42, height: 42, borderRadius: 8, background: color + "12", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <LinkIcon size={20} color={color} />
-                    </span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }}>
+                    <span style={{ color, display: "flex" }}><Illustration kind="mail" size={88} color="currentColor" /></span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
                       {requestStageLabel(stage.key)}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={r} /></div>{r.title}</div>
+                  <div className="fx-title" style={{ fontWeight: 600, fontSize: 17, color: MT.text1, letterSpacing: "-0.01em" }}><div style={{ marginBottom: 6 }}><TodoCategoryChip task={r} /></div>{r.title}</div>
                   {stage.deadline && <DeadlineBadge deadline={stage.deadline} />}
                 </button>
               );

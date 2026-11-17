@@ -31,7 +31,7 @@ export default function DocsModal({ order, onClose }: { order: HubOrder; onClose
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)" }} />
       <div style={{
         position: "relative", width: 420, maxWidth: "92vw", background: HT.surface,
@@ -58,7 +58,7 @@ export default function DocsModal({ order, onClose }: { order: HubOrder; onClose
               <button onClick={handleSaveInvoice} style={{
                 fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
                 background: HT.surfaceAlt, color: HT.text1, border: `1px dashed ${HT.borderStrong}`,
-                borderRadius: 8, padding: "10px 14px", width: "100%",
+                borderRadius: 0, padding: "10px 14px", width: "100%",
               }}>Subir factura manual (PDF)</button>
             )}
           </div>
@@ -75,7 +75,7 @@ export default function DocsModal({ order, onClose }: { order: HubOrder; onClose
               <button onClick={handleUploadLabel} style={{
                 fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
                 background: HT.surfaceAlt, color: HT.text1, border: `1px dashed ${HT.borderStrong}`,
-                borderRadius: 8, padding: "10px 14px", width: "100%",
+                borderRadius: 0, padding: "10px 14px", width: "100%",
               }}>Subir documento (PDF)</button>
             ) : (
               <>
@@ -85,13 +85,13 @@ export default function DocsModal({ order, onClose }: { order: HubOrder; onClose
                   placeholder="https://ship.pirateship.com/labels/…"
                   style={{
                     width: "100%", fontFamily: HT.font, fontSize: 13, padding: "10px 12px",
-                    border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", marginBottom: 8, boxSizing: "border-box",
+                    border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", marginBottom: 8, boxSizing: "border-box",
                   }}
                 />
                 <button onClick={handleSaveLabel} disabled={!url.trim()} style={{
                   fontFamily: HT.font, fontSize: 13, fontWeight: 700, cursor: url.trim() ? "pointer" : "not-allowed",
                   background: url.trim() ? HT.primary : HT.surfaceAlt, color: url.trim() ? "#fff" : HT.text3,
-                  border: "none", borderRadius: 8, padding: "9px 16px",
+                  border: "none", borderRadius: 0, padding: "9px 16px",
                 }}>Guardar Label</button>
               </>
             )}
@@ -101,7 +101,7 @@ export default function DocsModal({ order, onClose }: { order: HubOrder; onClose
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{
             fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            background: HT.text1, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px",
+            background: HT.text1, color: "#fff", border: "none", borderRadius: 0, padding: "10px 20px",
           }}>Listo</button>
         </div>
       </div>

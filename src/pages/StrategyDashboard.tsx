@@ -101,9 +101,9 @@ const NAME_COLUMN_HINTS = /usuario|username|tiktok|nombre|creator|influencer|han
 const cop = (n: number) => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Math.round(n));
 const pct  = (p: number) => `${Math.round(p * 100)}%`;
 const nv   = (v: number) => (v === 0 ? "" : v);
-const C = { roi:"#7c3aed", samples:"#0891b2", health:"#16a34a", operative:"#ea580c" };
-const lbl: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, color:"#64748b", display:"block", marginBottom:"0.3rem", textTransform:"uppercase", letterSpacing:"0.05em" };
-const qBtn: React.CSSProperties = { padding:"0.28rem 0.65rem", borderRadius:6, fontSize:"0.75rem", fontWeight:600, cursor:"pointer", border:"1px solid #e2e8f0", background:"white", color:"#64748b" };
+const C = { roi:"#1F1E1C", samples:"#0891b2", health:"#16a34a", operative:"#ea580c" };
+const lbl: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, color:"#6F6E67", display:"block", marginBottom:"0.3rem", textTransform:"uppercase", letterSpacing:"0.05em" };
+const qBtn: React.CSSProperties = { padding:"0.28rem 0.65rem", borderRadius:6, fontSize:"0.75rem", fontWeight:600, cursor:"pointer", border:"1px solid #E8E7E2", background:"white", color:"#6F6E67" };
 
 function roiLabel(v: number) {
   if(v>=10) return { text:"Dos dígitos o más",   color:"#15803d" };
@@ -114,7 +114,7 @@ function roiLabel(v: number) {
   if(v>=3)  return { text:"Inicial",              color:"#b45309" };
   if(v>=2)  return { text:"Inicial",              color:"#b45309" };
   if(v>=1)  return { text:"Inicial",              color:"#b45309" };
-  return    { text:"Sin bono (< 1%)",             color:"#9ca3af" };
+  return    { text:"Sin bono (< 1%)",             color:"#A3A29B" };
 }
 
 function parseDateParts(s: string) { const [y, m] = s.split("-"); return { year: y, month: Number(m) }; }
@@ -836,7 +836,7 @@ export default function StrategyDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">FTC Hub — <span style={{color:"#6366f1"}}>Strategy Team</span></div>
+        <div className="logo">FTC Hub — <span style={{color:"#1F1E1C"}}>Strategy Team</span></div>
         <ul className="nav-links">
           {TABS.map(([k,l]) => (
             <li key={k} className={tab===k?"active":""} onClick={()=>setTab(k)}>{l}</li>
@@ -867,10 +867,10 @@ export default function StrategyDashboard() {
               const b     = entry ? calcBonus(entry, ind2Amount) : null;
               return (
                 <div key={ag.id} style={{maxWidth:860,margin:"0 auto 2rem"}}>
-                  <h3 style={{fontWeight:800,fontSize:"1.1rem",color:"#1e293b",marginBottom:"1rem",textAlign:"center"}}>{ag.name}</h3>
+                  <h3 style={{fontWeight:800,fontSize:"1.1rem",color:"#1F1E1C",marginBottom:"1rem",textAlign:"center"}}>{ag.name}</h3>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem",marginBottom:"1.25rem"}}>
                     <SummaryBox label="Bono Base"     value={BONO_BASE}          color="#15803d" sub="Garantizado" />
-                    <SummaryBox label="Bono Variable"  value={b?.bonoVariable??0} color="#6366f1" sub={`de $${cop(650_000)} máx`} />
+                    <SummaryBox label="Bono Variable"  value={b?.bonoVariable??0} color="#1F1E1C" sub={`de $${cop(650_000)} máx`} />
                     <SummaryBox label="Total Estimado" value={b?.total??BONO_BASE} color="#1d4ed8" sub="Base + Variable" large />
                   </div>
                   {!entry ? (
@@ -891,7 +891,7 @@ export default function StrategyDashboard() {
                         detail={`${Math.round(entry.operativeCompliancePct)}% cumplimiento`} />
                     </div>
                   )}
-                  <div style={{marginTop:"0.75rem",padding:"0.55rem 1rem",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,fontSize:"0.75rem",color:"#94a3b8",textAlign:"center"}}>
+                  <div style={{marginTop:"0.75rem",padding:"0.55rem 1rem",background:"#FAFAF8",border:"1px solid #E8E7E2",borderRadius:8,fontSize:"0.75rem",color:"#A3A29B",textAlign:"center"}}>
                     Período oficial: {officialPeriod.from} → {officialPeriod.to}
                   </div>
                 </div>
@@ -909,18 +909,18 @@ export default function StrategyDashboard() {
               </div>
             </header>
             <div className="card" style={{marginBottom:"1.25rem",background:"#faf5ff",border:"1px solid #e9d5ff"}}>
-              <p style={{fontWeight:700,fontSize:"0.75rem",color:"#7c3aed",marginBottom:"0.75rem",textTransform:"uppercase",letterSpacing:"0.06em"}}>Escala de desempeño</p>
+              <p style={{fontWeight:700,fontSize:"0.75rem",color:"#1F1E1C",marginBottom:"0.75rem",textTransform:"uppercase",letterSpacing:"0.06em"}}>Escala de desempeño</p>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.5rem"}}>
                 {[{r:"≥ 10%",d:"Dos dígitos",p:"100%",b:"$260.000",c:"#15803d"},{r:"8–9.99%",d:"Buen desempeño",p:"70%",b:"$182.000",c:"#16a34a"},
                   {r:"6–7.99%",d:"Aceptable",p:"40%",b:"$104.000",c:"#ca8a04"},{r:"5–5.99%",d:"Bajo",p:"30%",b:"$78.000",c:"#d97706"},
                   {r:"4–4.99%",d:"Muy bajo",p:"20%",b:"$52.000",c:"#dc2626"},{r:"3–3.99%",d:"Inicial",p:"monto fijo",b:"$30.000",c:"#b45309"},
                   {r:"2–2.99%",d:"Inicial",p:"monto fijo",b:"$20.000",c:"#b45309"},{r:"1–1.99%",d:"Inicial",p:"monto fijo",b:"$10.000",c:"#b45309"},
-                  {r:"< 1%",d:"Sin bono",p:"0%",b:"$0",c:"#9ca3af"},
+                  {r:"< 1%",d:"Sin bono",p:"0%",b:"$0",c:"#A3A29B"},
                 ].map(t=>(
                   <div key={t.r} style={{border:`1px solid ${t.c}30`,borderLeft:`3px solid ${t.c}`,borderRadius:8,padding:"0.55rem 0.75rem"}}>
                     <div style={{fontWeight:800,fontSize:"0.9rem",color:t.c}}>{t.r}</div>
-                    <div style={{fontSize:"0.72rem",color:"#64748b"}}>{t.d} · {t.p}</div>
-                    <div style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b",marginTop:"0.15rem"}}>{t.b} COP</div>
+                    <div style={{fontSize:"0.72rem",color:"#6F6E67"}}>{t.d} · {t.p}</div>
+                    <div style={{fontWeight:700,fontSize:"0.85rem",color:"#1F1E1C",marginTop:"0.15rem"}}>{t.b} COP</div>
                   </div>
                 ))}
               </div>
@@ -932,7 +932,7 @@ export default function StrategyDashboard() {
               return (
                 <div key={ag.id} className="card" style={{marginBottom:"1rem"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem",flexWrap:"wrap",gap:"0.5rem"}}>
-                    <div><h3 style={{margin:0,color:"#4f46e5"}}>{ag.name}</h3>
+                    <div><h3 style={{margin:0,color:"#1F1E1C"}}>{ag.name}</h3>
                       <p style={{margin:0,fontSize:"0.8rem",color:"var(--text-muted)"}}>Ciclo: {currentCycleName}</p>
                     </div>
                     <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
@@ -950,10 +950,10 @@ export default function StrategyDashboard() {
                         value={nv(d.roiPct)} onChange={e=>setF(ag.id,"roiPct",parseFloat(e.target.value)||0)} />
                     </div>
                     <div style={{flex:1,minWidth:200}}>
-                      <div style={{height:10,background:"#e2e8f0",borderRadius:5,overflow:"hidden",marginBottom:"0.5rem"}}>
+                      <div style={{height:10,background:"#E8E7E2",borderRadius:5,overflow:"hidden",marginBottom:"0.5rem"}}>
                         <div style={{width:`${Math.min(100,(d.roiPct/10)*100)}%`,height:"100%",background:rl.color,transition:"width 0.3s",borderRadius:5}} />
                       </div>
-                      <div style={{fontSize:"0.75rem",color:"#64748b"}}>{pct(roiBonusAmount(d.roiPct)/IND1_MAX)} del bono máximo · Máx ${cop(IND1_MAX)} COP</div>
+                      <div style={{fontSize:"0.75rem",color:"#6F6E67"}}>{pct(roiBonusAmount(d.roiPct)/IND1_MAX)} del bono máximo · Máx ${cop(IND1_MAX)} COP</div>
                     </div>
                   </div>
                 </div>
@@ -972,8 +972,8 @@ export default function StrategyDashboard() {
             </header>
 
             <div style={{display:"flex",gap:"0.4rem",marginBottom:"1rem"}}>
-              <button style={{...qBtn,borderColor:uploadsSubTab==="revisar"?"#0891b2":"#e2e8f0",color:uploadsSubTab==="revisar"?C.samples:"#64748b"}} onClick={()=>setUploadsSubTab("revisar")}>Revisar</button>
-              <button style={{...qBtn,borderColor:uploadsSubTab==="documentos"?"#0891b2":"#e2e8f0",color:uploadsSubTab==="documentos"?C.samples:"#64748b"}} onClick={()=>setUploadsSubTab("documentos")}>Documentos subidos</button>
+              <button style={{...qBtn,borderColor:uploadsSubTab==="revisar"?"#0891b2":"#E8E7E2",color:uploadsSubTab==="revisar"?C.samples:"#6F6E67"}} onClick={()=>setUploadsSubTab("revisar")}>Revisar</button>
+              <button style={{...qBtn,borderColor:uploadsSubTab==="documentos"?"#0891b2":"#E8E7E2",color:uploadsSubTab==="documentos"?C.samples:"#6F6E67"}} onClick={()=>setUploadsSubTab("documentos")}>Documentos subidos</button>
             </div>
 
             {uploadsSubTab==="revisar" && (
@@ -989,14 +989,14 @@ export default function StrategyDashboard() {
                       </button>
                       <button className="btn btn-secondary" onClick={()=>setBulkNamesOpen(v=>!v)}>+ Agregar nombres en bulk</button>
                     </div>
-                    <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0.4rem 0 0"}}>Puedes seleccionar varios archivos a la vez.</p>
+                    <p style={{fontSize:"0.75rem",color:"#A3A29B",margin:"0.4rem 0 0"}}>Puedes seleccionar varios archivos a la vez.</p>
                     {uploadErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginTop:"0.5rem"}}>{uploadErr}</p>}
                     {bulkNamesOpen && (
                       <div className="card" style={{marginTop:"0.75rem",maxWidth:420,border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                         <label style={lbl}>Pega los usernames (uno por línea, o separados por coma)</label>
                         <textarea className="form-control" rows={6} placeholder={"peytonxblack\nchristinadesid\nchaoticfamof8sahm"}
                           value={bulkNamesText} onChange={e=>setBulkNamesText(e.target.value)} />
-                        <p style={{fontSize:"0.75rem",color:"#64748b",margin:"0.4rem 0 0.75rem"}}>
+                        <p style={{fontSize:"0.75rem",color:"#6F6E67",margin:"0.4rem 0 0.75rem"}}>
                           {bulkNamesText.split(/[\n,;]+/).map(n=>n.trim()).filter(Boolean).length} nombre(s) detectados — entran como "Pendientes" para revisar.
                         </p>
                         <div style={{display:"flex",gap:"0.5rem"}}>
@@ -1012,7 +1012,7 @@ export default function StrategyDashboard() {
                           <button className="btn btn-sm btn-secondary" onClick={()=>setBulkResult(null)}>Cerrar</button>
                         </div>
                         {bulkResult.map((r,i)=>(
-                          <div key={i} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",fontSize:"0.8rem",padding:"0.25rem 0",borderBottom:i<bulkResult.length-1?"1px solid #f1f5f9":"none"}}>
+                          <div key={i} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",fontSize:"0.8rem",padding:"0.25rem 0",borderBottom:i<bulkResult.length-1?"1px solid #F4F4F1":"none"}}>
                             <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.filename}</span>
                             {r.error
                               ? <span style={{color:"#b91c1c",fontWeight:600,flexShrink:0}}>✗ {r.error}</span>
@@ -1027,27 +1027,27 @@ export default function StrategyDashboard() {
                 {parsedUpload && (
                   <div className="card" style={{marginBottom:"1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                     <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{parsedUpload.filename}</h4>
-                    <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{parsedUpload.rows.length} filas detectadas.</p>
+                    <p style={{fontSize:"0.82rem",color:"#6F6E67",margin:"0 0 0.75rem"}}>{parsedUpload.rows.length} filas detectadas.</p>
                     <div style={{marginBottom:"1rem"}}>
                       <label style={lbl}>¿Cuál columna tiene el nombre/usuario del influencer?</label>
                       <select className="form-control" style={{maxWidth:280}} value={parsedUpload.nameColumn} onChange={e=>updateParsedNameColumn(e.target.value)}>
                         {parsedUpload.columns.map(c=><option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div style={{maxHeight:180,overflowY:"auto",border:"1px solid #e2e8f0",borderRadius:8,marginBottom:"1rem"}}>
+                    <div style={{maxHeight:180,overflowY:"auto",border:"1px solid #E8E7E2",borderRadius:8,marginBottom:"1rem"}}>
                       <table className="data-table" style={{margin:0}}>
                         <thead><tr><th>#</th><th>Nombre detectado</th>{parsedUpload.columns.filter(c=>c!==parsedUpload.nameColumn).map(c=><th key={c}>{c}</th>)}</tr></thead>
                         <tbody>
                           {parsedUpload.rows.slice(0,8).map((r,i)=>(
                             <tr key={i}>
                               <td>{i+1}</td>
-                              <td style={{fontWeight:600}}>{r.displayName || <em style={{color:"#94a3b8"}}>vacío</em>}</td>
-                              {parsedUpload.columns.filter(c=>c!==parsedUpload.nameColumn).map(c=><td key={c} style={{fontSize:"0.82rem",color:"#64748b"}}>{r.data[c] ?? ""}</td>)}
+                              <td style={{fontWeight:600}}>{r.displayName || <em style={{color:"#A3A29B"}}>vacío</em>}</td>
+                              {parsedUpload.columns.filter(c=>c!==parsedUpload.nameColumn).map(c=><td key={c} style={{fontSize:"0.82rem",color:"#6F6E67"}}>{r.data[c] ?? ""}</td>)}
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      {parsedUpload.rows.length>8 && <p style={{fontSize:"0.75rem",color:"#94a3b8",padding:"0.5rem"}}>… y {parsedUpload.rows.length-8} más</p>}
+                      {parsedUpload.rows.length>8 && <p style={{fontSize:"0.75rem",color:"#A3A29B",padding:"0.5rem"}}>… y {parsedUpload.rows.length-8} más</p>}
                     </div>
                     {uploadErr && <p style={{color:"#dc2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{uploadErr}</p>}
                     <div style={{display:"flex",gap:"0.5rem"}}>
@@ -1062,7 +1062,7 @@ export default function StrategyDashboard() {
                     value={uploadSearch} onChange={e=>setUploadSearch(e.target.value)} />
                   <div style={{display:"flex",gap:"0.4rem"}}>
                     {([["pending","Pendientes"],["accepted","Aceptados"],["rejected","Rechazados"]] as const).map(([k,l])=>(
-                      <button key={k} style={{...qBtn,borderColor:uploadStatusFilter===k?"#0891b2":"#e2e8f0",color:uploadStatusFilter===k?C.samples:"#64748b"}}
+                      <button key={k} style={{...qBtn,borderColor:uploadStatusFilter===k?"#0891b2":"#E8E7E2",color:uploadStatusFilter===k?C.samples:"#6F6E67"}}
                         onClick={()=>setUploadStatusFilter(k)}>{l}</button>
                     ))}
                   </div>
@@ -1113,7 +1113,7 @@ export default function StrategyDashboard() {
                               <td style={{fontWeight:600}}>{r.displayName}</td>
                               {uploadExtraColumns.map(c=><td key={c} style={{fontSize:"0.82rem",color:"var(--text-muted)"}}>{r.data[c] ?? "—"}</td>)}
                               <td>
-                                {r.decision==="pending" && <span style={{background:"#f1f5f9",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#64748b",fontWeight:700}}>Pendiente</span>}
+                                {r.decision==="pending" && <span style={{background:"#F4F4F1",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#6F6E67",fontWeight:700}}>Pendiente</span>}
                                 {r.decision==="accepted" && <span style={{background:"#f0fdf4",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#166534",fontWeight:700}}>✓ Aceptado</span>}
                                 {r.decision==="rejected" && <span style={{background:"#fef2f2",borderRadius:6,padding:"0.15rem 0.5rem",fontSize:"0.72rem",color:"#b91c1c",fontWeight:700}}>✗ Rechazado</span>}
                               </td>
@@ -1220,7 +1220,7 @@ export default function StrategyDashboard() {
             {analysisParsed && (
               <div className="card" style={{marginBottom:"1.1rem",border:`2px solid ${C.samples}`,background:"#f0f9ff"}}>
                 <h4 style={{margin:"0 0 0.75rem",color:C.samples}}>{analysisParsed.filename}</h4>
-                <p style={{fontSize:"0.82rem",color:"#64748b",margin:"0 0 0.75rem"}}>{analysisParsed.rows.length} productos detectados.</p>
+                <p style={{fontSize:"0.82rem",color:"#6F6E67",margin:"0 0 0.75rem"}}>{analysisParsed.rows.length} productos detectados.</p>
                 <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
                   <div><label style={lbl}>Desde</label>
                     <input type="date" className="form-control" value={analysisParsed.periodStart}
@@ -1249,11 +1249,11 @@ export default function StrategyDashboard() {
                 this; it's always the official cycle (see the breakdown card at the bottom). */}
             <div className="card" style={{marginBottom:"1.1rem",padding:"0.9rem 1rem"}}>
               <div style={{display:"flex",gap:"0.4rem",marginBottom:productFilterMode!=="cycle"?"0.75rem":0}}>
-                <button style={{...qBtn,borderColor:productFilterMode==="cycle"?"#0891b2":"#e2e8f0",color:productFilterMode==="cycle"?C.samples:"#64748b"}}
+                <button style={{...qBtn,borderColor:productFilterMode==="cycle"?"#0891b2":"#E8E7E2",color:productFilterMode==="cycle"?C.samples:"#6F6E67"}}
                   onClick={()=>setProductFilterMode("cycle")}>Ciclo actual</button>
-                <button style={{...qBtn,borderColor:productFilterMode==="month"?"#0891b2":"#e2e8f0",color:productFilterMode==="month"?C.samples:"#64748b"}}
+                <button style={{...qBtn,borderColor:productFilterMode==="month"?"#0891b2":"#E8E7E2",color:productFilterMode==="month"?C.samples:"#6F6E67"}}
                   onClick={()=>setProductFilterMode("month")}>Por mes</button>
-                <button style={{...qBtn,borderColor:productFilterMode==="range"?"#0891b2":"#e2e8f0",color:productFilterMode==="range"?C.samples:"#64748b"}}
+                <button style={{...qBtn,borderColor:productFilterMode==="range"?"#0891b2":"#E8E7E2",color:productFilterMode==="range"?C.samples:"#6F6E67"}}
                   onClick={()=>setProductFilterMode("range")}>Por rango de fechas</button>
               </div>
               {productFilterMode==="month" && (
@@ -1275,19 +1275,19 @@ export default function StrategyDashboard() {
             {/* Summary: samples shipped vs goal, for whatever window is selected above */}
             <div className="card" style={{marginBottom:"1.1rem"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
-                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>
+                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1F1E1C"}}>
                   Samples enviados {productFilterMode==="cycle"?"este ciclo":productFilterMode==="month"?`en ${productFilterMonth}`:"en el rango"}
                 </span>
                 <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>{productWindowShippedTotal} / {SAMPLES_GOAL}</span>
               </div>
-              <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
+              <div style={{height:8,background:"#E8E7E2",borderRadius:4,overflow:"hidden",marginBottom:"0.4rem"}}>
                 <div style={{width:`${Math.min(100,productWindowPct)}%`,height:"100%",background:C.samples,transition:"width 0.4s",borderRadius:4}} />
               </div>
-              <div style={{fontSize:"0.75rem",color:"#64748b"}}>{Math.round(productWindowPct)}% de la meta · {productFilterWindow.from} → {productFilterWindow.to}</div>
+              <div style={{fontSize:"0.75rem",color:"#6F6E67"}}>{Math.round(productWindowPct)}% de la meta · {productFilterWindow.from} → {productFilterWindow.to}</div>
             </div>
 
             {/* Uploaded periods within the selected window */}
-            <p style={{fontWeight:700,fontSize:"0.72rem",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.6rem"}}>
+            <p style={{fontWeight:700,fontSize:"0.72rem",color:"#6F6E67",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"0.6rem"}}>
               Documentos en este rango
             </p>
             {periodsInFilterWindow.length === 0 ? (
@@ -1299,8 +1299,8 @@ export default function StrategyDashboard() {
                   return (
                     <div key={period.id} className="card" style={{marginBottom:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem"}}>
                       <div>
-                        <div style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>{period.periodStart} → {period.periodEnd}</div>
-                        <div style={{fontSize:"0.75rem",color:"#94a3b8"}}>{period.filename} · {shipped} samples enviados</div>
+                        <div style={{fontWeight:700,fontSize:"0.85rem",color:"#1F1E1C"}}>{period.periodStart} → {period.periodEnd}</div>
+                        <div style={{fontSize:"0.75rem",color:"#A3A29B"}}>{period.filename} · {shipped} samples enviados</div>
                       </div>
                       <button className="btn btn-sm btn-danger" onClick={()=>deletePeriod(period.id)}>Eliminar</button>
                     </div>
@@ -1318,24 +1318,24 @@ export default function StrategyDashboard() {
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.82rem"}}>
                     <thead>
-                      <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
+                      <tr style={{background:"#FAFAF8",borderBottom:"2px solid #E8E7E2"}}>
                         {["Producto","Product ID","Meta","Enviados","Faltan","Estado","GMV","ROI 45d"].map(h=>(
-                          <th key={h} style={{padding:"0.6rem 0.85rem",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:"0.7rem",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                          <th key={h} style={{padding:"0.6rem 0.85rem",textAlign:"left",fontWeight:700,color:"#6F6E67",fontSize:"0.7rem",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {productBreakdown.map(({key,productId,productName,monthlyQuota,sent,gmv,roi45d,remaining,done}) => (
-                        <tr key={key} style={{borderBottom:"1px solid #f1f5f9"}}>
-                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#1e293b",maxWidth:280}}>{productName}</td>
-                          <td style={{padding:"0.6rem 0.85rem",color:"#64748b",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{productId || "—"}</td>
+                        <tr key={key} style={{borderBottom:"1px solid #F4F4F1"}}>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#1F1E1C",maxWidth:280}}>{productName}</td>
+                          <td style={{padding:"0.6rem 0.85rem",color:"#6F6E67",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{productId || "—"}</td>
                           <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center"}}>{monthlyQuota}</td>
-                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center",color:done?"#15803d":sent>0?"#ca8a04":"#64748b"}}>{sent}</td>
-                          <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:done?"#94a3b8":"#1e293b"}}>{remaining}</td>
+                          <td style={{padding:"0.6rem 0.85rem",fontWeight:700,textAlign:"center",color:done?"#15803d":sent>0?"#ca8a04":"#6F6E67"}}>{sent}</td>
+                          <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:done?"#A3A29B":"#1F1E1C"}}>{remaining}</td>
                           <td style={{padding:"0.6rem 0.85rem"}}>
                             <span style={{display:"inline-block",padding:"0.15rem 0.65rem",borderRadius:20,fontSize:"0.68rem",fontWeight:700,
-                              background:done?"#dcfce7":sent>0?"#fef9c3":"#f1f5f9",
-                              color:done?"#15803d":sent>0?"#854d0e":"#64748b"}}>
+                              background:done?"#dcfce7":sent>0?"#fef9c3":"#F4F4F1",
+                              color:done?"#15803d":sent>0?"#854d0e":"#6F6E67"}}>
                               {done?"✓ Completo":sent>0?"En progreso":"Sin enviar"}
                             </span>
                           </td>
@@ -1344,7 +1344,7 @@ export default function StrategyDashboard() {
                         </tr>
                       ))}
                       {unmatchedProducts.map(u => (
-                        <tr key={u.productId} style={{borderBottom:"1px solid #f1f5f9",background:"#fef2f2"}}>
+                        <tr key={u.productId} style={{borderBottom:"1px solid #F4F4F1",background:"#fef2f2"}}>
                           <td style={{padding:"0.6rem 0.85rem",fontWeight:600,color:"#b91c1c",maxWidth:280}}>{u.productName}</td>
                           <td style={{padding:"0.6rem 0.85rem",color:"#b91c1c",fontFamily:"monospace",fontSize:"0.72rem",whiteSpace:"nowrap"}}>{u.productId}</td>
                           <td style={{padding:"0.6rem 0.85rem",textAlign:"center",color:"#b91c1c"}}>—</td>
@@ -1361,8 +1361,8 @@ export default function StrategyDashboard() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
-                        <td colSpan={2} style={{padding:"0.6rem 0.85rem",fontWeight:700,color:"#64748b"}}>TOTAL</td>
+                      <tr style={{borderTop:"2px solid #E8E7E2",background:"#FAFAF8"}}>
+                        <td colSpan={2} style={{padding:"0.6rem 0.85rem",fontWeight:700,color:"#6F6E67"}}>TOTAL</td>
                         <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center"}}>{productBreakdown.reduce((s,r)=>s+r.monthlyQuota,0)}</td>
                         <td style={{padding:"0.6rem 0.85rem",fontWeight:800,textAlign:"center",color:C.samples}}>{productWindowShippedTotal}</td>
                         <td colSpan={4} />
@@ -1379,11 +1379,11 @@ export default function StrategyDashboard() {
               <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
                 <input type="number" min={0} max={100} className="form-control" style={{maxWidth:120}}
                   value={videoPctDraft} onChange={e=>setVideoPctDraft(e.target.value)} />
-                <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
+                <span style={{fontSize:"0.85rem",color:"#6F6E67"}}>%</span>
                 <button className="btn btn-primary btn-sm" disabled={savingVideoPct} onClick={saveVideoPct}>{savingVideoPct?"...":"Guardar"}</button>
               </div>
               {videoPctErr && <p style={{color:"#dc2626",fontSize:"0.8rem",marginTop:"0.5rem",marginBottom:0}}>{videoPctErr}</p>}
-              <p style={{fontSize:"0.75rem",color:"#94a3b8",marginTop:"0.5rem",marginBottom:0}}>
+              <p style={{fontSize:"0.75rem",color:"#A3A29B",marginTop:"0.5rem",marginBottom:0}}>
                 Aproximadamente 2 videos por sample enviado es un buen punto de referencia.
               </p>
             </div>
@@ -1391,17 +1391,17 @@ export default function StrategyDashboard() {
             {/* Bonus breakdown — always the official cycle, regardless of the browsing filter above */}
             <div className="card" style={{marginBottom:"1.1rem",background:"#f0f9ff",border:"1px solid #bae6fd"}}>
               <p style={{fontWeight:700,fontSize:"0.75rem",color:C.samples,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"0.2rem"}}>Desglose del bono</p>
-              <p style={{fontSize:"0.72rem",color:"#94a3b8",marginBottom:"0.75rem"}}>Ciclo oficial: {officialPeriod.from} → {officialPeriod.to} · {samplesShippedTotal} samples enviados ({Math.round(samplesPct)}%)</p>
+              <p style={{fontSize:"0.72rem",color:"#A3A29B",marginBottom:"0.75rem"}}>Ciclo oficial: {officialPeriod.from} → {officialPeriod.to} · {samplesShippedTotal} samples enviados ({Math.round(samplesPct)}%)</p>
               <div style={{display:"flex",justifyContent:"space-between",padding:"0.4rem 0",fontSize:"0.85rem"}}>
-                <span style={{color:"#64748b"}}>Samples enviados</span>
-                <span style={{fontWeight:700,color:"#1e293b"}}>${cop(samplesBonusAmount(samplesPct))} de ${cop(SAMPLES_BONUS_MAX)}</span>
+                <span style={{color:"#6F6E67"}}>Samples enviados</span>
+                <span style={{fontWeight:700,color:"#1F1E1C"}}>${cop(samplesBonusAmount(samplesPct))} de ${cop(SAMPLES_BONUS_MAX)}</span>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",padding:"0.4rem 0",fontSize:"0.85rem"}}>
-                <span style={{color:"#64748b"}}>Videos hechos</span>
-                <span style={{fontWeight:700,color:"#1e293b"}}>${cop(videosBonusAmount(samplesSettings.videoContentPct))} de ${cop(VIDEOS_BONUS_MAX)}</span>
+                <span style={{color:"#6F6E67"}}>Videos hechos</span>
+                <span style={{fontWeight:700,color:"#1F1E1C"}}>${cop(videosBonusAmount(samplesSettings.videoContentPct))} de ${cop(VIDEOS_BONUS_MAX)}</span>
               </div>
               <div style={{borderTop:"1px solid #bae6fd",marginTop:"0.5rem",paddingTop:"0.6rem",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1e293b"}}>Total Indicador #2</span>
+                <span style={{fontWeight:700,fontSize:"0.85rem",color:"#1F1E1C"}}>Total Indicador #2</span>
                 <span style={{fontWeight:800,fontSize:"1.1rem",color:C.samples}}>${cop(ind2Amount)} de ${cop(IND2_MAX)} COP</span>
               </div>
             </div>
@@ -1450,7 +1450,7 @@ export default function StrategyDashboard() {
               <p style={{fontSize:"0.8rem",color:"var(--text-muted)",margin:"0 0 0.25rem"}}>
                 {contestRanked.length} afiliado{contestRanked.length!==1?"s":""} · {contestRanked.filter(e=>e.qualified).length} compitiendo
               </p>
-              <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0 0 0.75rem",fontWeight:600}}>
+              <p style={{fontSize:"0.75rem",color:"#A3A29B",margin:"0 0 0.75rem",fontWeight:600}}>
                 Período: {contestPeriodLabel}
               </p>
               {contestRanked.length===0 ? (
@@ -1467,18 +1467,18 @@ export default function StrategyDashboard() {
                   </tr></thead>
                   <tbody>
                     {contestRanked.map(e => (
-                      <tr key={e.id} style={{background: e.qualified ? undefined : "#f8fafc", opacity: e.qualified ? 1 : 0.55}}>
+                      <tr key={e.id} style={{background: e.qualified ? undefined : "#FAFAF8", opacity: e.qualified ? 1 : 0.55}}>
                         <td style={{textAlign:"center"}}>
                           <input type="checkbox" checked={contestSelected.has(e.id)} onChange={()=>toggleContestSelected(e.id)} style={{width:16,height:16,cursor:"pointer"}} />
                         </td>
-                        <td style={{fontWeight:800,color:e.qualified?C.samples:"#94a3b8"}}>{e.rank ?? "—"}</td>
-                        <td style={{fontWeight:600,color:e.qualified?"#1e293b":"#94a3b8",cursor:"default",userSelect:revealedContestId===e.id?"text":"none"}}
+                        <td style={{fontWeight:800,color:e.qualified?C.samples:"#A3A29B"}}>{e.rank ?? "—"}</td>
+                        <td style={{fontWeight:600,color:e.qualified?"#1F1E1C":"#A3A29B",cursor:"default",userSelect:revealedContestId===e.id?"text":"none"}}
                           onMouseEnter={()=>setRevealedContestId(e.id)}
                           onMouseLeave={()=>setRevealedContestId(null)}
                           title={e.username}>
                           {revealedContestId===e.id ? e.username : CONTEST_MASK}
                         </td>
-                        <td style={{fontWeight:700,color:e.qualified?"#15803d":"#94a3b8"}}>{e.videosTotal}</td>
+                        <td style={{fontWeight:700,color:e.qualified?"#15803d":"#A3A29B"}}>{e.videosTotal}</td>
                         <td style={{textAlign:"center"}}>
                           <input type="checkbox" checked={e.qualified} onChange={()=>toggleContestQualified(e)} style={{width:18,height:18,cursor:"pointer"}} />
                         </td>
@@ -1513,7 +1513,7 @@ export default function StrategyDashboard() {
                     <h3 style={{margin:0,color:C.health}}>{ag.name}</h3>
                     <div style={{display:"flex",gap:"0.75rem",alignItems:"center"}}>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:"0.7rem",color:"#64748b"}}>Bono estimado (de ${cop(IND3_MAX)} máx)</div>
+                        <div style={{fontSize:"0.7rem",color:"#6F6E67"}}>Bono estimado (de ${cop(IND3_MAX)} máx)</div>
                         <div style={{fontSize:"1.2rem",fontWeight:800,color:C.health}}>${cop(earned)} COP</div>
                       </div>
                       <button className="btn btn-primary btn-sm" onClick={()=>saveEntry(ag.id)} disabled={saving}>{saving?"...":"Guardar"}</button>
@@ -1548,7 +1548,7 @@ export default function StrategyDashboard() {
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={20} step={0.01} className="form-control"
                           value={nv(d.nonBuyerFaultRate)} onChange={e=>setF(ag.id,"nonBuyerFaultRate",parseFloat(e.target.value)||0)} />
-                        <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
+                        <span style={{fontSize:"0.85rem",color:"#6F6E67"}}>%</span>
                       </div>
                     </SubMetric>
                     <SubMetric color={C.health} label="C. Negative Review Rate" sublabel="Meta: < 0.55% · Peso: 45%" scalePct={pC}
@@ -1566,7 +1566,7 @@ export default function StrategyDashboard() {
                       <div style={{display:"flex",gap:"0.4rem",alignItems:"center"}}>
                         <input type="number" min={0} max={10} step={0.01} className="form-control"
                           value={nv(d.negativeReviewRate)} onChange={e=>setF(ag.id,"negativeReviewRate",parseFloat(e.target.value)||0)} />
-                        <span style={{fontSize:"0.85rem",color:"#64748b"}}>%</span>
+                        <span style={{fontSize:"0.85rem",color:"#6F6E67"}}>%</span>
                       </div>
                     </SubMetric>
                   </div>
@@ -1619,23 +1619,23 @@ export default function StrategyDashboard() {
                           </button>
                           {/* List */}
                           {list.length===0
-                            ? <div style={{textAlign:"center",color:"#94a3b8",fontSize:"0.8rem",padding:"1rem"}}>Sin incidentes registrados</div>
+                            ? <div style={{textAlign:"center",color:"#A3A29B",fontSize:"0.8rem",padding:"1rem"}}>Sin incidentes registrados</div>
                             : <div style={{display:"flex",flexDirection:"column",gap:"0.5rem"}}>
                                 {list.map(inc=>(
-                                  <div key={inc.id} style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:"0.75rem",alignItems:"center",padding:"0.6rem 0.75rem",borderRadius:8,border:"1px solid #e2e8f0",background:"#f8fafc"}}>
+                                  <div key={inc.id} style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:"0.75rem",alignItems:"center",padding:"0.6rem 0.75rem",borderRadius:8,border:"1px solid #E8E7E2",background:"#FAFAF8"}}>
                                     <button onClick={()=>cycleIncidentStatus(inc)}
                                       title={STATUS_LABELS[inc.status]}
                                       style={{width:26,height:26,borderRadius:"50%",border:`2px solid ${STATUS_COLORS[inc.status]}`,
                                         background:STATUS_COLORS[inc.status],cursor:"pointer",flexShrink:0}} />
                                     <div>
-                                      <div style={{fontSize:"0.8rem",fontWeight:600,color:"#1e293b"}}>
-                                        {inc.orderNumber && <span style={{color:"#64748b",marginRight:"0.5rem"}}>#{inc.orderNumber}</span>}
-                                        {inc.username && <span style={{color:"#64748b",marginRight:"0.5rem"}}>@{inc.username}</span>}
+                                      <div style={{fontSize:"0.8rem",fontWeight:600,color:"#1F1E1C"}}>
+                                        {inc.orderNumber && <span style={{color:"#6F6E67",marginRight:"0.5rem"}}>#{inc.orderNumber}</span>}
+                                        {inc.username && <span style={{color:"#6F6E67",marginRight:"0.5rem"}}>@{inc.username}</span>}
                                         {inc.note}
                                       </div>
-                                      <div style={{fontSize:"0.68rem",color:"#94a3b8"}}>{STATUS_LABELS[inc.status]} · {inc.createdAt.slice(0,10)}</div>
+                                      <div style={{fontSize:"0.68rem",color:"#A3A29B"}}>{STATUS_LABELS[inc.status]} · {inc.createdAt.slice(0,10)}</div>
                                     </div>
-                                    <button onClick={()=>removeIncident(inc)} style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:"0.9rem"}} title="Eliminar">✕</button>
+                                    <button onClick={()=>removeIncident(inc)} style={{background:"transparent",border:"none",color:"#A3A29B",cursor:"pointer",fontSize:"0.9rem"}} title="Eliminar">✕</button>
                                   </div>
                                 ))}
                               </div>
@@ -1685,24 +1685,24 @@ export default function StrategyDashboard() {
                       <button className="btn btn-primary btn-sm" onClick={()=>saveEntry(ag.id)} disabled={saving}>{saving?"...":"Guardar"}</button>
                     </div>
                   </div>
-                  <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden",marginBottom:"1.25rem"}}>
+                  <div style={{height:8,background:"#E8E7E2",borderRadius:4,overflow:"hidden",marginBottom:"1.25rem"}}>
                     <div style={{width:`${compliancePct}%`,height:"100%",background:C.operative,transition:"width 0.3s",borderRadius:4}} />
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:"0.6rem"}}>
                     {QA_ITEMS.map(({key,label},i)=>{
                       const ans = qa[key] ?? "";
                       return (
-                        <div key={key} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"1rem",alignItems:"center",padding:"0.65rem 0.85rem",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
-                          <div style={{fontSize:"0.85rem",fontWeight:600,color:"#1e293b"}}>
-                            <span style={{fontSize:"0.7rem",color:"#94a3b8",marginRight:"0.4rem"}}>#{i+1}</span>{label}
+                        <div key={key} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"1rem",alignItems:"center",padding:"0.65rem 0.85rem",background:"#FAFAF8",borderRadius:8,border:"1px solid #E8E7E2"}}>
+                          <div style={{fontSize:"0.85rem",fontWeight:600,color:"#1F1E1C"}}>
+                            <span style={{fontSize:"0.7rem",color:"#A3A29B",marginRight:"0.4rem"}}>#{i+1}</span>{label}
                           </div>
                           <div style={{display:"flex",gap:"0.35rem"}}>
                             {(["si","masomenos","no"] as QaAnswer[]).map(opt=>(
                               <button key={opt} onClick={()=>setQa(ag.id,key,opt)}
                                 style={{padding:"0.3rem 0.7rem",borderRadius:6,fontSize:"0.78rem",fontWeight:600,cursor:"pointer",
-                                  border:`2px solid ${ans===opt?(opt==="si"?"#15803d":opt==="masomenos"?"#d97706":"#dc2626"):"#e2e8f0"}`,
+                                  border:`2px solid ${ans===opt?(opt==="si"?"#15803d":opt==="masomenos"?"#d97706":"#dc2626"):"#E8E7E2"}`,
                                   background:ans===opt?(opt==="si"?"#f0fdf4":opt==="masomenos"?"#fffbeb":"#fef2f2"):"white",
-                                  color:ans===opt?(opt==="si"?"#15803d":opt==="masomenos"?"#d97706":"#dc2626"):"#64748b"}}>
+                                  color:ans===opt?(opt==="si"?"#15803d":opt==="masomenos"?"#d97706":"#dc2626"):"#6F6E67"}}>
                                 {opt==="si"?"✓ Sí":opt==="masomenos"?"~ Más o menos":"✗ No"}
                               </button>
                             ))}
@@ -1776,11 +1776,11 @@ function SummaryBox({ label, value, color, sub, large }:{ label:string; value:nu
   return (
     <div style={{border:`1px solid ${color}25`,borderTop:`3px solid ${color}`,borderRadius:12,padding:"1.1rem 1.25rem",background:"white",textAlign:"center"}}>
       <div style={{fontSize:"0.7rem",fontWeight:700,color,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"0.4rem"}}>{label}</div>
-      <div style={{fontSize:large?"1.5rem":"1.25rem",fontWeight:800,color:large?color:"#1e293b"}}>
+      <div style={{fontSize:large?"1.5rem":"1.25rem",fontWeight:800,color:large?color:"#1F1E1C"}}>
         ${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(Math.round(value))}
-        <span style={{fontSize:"0.7rem",fontWeight:400,color:"#94a3b8",marginLeft:3}}>COP</span>
+        <span style={{fontSize:"0.7rem",fontWeight:400,color:"#A3A29B",marginLeft:3}}>COP</span>
       </div>
-      <div style={{fontSize:"0.72rem",color:"#94a3b8",marginTop:"0.3rem"}}>{sub}</div>
+      <div style={{fontSize:"0.72rem",color:"#A3A29B",marginTop:"0.3rem"}}>{sub}</div>
     </div>
   );
 }
@@ -1793,16 +1793,16 @@ function IndSummaryCard({ num, weight, label, earned, max, color, scalePct, deta
       {locked && <span style={{position:"absolute",top:"0.6rem",right:"0.75rem",fontSize:"0.65rem",background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",borderRadius:4,padding:"0.1rem 0.4rem",fontWeight:700}}>🔒 Bloqueado</span>}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.3rem"}}>
         <span style={{fontSize:"0.65rem",fontWeight:800,color,textTransform:"uppercase"}}>#{num} · {weight}</span>
-        <span style={{fontSize:"0.65rem",color:"#94a3b8"}}>máx ${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(max)}</span>
+        <span style={{fontSize:"0.65rem",color:"#A3A29B"}}>máx ${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(max)}</span>
       </div>
-      <div style={{fontSize:"0.82rem",fontWeight:700,color:"#1e293b",marginBottom:"0.5rem"}}>{label}</div>
-      <div style={{height:6,background:"#e2e8f0",borderRadius:3,overflow:"hidden",marginBottom:"0.5rem"}}>
+      <div style={{fontSize:"0.82rem",fontWeight:700,color:"#1F1E1C",marginBottom:"0.5rem"}}>{label}</div>
+      <div style={{height:6,background:"#E8E7E2",borderRadius:3,overflow:"hidden",marginBottom:"0.5rem"}}>
         <div style={{width:`${Math.min(100,scalePct*100)}%`,height:"100%",background:color,transition:"width 0.4s",borderRadius:3}} />
       </div>
-      <div style={{fontSize:"0.7rem",color:"#64748b",marginBottom:"0.4rem"}}>{detail}</div>
+      <div style={{fontSize:"0.7rem",color:"#6F6E67",marginBottom:"0.4rem"}}>{detail}</div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
         <div style={{fontSize:"1.05rem",fontWeight:800,color}}>${new Intl.NumberFormat("es-CO",{maximumFractionDigits:0}).format(displayEarned)}</div>
-        <div style={{fontSize:"0.7rem",color:"#94a3b8"}}>{Math.round(scalePct*100)}%</div>
+        <div style={{fontSize:"0.7rem",color:"#A3A29B"}}>{Math.round(scalePct*100)}%</div>
       </div>
     </div>
   );
@@ -1812,24 +1812,24 @@ function SubMetric({ color, label, sublabel, scalePct, scales, onSetVal, inciden
   { color:string; label:string; sublabel:string; scalePct:number; scales:{r:string;p:string;setVal?:number}[];
     onSetVal?:(v:number)=>void; incidentCount?:number; onOpenIncidents?:()=>void; children:React.ReactNode }) {
   return (
-    <div style={{background:"#f8fafc",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
+    <div style={{background:"#FAFAF8",borderRadius:10,padding:"1rem",border:`1px solid ${color}20`}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"0.15rem"}}>
-        <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1e293b"}}>{label}</div>
+        <div style={{fontSize:"0.8rem",fontWeight:700,color:"#1F1E1C"}}>{label}</div>
         {onOpenIncidents && (
           <button onClick={onOpenIncidents}
-            style={{fontSize:"0.65rem",fontWeight:700,color:"white",background:incidentCount&&incidentCount>0?"#dc2626":"#64748b",
+            style={{fontSize:"0.65rem",fontWeight:700,color:"white",background:incidentCount&&incidentCount>0?"#dc2626":"#6F6E67",
               border:"none",borderRadius:12,padding:"0.15rem 0.5rem",cursor:"pointer",whiteSpace:"nowrap",lineHeight:1.4}}>
             {incidentCount&&incidentCount>0?`${incidentCount} incidente${incidentCount>1?"s":""}`:"Incidentes"}
           </button>
         )}
       </div>
-      <div style={{fontSize:"0.7rem",color:"#64748b",marginBottom:"0.75rem"}}>{sublabel}</div>
+      <div style={{fontSize:"0.7rem",color:"#6F6E67",marginBottom:"0.75rem"}}>{sublabel}</div>
       {children}
-      <div style={{height:6,background:"#e2e8f0",borderRadius:3,overflow:"hidden",margin:"0.6rem 0 0.4rem"}}>
+      <div style={{height:6,background:"#E8E7E2",borderRadius:3,overflow:"hidden",margin:"0.6rem 0 0.4rem"}}>
         <div style={{width:`${scalePct*100}%`,height:"100%",background:color,transition:"width 0.3s",borderRadius:3}} />
       </div>
       <div style={{fontSize:"0.7rem",color,fontWeight:700,marginBottom:"0.5rem"}}>{Math.round(scalePct*100)}% de este sub-indicador</div>
-      {onSetVal && <div style={{fontSize:"0.6rem",color:"#94a3b8",marginBottom:"0.35rem"}}>Clic para autocompletar →</div>}
+      {onSetVal && <div style={{fontSize:"0.6rem",color:"#A3A29B",marginBottom:"0.35rem"}}>Clic para autocompletar →</div>}
       <div style={{display:"flex",flexDirection:"column",gap:"0.2rem"}}>
         {scales.map(s=>{
           const clickable = onSetVal && s.setVal != null;
@@ -1838,11 +1838,11 @@ function SubMetric({ color, label, sublabel, scalePct, scales, onSetVal, inciden
               onClick={clickable ? ()=>onSetVal!(s.setVal!) : undefined}
               style={{display:"flex",justifyContent:"space-between",fontSize:"0.68rem",padding:"0.2rem 0.4rem",borderRadius:4,
                 cursor:clickable?"pointer":"default",
-                color:clickable?"#374151":"#64748b",
-                border:clickable?"1px solid #e2e8f0":"1px solid transparent",
+                color:clickable?"#3A3936":"#6F6E67",
+                border:clickable?"1px solid #E8E7E2":"1px solid transparent",
                 background:"white",transition:"background 0.15s"}}>
               <span>{s.r}</span>
-              <span style={{fontWeight:700,color:clickable?color:"#64748b"}}>{s.p}</span>
+              <span style={{fontWeight:700,color:clickable?color:"#6F6E67"}}>{s.p}</span>
             </div>
           );
         })}

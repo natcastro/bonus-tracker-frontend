@@ -5,6 +5,8 @@ import { useHubAccess } from "../auth/HubAccessContext";
 import { useMsal } from "@azure/msal-react";
 import AccessAdminPanel from "../auth/AccessAdminPanel";
 import { GlobeIcon, ToolsIcon, ChartIcon, PaletteIcon, HeadsetIcon, WaveIcon, BookIcon, GearIcon, UsersIcon } from "../components/icons";
+import { Illustration } from "../components/Illustrations";
+import type { IllustrationKind } from "../components/Illustrations";
 import fcSymbol from "../assets/brand/fc-symbol.png";
 
 type Team = "MEX" | "OPS" | "APT" | "TKLIVES" | "CSQUALITY" | "MGMT" | "LOGISTICS" | "MARKETING" | "DEVOLUCIONES" | "HR";
@@ -18,66 +20,31 @@ const ROUTES: Record<Team, string> = {
 };
 
 const CS_TEAMS: { key: Team; label: string; desc: string; color: string }[] = [
-  { key: "OPS",  label: "Operations Team",  desc: "Handling Time & TikTok",  color: "#7c3aed" },
-  { key: "APT",  label: "Strategy Team",    desc: "Afiliados & CS",          color: "#6366f1" },
+  { key: "OPS",  label: "Operations Team",  desc: "Handling Time & TikTok",  color: "#1F1E1C" },
+  { key: "APT",  label: "Strategy Team",    desc: "Afiliados & CS",          color: "#1F1E1C" },
 ];
 
 // ── Card component ────────────────────────────────────────────────────────────
+const KIND: Record<string, IllustrationKind> = { "FTC USA": "dots", "FTC México": "grid", "Operational Tools": "rings", Management: "line", Marketing: "layers", HR: "rings", "Customer Service": "dots", Lives: "line", "CS Quality Dictionary": "grid" };
+
 function HubCard({
-  icon, eyebrow, title, subtitle, color, onClick, active,
+  eyebrow, title, subtitle, onClick, active,
 }: {
-  icon: ReactNode; eyebrow: string; title: string; subtitle: string;
-  color: string; onClick: () => void; active?: boolean;
+  icon?: ReactNode; eyebrow: string; title: string; subtitle: string;
+  color?: string; onClick: () => void; active?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        background: "#fff",
-        border: `1px solid ${active ? color : "#EEEEEE"}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: "14px",
-        padding: "1.85rem",
-        cursor: "pointer",
-        textAlign: "left",
-        transition: "box-shadow 0.25s, transform 0.25s, border-color 0.25s",
-        boxShadow: active ? `0 4px 16px ${color}22` : "0 1px 2px rgba(35,31,32,0.04), 0 6px 16px -4px rgba(35,31,32,0.06)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "1rem",
-        minWidth: 260,
-        maxWidth: 360,
-        flex: "1 1 260px",
-        position: "relative",
-        fontFamily: "var(--font-body)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 12px 28px -6px ${color}33`;
-        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-3px)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = active
-          ? `0 4px 16px ${color}22`
-          : "0 1px 2px rgba(35,31,32,0.04), 0 6px 16px -4px rgba(35,31,32,0.06)";
-        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <span style={{
-          width: 44, height: 44,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: color + "14",
-          borderRadius: "10px",
-          flexShrink: 0,
-        }}>{icon}</span>
-        <span style={{
-          fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.09em",
-          textTransform: "uppercase", color: color,
-        }}>{eyebrow}</span>
+    <button onClick={onClick} className={`hub-card${active ? " active" : ""}`} style={{ minWidth: 250, maxWidth: 340, flex: "1 1 250px" }}>
+      <div className="hub-card__top">
+        <span className="eyebrow">{eyebrow}</span>
       </div>
-      <div>
-        <div style={{ fontFamily: "var(--font-display)", fontWeight: 400, fontSize: "1.3rem", color: "var(--ftc-black)", letterSpacing: "-0.005em" }}>{title}</div>
-        <div style={{ fontSize: "0.85rem", color: "#6B7280", marginTop: 6, lineHeight: 1.5 }}>{subtitle}</div>
+      <div style={{ display: "flex", justifyContent: "center", color: "var(--ink)" }}><Illustration kind={KIND[title] ?? "dots"} size={104} /></div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "0.75rem" }}>
+        <div>
+          <div className="hub-card__title">{title}</div>
+          <div className="hub-card__sub">{subtitle}</div>
+        </div>
+        <span className="hub-card__arrow" aria-hidden>→</span>
       </div>
     </button>
   );
@@ -102,7 +69,7 @@ export default function Landing() {
 
   if (accessLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280" }}>
+      <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)" }}>
         Cargando…
       </div>
     );
@@ -111,8 +78,8 @@ export default function Landing() {
   if (!access) {
     return (
       <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0F172A", marginBottom: "0.5rem" }}>Sin acceso todavía</h1>
-        <p style={{ color: "#6B7280", maxWidth: 420, marginBottom: "1.5rem" }}>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--ink)", marginBottom: "0.5rem" }}>Sin acceso todavía</h1>
+        <p style={{ color: "var(--ink-3)", maxWidth: 420, marginBottom: "1.5rem" }}>
           Tu cuenta <strong>{email}</strong> inició sesión correctamente, pero todavía no tiene un equipo asignado en FTC Hub. Pide a un administrador que te dé acceso.
         </p>
         <button onClick={logout} className="btn btn-secondary btn-sm">Cerrar sesión</button>
@@ -134,20 +101,8 @@ export default function Landing() {
         position: "relative",
         overflow: "hidden",
       }}>
-        {/* Soft brand-colored accents — kept out of the content area, which stays white */}
-        <div aria-hidden style={{
-          position: "fixed", top: "-12%", left: "-10%", width: 480, height: 480, borderRadius: "50%",
-          background: "radial-gradient(circle, #CCDB9555 0%, transparent 70%)",
-          filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
-        }} />
-        <div aria-hidden style={{
-          position: "fixed", bottom: "-15%", right: "-10%", width: 560, height: 560, borderRadius: "50%",
-          background: "radial-gradient(circle, #FDD6BA55 0%, transparent 70%)",
-          filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
-        }} />
-
         <div style={{ position: "absolute", top: "1.25rem", right: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem", zIndex: 1 }}>
-          <span style={{ fontSize: "0.8rem", color: "#6B7280" }}>{name}</span>
+          <span style={{ fontSize: "0.8rem", color: "var(--ink-3)" }}>{name}</span>
           {access.isAdmin && !viewAs && (
             <button
               onClick={() => setShowAdminPanel(true)}
@@ -163,33 +118,23 @@ export default function Landing() {
         {showAdminPanel && <AccessAdminPanel onClose={() => setShowAdminPanel(false)} />}
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: "3rem", position: "relative", zIndex: 1 }}>
-          <img src={fcSymbol} alt="" aria-hidden style={{ height: 56, marginBottom: "0.9rem" }} />
-          <div style={{
-            fontSize: "0.8rem",
-            fontWeight: 700,
-            letterSpacing: "0.15em",
-            color: "var(--ftc-black)",
-            textTransform: "uppercase",
-            marginBottom: "0.5rem",
-          }}>
-            Forma tu Cuerpo
-            <span style={{ display: "inline-block", width: 24, height: 3, background: "var(--ftc-green)", borderRadius: 999, marginLeft: 8, verticalAlign: "middle" }} />
-          </div>
+          <img src={fcSymbol} alt="" aria-hidden style={{ height: 44, marginBottom: "1.25rem" }} />
+          <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>[ Forma tu Cuerpo ]</div>
           <h1 style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "2.75rem",
-            fontWeight: 400,
-            color: "var(--ftc-black)",
-            letterSpacing: "-0.01em",
+            fontSize: "3.25rem",
+            fontWeight: 600,
+            color: "var(--ink)",
+            letterSpacing: "-0.045em",
+            lineHeight: 1,
             margin: 0,
           }}>FTC Hub</h1>
-          <p style={{ color: "#6B7280", marginTop: "0.6rem", fontSize: "0.95rem" }}>
+          <p style={{ color: "var(--ink-3)", marginTop: "0.85rem", fontSize: "1rem" }}>
             Selecciona tu equipo para continuar
           </p>
         </div>
 
         {/* 3 main cards */}
-        <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100, position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100, position: "relative", zIndex: 1 }}>
           {(hasTeam("OPS") || hasTeam("APT") || hasTeam("TKLIVES")) && (
             <HubCard
               icon={<GlobeIcon color="#1e40af" />}
@@ -212,21 +157,21 @@ export default function Landing() {
           )}
           {hasTeam("CSQUALITY") && (
             <HubCard
-              icon={<ToolsIcon color="#475569" />}
+              icon={<ToolsIcon color="#57564F" />}
               eyebrow="Herramientas"
               title="Operational Tools"
               subtitle="Herramientas internas del equipo"
-              color="#475569"
+              color="#57564F"
               onClick={() => setView("ops-tools")}
             />
           )}
           {hasTeam("MGMT") && (
             <HubCard
-              icon={<ChartIcon color="#64748b" />}
+              icon={<ChartIcon color="#6F6E67" />}
               eyebrow="Gestión"
               title="Management"
               subtitle="Historial y datos del equipo"
-              color="#64748b"
+              color="#6F6E67"
               onClick={() => directGo("MGMT")}
             />
           )}
@@ -252,7 +197,7 @@ export default function Landing() {
           )}
         </div>
         {!hasTeam("OPS") && !hasTeam("APT") && !hasTeam("TKLIVES") && !hasTeam("MEX") && !hasTeam("CSQUALITY") && !hasTeam("MGMT") && !hasTeam("MARKETING") && !hasTeam("HR") && (
-          <p style={{ color: "#6B7280", marginTop: "1.5rem", position: "relative", zIndex: 1 }}>No tienes ningún equipo asignado todavía.</p>
+          <p style={{ color: "var(--ink-3)", marginTop: "1.5rem", position: "relative", zIndex: 1 }}>No tienes ningún equipo asignado todavía.</p>
         )}
 
       </div>
@@ -275,7 +220,7 @@ export default function Landing() {
           onClick={() => { setView("hub"); setCsSelected(null); }}
           style={{
             background: "none", border: "none", cursor: "pointer",
-            color: "#6B7280", fontSize: "0.85rem", fontWeight: 500,
+            color: "var(--ink-3)", fontSize: "0.85rem", fontWeight: 500,
             marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.4rem",
             alignSelf: "flex-start", maxWidth: 1100, width: "100%",
             padding: "0 0.25rem",
@@ -285,14 +230,14 @@ export default function Landing() {
         </button>
 
         <div style={{ textAlign: "center", marginBottom: "2.5rem", width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.15em", color: "#1e40af", textTransform: "uppercase", marginBottom: "0.4rem" }}>FTC USA</div>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", fontWeight: 400, color: "var(--ftc-black)", letterSpacing: "-0.01em", margin: 0 }}>
+          <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>[ FTC USA ]</div>
+          <h2 style={{ fontSize: "2.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0 }}>
             Selecciona tu área
           </h2>
         </div>
 
         {/* 2 sub-cards */}
-        <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 1100 }}>
           {(hasTeam("OPS") || hasTeam("APT")) && (
             <HubCard
               icon={<HeadsetIcon color="#1e40af" />}
@@ -324,17 +269,8 @@ export default function Landing() {
                 <button
                   key={t.key}
                   onClick={() => directGo(t.key)}
-                  style={{
-                    padding: "0.5rem 1.25rem",
-                    borderRadius: 9999,
-                    border: `2px solid ${t.color}`,
-                    background: t.color + "12",
-                    color: t.color,
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
+                  className="btn btn-secondary fx-card"
+                  style={{ padding: "0.85rem 1.75rem", fontSize: "0.95rem", borderColor: "var(--ink)", transition: "background-color 0.18s" }}
                 >
                   {t.label}
                 </button>
@@ -360,7 +296,7 @@ export default function Landing() {
         onClick={() => setView("hub")}
         style={{
           background: "none", border: "none", cursor: "pointer",
-          color: "#6B7280", fontSize: "0.85rem", fontWeight: 500,
+          color: "var(--ink-3)", fontSize: "0.85rem", fontWeight: 500,
           marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.4rem",
           alignSelf: "flex-start", maxWidth: 1100, width: "100%",
           padding: "0 0.25rem",
@@ -370,19 +306,19 @@ export default function Landing() {
       </button>
 
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-        <div style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.15em", color: "#475569", textTransform: "uppercase", marginBottom: "0.4rem" }}>Operational Tools</div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", fontWeight: 400, color: "var(--ftc-black)", letterSpacing: "-0.01em", margin: 0 }}>
+        <div className="eyebrow" style={{ marginBottom: "0.6rem" }}>[ Operational Tools ]</div>
+        <h2 style={{ fontSize: "2.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0 }}>
           Herramientas internas
         </h2>
       </div>
 
-      <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", justifyContent: "center" }}>
+      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
         <HubCard
-          icon={<BookIcon color="#475569" />}
+          icon={<BookIcon color="#57564F" />}
           eyebrow="Herramienta"
           title="CS Quality Dictionary"
           subtitle="Casos de calidad y categorías"
-          color="#475569"
+          color="#57564F"
           onClick={() => directGo("CSQUALITY")}
         />
       </div>

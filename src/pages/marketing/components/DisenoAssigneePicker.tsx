@@ -31,7 +31,7 @@ export default function DisenoAssigneePicker({
 
   const fieldStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
     background: MT.surface, cursor: "pointer", textAlign: "left",
   };
 
@@ -43,7 +43,7 @@ export default function DisenoAssigneePicker({
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 10,
-          background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg,
+          background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 0, boxShadow: MT.shadowLg,
           maxHeight: 260, overflowY: "auto",
         }}>
           {options.length === 0 ? (
@@ -61,7 +61,7 @@ export default function DisenoAssigneePicker({
                   onMouseEnter={e => { if (!off) e.currentTarget.style.background = MT.surfaceAlt; }}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ color: MT.text1, fontWeight: 600 }}>{disenoDisplayName(email)}{tags[email] && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>{tags[email]}</span>}</span>
+                  <span style={{ color: MT.text1, fontWeight: 600 }}>{disenoDisplayName(email)}{tags[email] && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 600, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>{tags[email]}</span>}</span>
                   <span style={{ color: MT.text3, fontSize: 12 }}>{country || (tags[email] ? "" : "No sé el país")}</span>
                 </div>
               );

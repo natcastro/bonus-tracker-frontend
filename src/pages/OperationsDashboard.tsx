@@ -437,7 +437,7 @@ export default function OperationsDashboard() {
   return (
     <div>
       <nav className="top-nav">
-        <div className="logo">FTC Hub — <span style={{ color: "#7c3aed" }}>Operations 🇺🇸</span></div>
+        <div className="logo">FTC Hub — <span style={{ color: "#1F1E1C" }}>Operations 🇺🇸</span></div>
         <ul className="nav-links">
           {TABS.map(([key, label]) => (
             <li key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}>{label}</li>
@@ -464,9 +464,9 @@ export default function OperationsDashboard() {
             <header className="section-header"><h2>Bonifications Summary — Operations</h2></header>
             <div className="summary-cards">
               {agentTotals.map((t) => (
-                <div key={t.agent.id} className="stat-card" style={{ borderTopColor: "#7c3aed" }}>
+                <div key={t.agent.id} className="stat-card" style={{ borderTopColor: "#1F1E1C" }}>
                   <h3>{t.agent.name}</h3>
-                  <div className="amount" style={{ color: "#7c3aed" }}><UsdCop v={t.total} /></div>
+                  <div className="amount" style={{ color: "#1F1E1C" }}><UsdCop v={t.total} /></div>
                   {t.raw > (t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP) && (
                     <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Raw: ${t.raw.toFixed(2)} (capped at ${t.isFullTime ? FULLTIME_TOTAL_CAP : OPS_TOTAL_CAP})</div>
                   )}
@@ -622,31 +622,31 @@ export default function OperationsDashboard() {
               </div>
               {/* Filters: agent, type and outcome as one tidy panel of pills (each with its count) */}
               {(() => {
-                const PURPLE = "#7c3aed";
+                const PURPLE = "#1F1E1C";
                 const byAgent = appeals.filter((a) => filterAgentId === 0 || a.agentId === filterAgentId);
                 const typeOf = (a: OpsAppeal) => a.appealType ?? "tiktok";
                 const outcomeKey = (a: OpsAppeal) => (a.status === "completed" ? a.outcome : "none");
-                const OUTCOME_DOT: Record<string, string> = { fullRefund: "#16a34a", partialRefund: "#f59e0b", fee: "#3b82f6", lost: "#dc2626", none: "#94a3b8" };
+                const OUTCOME_DOT: Record<string, string> = { fullRefund: "#16a34a", partialRefund: "#f59e0b", fee: "#3b82f6", lost: "#dc2626", none: "#A3A29B" };
                 const pill = (key: string, active: boolean, onClick: () => void, label: string, count: number, dot?: string) => (
                   <button key={key} onClick={onClick} style={{
                     display: "inline-flex", alignItems: "center", gap: 6, padding: "0.3rem 0.8rem", borderRadius: 9999, fontSize: "0.8rem", cursor: "pointer",
-                    fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? PURPLE : "#e2e8f0"}`, background: active ? `${PURPLE}14` : "#fff", color: active ? PURPLE : "#475569",
+                    fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? PURPLE : "#E8E7E2"}`, background: active ? `${PURPLE}14` : "#fff", color: active ? PURPLE : "#57564F",
                     transition: "all 0.15s",
                   }}>
                     {dot && <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />}
                     {label}
-                    <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0 6px", borderRadius: 9999, background: active ? PURPLE : "#f1f5f9", color: active ? "#fff" : "#64748b" }}>{count}</span>
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0 6px", borderRadius: 9999, background: active ? PURPLE : "#F4F4F1", color: active ? "#fff" : "#6F6E67" }}>{count}</span>
                   </button>
                 );
                 const row = (title: string, children: React.ReactNode) => (
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-                    <span style={{ width: 70, fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>{title}</span>
+                    <span style={{ width: 70, fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#A3A29B" }}>{title}</span>
                     {children}
                   </div>
                 );
                 const filtersOn = !!filterType || !!filterOutcome || filterAgentId !== 0;
                 return (
-                  <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1rem" }}>
+                  <div style={{ background: "#FAFAF8", border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1rem" }}>
                     {row("Agent", <>
                       {pill("a0", filterAgentId === 0, () => setFilterAgentId(0), "All", appeals.length)}
                       {visibleAgents.map((ag) => pill(`a${ag.id}`, filterAgentId === ag.id, () => setFilterAgentId(filterAgentId === ag.id ? 0 : ag.id), ag.name, appeals.filter((x) => x.agentId === ag.id).length))}
@@ -660,8 +660,8 @@ export default function OperationsDashboard() {
                       {Object.entries(OUTCOME_LABELS).map(([k, l]) => pill(`o${k}`, filterOutcome === k, () => setFilterOutcome(filterOutcome === k ? "" : k), l, byAgent.filter((x) => outcomeKey(x) === k).length, OUTCOME_DOT[k]))}
                       {pill("onone", filterOutcome === "none", () => setFilterOutcome(filterOutcome === "none" ? "" : "none"), "No outcome yet", byAgent.filter((x) => outcomeKey(x) === "none").length, OUTCOME_DOT.none)}
                     </>)}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}>
-                      <span>Showing <strong style={{ color: "#0f172a" }}>{listedAppeals.length}</strong> of {appeals.length} appeals</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E8E7E2", paddingTop: "0.5rem", fontSize: "0.8rem", color: "#6F6E67" }}>
+                      <span>Showing <strong style={{ color: "#1F1E1C" }}>{listedAppeals.length}</strong> of {appeals.length} appeals</span>
                       {filtersOn && <button onClick={() => { setFilterAgentId(0); setFilterType(""); setFilterOutcome(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 700, cursor: "pointer", fontSize: "0.8rem" }}>✕ Clear filters</button>}
                     </div>
                   </div>
@@ -737,24 +737,26 @@ export default function OperationsDashboard() {
                     {ag.name}
                     {isThomasFullTime && <span className="badge" style={{ marginLeft: 8, fontSize: "0.7rem", background: "#fef9c3", color: "#854d0e", border: "none" }}>Full-time (cap ${FULLTIME_HANDLING_CAP})</span>}
                   </h3>
-                  <table className="data-table" style={{ marginBottom: "1rem", maxWidth: 320 }}>
-                    <thead><tr><th>Handling Time</th><th>Bonus</th></tr></thead>
-                    <tbody>{rows.map(([r, b]) => <tr key={r}><td>{r}</td><td>{b}</td></tr>)}</tbody>
-                  </table>
-                  <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-                    <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
-                      <label>Handling Time (hours)</label>
-                      <input type="number" min="0" step="0.1" className="form-control" placeholder="ej. 18.5"
-                        value={val} onChange={(e) => setHandlingForms((p) => ({ ...p, [ag.id]: e.target.value }))} />
-                    </div>
-                    {preview !== null && (
-                      <div style={{ padding: "0.5rem 1rem", background: "#f3f0ff", borderRadius: "6px", fontWeight: 600, color: "#7c3aed", whiteSpace: "nowrap" }}>
-                        Bonus: ${preview.toFixed(2)}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "2rem", alignItems: "start" }}>
+                    <table className="data-table table-framed" style={{ margin: 0 }}>
+                      <thead><tr><th>Handling Time</th><th style={{ textAlign: "right" }}>Bonus</th></tr></thead>
+                      <tbody>{rows.map(([r, b]) => <tr key={r}><td>{r}</td><td className="mono" style={{ textAlign: "right" }}>{b}</td></tr>)}</tbody>
+                    </table>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 360 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Handling Time (hours)</label>
+                        <input type="number" min="0" step="0.1" className="form-control" placeholder="ej. 18.5"
+                          value={val} onChange={(e) => setHandlingForms((p) => ({ ...p, [ag.id]: e.target.value }))} />
                       </div>
-                    )}
-                    <button className="btn btn-primary" style={{ background: handlingSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => saveHandlingTime(ag.id)}>
-                      {handlingSaved[ag.id] ? "Saved! ✓" : "Save"}
-                    </button>
+                      {preview !== null && (
+                        <div className="mono" style={{ padding: "0.6rem 0.9rem", background: "var(--paper-3)", fontWeight: 500, color: "var(--ink)" }}>
+                          Bonus: ${preview.toFixed(2)}
+                        </div>
+                      )}
+                      <button className="btn btn-primary" style={{ background: handlingSaved[ag.id] ? "#16a34a" : undefined, borderColor: handlingSaved[ag.id] ? "#16a34a" : undefined, alignSelf: "flex-start" }} onClick={() => saveHandlingTime(ag.id)}>
+                        {handlingSaved[ag.id] ? "Saved! ✓" : "Save"}
+                      </button>
+                    </div>
                   </div>
                   {ht && <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>Last saved: {ht.hours}h → ${calcFn(ht.hours).toFixed(2)}</p>}
                 </div>
@@ -773,7 +775,7 @@ export default function OperationsDashboard() {
               </div>
             ) : (
               <>
-                <div className="card" style={{ background: "#f9fafb", marginBottom: "1rem" }}>
+                <div className="card" style={{ background: "#FAFAF8", marginBottom: "1rem" }}>
                   <h3 style={{ marginBottom: "0.5rem" }}>Cómo se califica</h3>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0 0 0.75rem" }}>
                     Quien revisa califica cada área. Cada una vale un porcentaje del bono máximo de ${FULLTIME_AMAZON_PERF_CAP}; el bono es la suma de lo que se gana en cada área, sin extremos de todo o nada.

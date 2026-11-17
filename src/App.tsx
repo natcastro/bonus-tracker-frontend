@@ -16,6 +16,7 @@ import LogisticsHubApp from "./pages/logistics-hub/LogisticsHubApp";
 import MarketingApp from "./pages/marketing/MarketingApp";
 import DevolucionesDashboard from "./pages/DevolucionesDashboard";
 import HrDashboard from "./pages/HrDashboard";
+import StyleGuide from "./pages/StyleGuide";
 
 const NO_PASSWORD_TEAMS = new Set(["TKLIVES", "CSQUALITY", "LOGISTICS", "MARKETING", "DEVOLUCIONES", "HR"]);
 
@@ -32,6 +33,8 @@ function ProtectedRoute({ team, children }: { team: string; children: ReactEleme
 }
 
 export default function App() {
+  // Local-only design system reference — never reachable in the deployed build.
+  if (import.meta.env.DEV && window.location.pathname === "/styleguide") return <StyleGuide />;
   return (
     <MsalProvider instance={msalInstance}>
       <AuthGate>

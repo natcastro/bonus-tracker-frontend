@@ -46,7 +46,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
 
   const inputStyle: React.CSSProperties = {
     width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-    border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+    border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
   };
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 };
 
@@ -101,7 +101,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
             {cat.category === "videos" && videoEmailList.length === 0 && <p style={{ fontSize: 12, color: MT.text3, margin: "6px 0 0" }}>Todavía no hay personas con el rol Video. Un administrador las agrega en Accesos (Marketing → Video).</p>}
           </div>
 
-          {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 8, padding: "8px 12px" }}>{error}</div>}
+          {error && <div style={{ fontSize: 12.5, color: MT.danger, background: MT.dangerSoft, borderRadius: 0, padding: "8px 12px" }}>{error}</div>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
             <button type="button" onClick={onClose} style={{
@@ -110,7 +110,7 @@ export default function NewTodoTaskModal({ onClose }: { onClose: () => void }) {
             }}>Cancelar</button>
             <button type="submit" disabled={saving} style={{
               fontFamily: MT.font, fontSize: 13.5, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
-              background: MT.clay, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+              background: MT.clay, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
             }}>{saving ? "Creando..." : "Asignar tarea"}</button>
           </div>
         </form>

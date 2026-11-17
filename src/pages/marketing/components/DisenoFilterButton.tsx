@@ -43,7 +43,7 @@ export default function DisenoFilterButton({
         onClick={() => { onActivate(); setOpen(v => !v); }}
         style={{
           fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-          padding: "5px 11px", borderRadius: 7, whiteSpace: "nowrap",
+          padding: "5px 11px", borderRadius: 0, whiteSpace: "nowrap",
           border: `1px solid ${active ? MT.primary : MT.border}`,
           background: active ? MT.primarySoft : MT.surface,
           color: active ? MT.primary : MT.text2,
@@ -53,7 +53,7 @@ export default function DisenoFilterButton({
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 20, minWidth: 180,
-          background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg,
+          background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 0, boxShadow: MT.shadowLg,
           overflow: "hidden",
         }}>
           <div onClick={() => onChangeSelected([])} style={{ ...rowStyle, borderBottom: `1px solid ${MT.border}`, fontWeight: 700 }}

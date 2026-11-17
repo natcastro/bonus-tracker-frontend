@@ -117,7 +117,7 @@ export function taskCategoryDetailsBlock(s: TaskCategoryState): string {
 
 const fieldStyle: React.CSSProperties = {
   width: "100%", fontFamily: MT.font, fontSize: 13.5, padding: "9px 11px",
-  border: `1px solid ${MT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+  border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
 };
 const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: MT.text2, display: "block", marginBottom: 6 };
 
@@ -214,7 +214,7 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
           {showOptions && !state.selectedType && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 10,
-              background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 8, boxShadow: MT.shadowLg,
+              background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: 0, boxShadow: MT.shadowLg,
               maxHeight: 220, overflowY: "auto",
             }}>
               {filteredTypes.length === 0 ? (
@@ -316,8 +316,8 @@ export default function TaskCategoryFields({ state, onChange }: { state: TaskCat
           </div>
 
           {/* Video brief template — a video can't be made from a one-line request */}
-          <div style={{ background: MT.surfaceAlt, borderRadius: 10, padding: "0.85rem 0.9rem", display: "flex", flexDirection: "column", gap: 12 }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <div style={{ background: MT.surfaceAlt, borderRadius: 0, padding: "0.85rem 0.9rem", display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: MT.clay, textTransform: "uppercase", letterSpacing: "0.04em" }}>
               ⚠ Importante: ser específico
             </p>
             <div>

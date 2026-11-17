@@ -51,7 +51,7 @@ export default function Navbar() {
           style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
         >
           <div style={{
-            width: 26, height: 26, borderRadius: 7, background: HT.primary,
+            width: 26, height: 26, borderRadius: 0, background: HT.primary,
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 13, fontWeight: 800, fontFamily: HT.font,
           }}>L</div>
@@ -72,7 +72,7 @@ export default function Navbar() {
                   fontFamily: HT.font, fontSize: 13.5, fontWeight: 600, cursor: "pointer",
                   background: active ? HT.primarySoft : "transparent",
                   color: active ? HT.primary : HT.text2,
-                  border: "none", borderRadius: 8, padding: "7px 12px",
+                  border: "none", borderRadius: 0, padding: "7px 12px",
                   transition: "background 0.12s",
                 }}
               >
@@ -89,7 +89,7 @@ export default function Navbar() {
           onClick={() => navigate("/logistics/hub/users")}
           title="Usuarios y configuración"
           style={{
-            width: 32, height: 32, borderRadius: 8, border: "none",
+            width: 32, height: 32, borderRadius: 0, border: "none",
             background: location.pathname.startsWith("/logistics/hub/users") ? HT.primarySoft : "transparent",
             color: location.pathname.startsWith("/logistics/hub/users") ? HT.primary : HT.text2,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -111,7 +111,7 @@ export default function Navbar() {
           <span style={{ fontFamily: HT.font, fontSize: 12.5, fontWeight: 600, color: HT.text1 }}>{currentUser}</span>
         </button>
         <button onClick={logout} title="Salir" style={{
-          width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent",
+          width: 32, height: 32, borderRadius: 0, border: "none", background: "transparent",
           color: HT.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <Icon name="logout" size={17} />

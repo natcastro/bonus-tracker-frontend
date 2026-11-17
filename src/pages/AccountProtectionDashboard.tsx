@@ -319,7 +319,7 @@ export default function AccountProtectionDashboard() {
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.75rem" }}>
-                  <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: "6px", fontWeight: 600, color: claimForm.status === "pending" ? "var(--text-muted)" : "#0891b2" }}>
+                  <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: 0, fontWeight: 600, color: claimForm.status === "pending" ? "var(--text-muted)" : "#0891b2" }}>
                     Bonus: {claimForm.status === "pending" ? "—" : `$${bonusPreview.toFixed(2)}`}
                   </div>
                   <button type="submit" className="btn btn-primary">Add Entry</button>
@@ -418,7 +418,7 @@ export default function AccountProtectionDashboard() {
                         ))}
                       </select>
                     </div>
-                    <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: "6px", fontWeight: 600, color: "#0891b2", whiteSpace: "nowrap" }}>
+                    <div style={{ padding: "0.5rem 1rem", background: "#e0f2fe", borderRadius: 0, fontWeight: 600, color: "#0891b2", whiteSpace: "nowrap" }}>
                       Bonus: ${bonus.toFixed(2)}
                     </div>
                     <button className="btn btn-primary" style={{ background: perfSaved[ag.id] ? "#16a34a" : undefined, whiteSpace: "nowrap" }} onClick={() => savePerformance(ag.id)}>

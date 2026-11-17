@@ -196,7 +196,7 @@ export default function DevolucionesDashboard() {
                 <h4 style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Archivos subidos</h4>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                   {uploads.map((u) => (
-                    <div key={u.id} className="badge" style={{ background: "#f1f5f9", color: "#334155", border: "none", display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.75rem" }}>
+                    <div key={u.id} className="badge" style={{ background: "#F4F4F1", color: "#3A3936", border: "none", display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.75rem" }}>
                       <span>{u.filename} ({new Date(u.uploadedAt).toLocaleDateString()})</span>
                       <button
                         onClick={() => removeUpload(u.id)}

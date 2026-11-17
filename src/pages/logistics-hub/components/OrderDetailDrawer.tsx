@@ -31,7 +31,7 @@ export default function OrderDetailDrawer() {
   if (!order) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", justifyContent: "flex-end" }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", justifyContent: "flex-end" }}>
       <div onClick={closeOrder} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.35)" }} />
       <div style={{
         position: "relative", width: 440, maxWidth: "92vw", height: "100%",
@@ -47,14 +47,14 @@ export default function OrderDetailDrawer() {
             </div>
           </div>
           <button onClick={closeOrder} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none", background: HT.surfaceAlt,
+            width: 30, height: 30, borderRadius: 0, border: "none", background: HT.surfaceAlt,
             color: HT.text2, cursor: "pointer", fontSize: 16, lineHeight: 1,
           }}>×</button>
         </div>
 
         {order.status === "attention" && order.attentionReason && (
           <div style={{
-            background: HT.dangerSoft, border: `1px solid rgba(220,38,38,0.2)`, borderRadius: 10,
+            background: HT.dangerSoft, border: `1px solid rgba(220,38,38,0.2)`, borderRadius: 0,
             padding: "12px 14px", marginBottom: 20,
           }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: HT.danger, marginBottom: 6 }}>Requiere atención</div>

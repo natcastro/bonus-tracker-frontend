@@ -8,6 +8,7 @@ import StatusPill from "../components/StatusPill";
 import { SearchIcon, PaletteIcon } from "../../../components/icons";
 import { todoStageLabel, todoFullName, requestStageLabel, isPastDeadline, stageLate, todayIso } from "../types";
 import type { TodoTask, MarketingRequest } from "../types";
+import Mascot from "../../../components/Mascot";
 import { moodBird } from "../../../components/moodBird";
 import { LinkIcon } from "../../../components/icons";
 import DisenoFilterButton from "../components/DisenoFilterButton";
@@ -86,14 +87,14 @@ export default function TodoPage() {
   const kpi = (label: string, value: string | number, color: string, last?: boolean) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0.6rem 0.9rem", flex: 1, minWidth: 110, borderRight: last ? "none" : `1px solid ${MT.border}` }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div style={{ fontSize: 16.5, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 16.5, fontWeight: 600, color }}>{value}</div>
     </div>
   );
 
   const segButton = (active: boolean, onClick: () => void, label: string) => (
     <button onClick={onClick} style={{
       fontFamily: MT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-      padding: "5px 11px", borderRadius: 7, whiteSpace: "nowrap",
+      padding: "5px 11px", borderRadius: 0, whiteSpace: "nowrap",
       border: `1px solid ${active ? MT.clay : MT.border}`,
       background: active ? MT.claySoft : MT.surface,
       color: active ? MT.clay : MT.text2,
@@ -104,10 +105,10 @@ export default function TodoPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.9rem", gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>To Do</h1>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: MT.text1 }}>To Do</h1>
           <p style={{ margin: "0.15rem 0 0", fontSize: 12.5, color: MT.text2 }}>Tareas rápidas de Karol y solicitudes asignadas a Diseño</p>
         </div>
-        <img className="ftc-mascot" src={bird.src} alt={bird.label} title={`${onTimePct}% a tiempo — ${bird.label}`} style={{ width: 110, height: 110, objectFit: "contain", flexShrink: 0 }} />
+        <Mascot src={bird.src} label={bird.label} pct={onTimePct} frames={bird.frames} rig={bird.rig} />
       </div>
 
       {/* KPI strip */}
@@ -130,7 +131,7 @@ export default function TodoPage() {
           </span>
           <input
             value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tarea..."
-            style={{ fontFamily: MT.font, fontSize: 12.5, padding: "7px 11px 7px 30px", width: "100%", border: `1px solid ${MT.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box" }}
+            style={{ fontFamily: MT.font, fontSize: 12.5, padding: "7px 11px 7px 30px", width: "100%", border: `1px solid ${MT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box" }}
           />
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -149,10 +150,10 @@ export default function TodoPage() {
           options={[...disenoEmailList, ...videoEmailList]} label="Diseño / Video" disenoDisplayName={disenoDisplayName}
         />
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
-          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
         }} />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Hasta" style={{
-          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+          fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
         }} />
       </div>
 
@@ -178,7 +179,7 @@ export default function TodoPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = MT.surfaceAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ width: 32, height: 32, borderRadius: 8, background: `${isTodo ? MT.clay : MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 0, background: `${isTodo ? MT.clay : MT.violet}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {isTodo ? <PaletteIcon size={16} color={MT.clay} /> : <LinkIcon size={16} color={MT.violet} />}
                   </span>
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: MT.text1, minWidth: 0 }}>{item.title}<TodoCategoryChip task={item.kind === "todo" ? item.task : item.request} /></span>

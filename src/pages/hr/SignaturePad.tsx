@@ -17,14 +17,14 @@ export default function SignaturePad({ value, onChange, disabled }: { value: str
   const move = (e: React.PointerEvent) => {
     if (!drawing.current) return;
     const ctx = ref.current!.getContext("2d")!; const p = pos(e);
-    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#0f172a"; ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#1F1E1C"; ctx.lineTo(p.x, p.y); ctx.stroke();
   };
   const up = () => { if (!drawing.current) return; drawing.current = false; onChange(ref.current!.toDataURL("image/png")); };
 
   return (
     <div>
       <canvas ref={ref} width={520} height={140} onPointerDown={down} onPointerMove={move} onPointerUp={up}
-        style={{ width: "100%", maxWidth: 520, height: 140, border: "1px dashed #94a3b8", borderRadius: 8, background: disabled ? "#f8fafc" : "#fff", touchAction: "none", cursor: disabled ? "default" : "crosshair" }} />
+        style={{ width: "100%", maxWidth: 520, height: 140, border: "1px dashed #A3A29B", borderRadius: 0, background: disabled ? "#FAFAF8" : "#fff", touchAction: "none", cursor: disabled ? "default" : "crosshair" }} />
       {!disabled && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => onChange(null)}>Borrar firma</button>}
     </div>
   );

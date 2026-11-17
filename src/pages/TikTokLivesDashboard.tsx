@@ -7,7 +7,7 @@ import { MONTHS } from "../services/mexBonus";
 const TEAM = "TKLIVES";
 const YEARS = ["2025", "2026", "2027", "2028"];
 const DOW_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const AGENT_COLORS = ["#1e40af", "#0891b2", "#7c3aed", "#dc2626", "#d97706", "#db2777"];
+const AGENT_COLORS = ["#1e40af", "#0891b2", "#1F1E1C", "#dc2626", "#d97706", "#db2777"];
 const TIMEZONES = [
   { value: "", label: "Sin definir" },
   { value: "America/Los_Angeles", label: "Pacífico (California) — PT" },
@@ -361,9 +361,9 @@ export default function TikTokLivesDashboard() {
 
       <main className="content-area">
         {error && (
-          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
+          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 0, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
             <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: "0.4rem" }}>⚠️ {error}</div>
-            <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: 0, whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 4 }}>{`CREATE TABLE IF NOT EXISTS usa_live_schedules (
+            <pre style={{ fontSize: "0.75rem", color: "#7f1d1d", margin: 0, whiteSpace: "pre-wrap", background: "#fff5f5", padding: "0.5rem", borderRadius: 0 }}>{`CREATE TABLE IF NOT EXISTS usa_live_schedules (
   id BIGSERIAL PRIMARY KEY,
   agent_id BIGINT REFERENCES agents(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -418,7 +418,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                     { label: "⏱ Total", val: totalHrs, red: true },
                   ].map(({ label, val, red }) => (
                     <div key={label} className="card" style={{ flex: "1 1 120px", padding: "0.65rem 1rem", display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#A3A29B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
                       <span style={statStyle(val, red)}>{fmt(val)}<span style={{ fontSize: "0.85rem", fontWeight: 600, marginLeft: 2 }}>h</span></span>
                     </div>
                   ))}
@@ -443,8 +443,8 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 <span style={{ fontSize: "0.65rem", fontWeight: 800, color, textTransform: "uppercase", letterSpacing: "0.04em" }}>{txt}</span>
               );
               return (
-                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "0.85rem 1rem", minWidth: 210, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
-                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Resumen del mes</div>
+                <div style={{ position: "absolute", top: "3.75rem", left: 0, zIndex: 30, background: "white", border: "1px solid #E8E7E2", borderRadius: 0, padding: "0.85rem 1rem", minWidth: 210, boxShadow: "0 6px 20px rgba(0,0,0,0.13)" }}>
+                  <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#6F6E67", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.6rem" }}>Resumen del mes</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     {agents.map((ag) => {
                       const color = agColor(ag.id);
@@ -465,21 +465,21 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                             {lbl("🔴 Lives", color)}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                               <span style={{ fontSize: "0.78rem", fontWeight: 800, color, background: color + "18", borderRadius: 100, padding: "1px 7px" }}>{fmt(liveMonth)}h</span>
-                              <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(liveWeek)}h</span>
+                              <span style={{ fontSize: "0.65rem", color: "#A3A29B", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(liveWeek)}h</span>
                             </div>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 13, marginTop: "0.2rem" }}>
-                            {lbl("📝 Contenido", "#64748b")}
+                            {lbl("📝 Contenido", "#6F6E67")}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-                              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#64748b", background: "#64748b18", borderRadius: 100, padding: "1px 7px" }}>{fmt(contMonth)}h</span>
-                              <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(contWeek)}h</span>
+                              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#6F6E67", background: "#64748b18", borderRadius: 100, padding: "1px 7px" }}>{fmt(contMonth)}h</span>
+                              <span style={{ fontSize: "0.65rem", color: "#A3A29B", fontWeight: 600, paddingRight: 3 }}>sem: {fmt(contWeek)}h</span>
                             </div>
                           </div>
                         </div>
                       );
                     })}
-                    <div style={{ paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#94a3b8" }}>
-                      Turnos: <strong style={{ color: "#0f172a" }}>{displaySchedules.length}</strong>
+                    <div style={{ paddingTop: "0.5rem", borderTop: "1px solid #F4F4F1", fontSize: "0.72rem", color: "#A3A29B" }}>
+                      Turnos: <strong style={{ color: "#1F1E1C" }}>{displaySchedules.length}</strong>
                     </div>
                   </div>
                 </div>
@@ -493,7 +493,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                   <button
                     onClick={() => setLivesCountOpen((o) => !o)}
                     title="Ver resumen de horas por agente"
-                    style={{ background: livesCountOpen ? "#fdf2f8" : "white", border: `1px solid ${livesCountOpen ? "#e91e8c" : "#e2e8f0"}`, borderRadius: 7, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#e91e8c" : "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                    style={{ background: livesCountOpen ? "#fdf2f8" : "white", border: `1px solid ${livesCountOpen ? "#e91e8c" : "#E8E7E2"}`, borderRadius: 0, padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: livesCountOpen ? "#e91e8c" : "#6F6E67", display: "flex", alignItems: "center", gap: "0.3rem" }}
                   >
                     📋 {livesCountOpen ? "▲" : "▼"}
                   </button>
@@ -511,11 +511,11 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
               <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
                 {agents.map((ag) => (
                   <span key={ag.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem" }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 3, background: agColor(ag.id), display: "inline-block" }} />
+                    <span style={{ width: 12, height: 12, borderRadius: 0, background: agColor(ag.id), display: "inline-block" }} />
                     {ag.name}
                   </span>
                 ))}
-                {agents.length === 0 && <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>Sin agentes — agrégalos en Configuración.</span>}
+                {agents.length === 0 && <span style={{ fontSize: "0.8rem", color: "#A3A29B" }}>Sin agentes — agrégalos en Configuración.</span>}
               </div>
 
               <div style={{ overflowX: "auto" }}>
@@ -545,7 +545,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                   <div style={{ display: "grid", gridTemplateColumns: "52px repeat(6, 1fr)", height: `${(SCHED_END - SCHED_START) * PX_HR}px`, position: "relative" }}>
                     <div>
                       {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                        <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #f1f5f9" : "none" }}>
+                        <div key={i} style={{ height: PX_HR, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 6, paddingTop: 2, fontSize: "0.65rem", color: "var(--text-muted)", borderTop: i > 0 ? "1px solid #F4F4F1" : "none" }}>
                           {String((SCHED_START + i) % 24).padStart(2, "0")}:00
                         </div>
                       ))}
@@ -558,7 +558,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       return (
                         <div
                           key={colIdx}
-                          style={{ position: "relative", borderLeft: "1px solid #f1f5f9", background: isToday ? "#fef2f2" : "transparent", cursor: day ? "crosshair" : "default" }}
+                          style={{ position: "relative", borderLeft: "1px solid #F4F4F1", background: isToday ? "#fef2f2" : "transparent", cursor: day ? "crosshair" : "default" }}
                           onClick={day ? (e) => {
                             if ((e.target as HTMLElement).closest("[data-ev]")) return;
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -576,7 +576,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                           } : undefined}
                         >
                           {Array.from({ length: SCHED_END - SCHED_START }, (_, i) => (
-                            <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #f1f5f9" : "none", height: PX_HR }} />
+                            <div key={i} style={{ position: "absolute", top: i * PX_HR, left: 0, right: 0, borderTop: i > 0 ? "1px solid #F4F4F1" : "none", height: PX_HR }} />
                           ))}
                           {colEvs.map((ev) => {
                             const topPx = ((timeMins(ev.startTime) - SCHED_START * 60) / 60) * PX_HR;
@@ -595,12 +595,12 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                                   background: isContenido ? "transparent" : color + "22",
                                   backgroundImage: isContenido ? `repeating-linear-gradient(135deg, ${color}18 0px, ${color}18 4px, transparent 4px, transparent 10px)` : "none",
                                   border: `${isContenido ? "1.5px dashed" : "1.5px solid"} ${color}`,
-                                  borderRadius: 4, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none",
+                                  borderRadius: 0, padding: "2px 4px", fontSize: "0.66rem", overflow: "hidden", zIndex: 1, cursor: "pointer", userSelect: "none",
                                 }}
                               >
                                 <div style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1.3 }}>
                                   <span style={{ fontWeight: 700, color }}>{agents.find((a) => a.id === ev.agentId)?.name ?? ""}</span>
-                                  {isContenido && <span style={{ fontSize: "0.6rem", background: color, color: "white", borderRadius: 3, padding: "0 3px", fontWeight: 700, lineHeight: 1.4 }}>C</span>}
+                                  {isContenido && <span style={{ fontSize: "0.6rem", background: color, color: "white", borderRadius: 0, padding: "0 3px", fontWeight: 700, lineHeight: 1.4 }}>C</span>}
                                 </div>
                                 <div style={{ color: "var(--text-muted)", lineHeight: 1.2 }}>{ev.startTime.slice(0,5)}–{ev.endTime.slice(0,5)}{viewTimezone ? ` ${TZ_ABBR[viewTimezone] ?? ""}` : ""}</div>
                                 {evNote && <div style={{ color: "var(--text-muted)", lineHeight: 1.2, fontStyle: "italic" }}>{evNote}</div>}
@@ -649,7 +649,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       <div style={{ display: "flex", gap: "0.5rem" }}>
                         {(["live", "contenido"] as const).map((t) => (
                           <button key={t} type="button" onClick={() => setForm((f) => ({ ...f, type: t }))}
-                            style={{ flex: 1, padding: "0.45rem", borderRadius: 6, fontSize: "0.85rem", fontWeight: form.type === t ? 700 : 400, cursor: "pointer",
+                            style={{ flex: 1, padding: "0.45rem", borderRadius: 0, fontSize: "0.85rem", fontWeight: form.type === t ? 700 : 400, cursor: "pointer",
                               border: form.type === t ? "2px solid #e91e8c" : "1px solid var(--border)",
                               background: form.type === t ? "#e91e8c15" : "white",
                               color: form.type === t ? "#e91e8c" : "var(--text-muted)" }}>
@@ -681,7 +681,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                                 key={label}
                                 onClick={() => toggleRepeatDay(i)}
                                 style={{
-                                  padding: "0.35rem 0.7rem", borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
+                                  padding: "0.35rem 0.7rem", borderRadius: 0, fontSize: "0.8rem", cursor: "pointer",
                                   border: form.repeatDays.includes(i) ? "2px solid #e91e8c" : "1px solid var(--border)",
                                   background: form.repeatDays.includes(i) ? "#e91e8c15" : "white",
                                   color: form.repeatDays.includes(i) ? "#e91e8c" : "var(--text-muted)",
@@ -725,7 +725,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
                   {(["month", "week", "range"] as const).map((f) => (
                     <button key={f} type="button" onClick={() => setContabFilter(f)}
-                      style={{ padding: "0.35rem 0.75rem", borderRadius: 6, fontSize: "0.82rem", cursor: "pointer", fontWeight: contabFilter === f ? 700 : 400,
+                      style={{ padding: "0.35rem 0.75rem", borderRadius: 0, fontSize: "0.82rem", cursor: "pointer", fontWeight: contabFilter === f ? 700 : 400,
                         border: contabFilter === f ? "2px solid #e91e8c" : "1px solid var(--border)",
                         background: contabFilter === f ? "#e91e8c15" : "white",
                         color: contabFilter === f ? "#e91e8c" : "var(--text-muted)" }}>
@@ -793,7 +793,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                       return (
                         <div key={ag.id} className="card" style={{ flex: "1 1 220px", borderTop: `4px solid ${color}` }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
-                            <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
+                            <span style={{ width: 10, height: 10, borderRadius: 0, background: color, flexShrink: 0 }} />
                             <span style={{ fontWeight: 700, fontSize: "1rem" }}>{ag.name}</span>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -864,7 +864,7 @@ ALTER TABLE usa_live_schedules DISABLE ROW LEVEL SECURITY;`}</pre>
                   <div>
                     <label>Color</label>
                     <input type="color" value={agColor(ag.id)} onChange={(e) => saveAgentColor(ag.id, e.target.value)}
-                      style={{ width: 42, height: 36, padding: 2, border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer" }} />
+                      style={{ width: 42, height: 36, padding: 2, border: "1px solid var(--border)", borderRadius: 0, cursor: "pointer" }} />
                   </div>
                   <button className="btn btn-primary" onClick={() => saveAgentName(ag.id)}>Guardar Nombre</button>
                   <button

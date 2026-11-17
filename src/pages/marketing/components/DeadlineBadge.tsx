@@ -59,7 +59,7 @@ export default function DeadlineBadge({ deadline, compact }: { deadline: string 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-        <span style={{ fontWeight: 800, fontSize: compact ? 13 : 16, color }}>
+        <span style={{ fontWeight: 600, fontSize: compact ? 13 : 16, color }}>
           {overdue ? "⚠ Atrasado" : bigLabel(deadline, diffDays)}
         </span>
         <span style={{ fontSize: 11, color: MT.text3 }}>{smallDate}</span>

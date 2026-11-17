@@ -126,7 +126,7 @@ export default function HomePage() {
         <button onClick={() => setShowManualAdd(true)} style={{
           fontFamily: HT.font, fontSize: 13, fontWeight: 700, cursor: "pointer",
           background: HT.surface, color: HT.text1, border: `1px dashed ${HT.borderStrong}`,
-          borderRadius: 8, padding: "9px 16px", whiteSpace: "nowrap",
+          borderRadius: 0, padding: "9px 16px", whiteSpace: "nowrap",
         }}>+ Agregar orden</button>
       </div>
 
@@ -137,14 +137,14 @@ export default function HomePage() {
           placeholder="Buscar por número de orden o producto…"
           style={{
             flex: 1, fontFamily: HT.font, fontSize: 14, padding: "10px 14px",
-            border: `1px solid ${HT.border}`, borderRadius: 10, outline: "none", background: HT.surface,
+            border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", background: HT.surface,
           }}
         />
         <div style={{ display: "flex", gap: 6 }}>
           {PLATFORM_FILTERS.map((p) => (
             <button key={p.key} onClick={() => setPlatform(p.key)} style={{
               fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              padding: "0 14px", borderRadius: 10,
+              padding: "0 14px", borderRadius: 0,
               background: platform === p.key ? HT.text1 : HT.surface,
               color: platform === p.key ? "#fff" : HT.text2,
               border: `1px solid ${platform === p.key ? HT.text1 : HT.border}`, whiteSpace: "nowrap",
@@ -187,7 +187,7 @@ export default function HomePage() {
             <div><AgeChip createdAt={o.createdAt} /></div>
             <button onClick={() => setAssigning(o)} style={{
               fontFamily: HT.font, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-              background: HT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px",
+              background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "7px 14px",
             }}>Asignar</button>
           </div>
         ))}

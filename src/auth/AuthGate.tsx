@@ -28,8 +28,7 @@ function ViewAsBanner() {
   return (
     <div style={{
       position: "sticky", top: 0, zIndex: 9999, background: "#78350F", color: "#fff",
-      fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
-      fontSize: "0.8rem", fontWeight: 600, padding: "0.5rem 1rem",
+      fontSize: "0.8rem", fontWeight: 500, padding: "0.5rem 1rem",
       display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem",
     }}>
       <span>👀 Vista previa — viendo el Hub como: {viewAsLabel(viewAs.team, viewAs.role)}</span>
@@ -37,7 +36,7 @@ function ViewAsBanner() {
         onClick={stopViewAs}
         style={{
           background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.4)", color: "#fff",
-          borderRadius: 6, padding: "0.2rem 0.65rem", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer",
+          borderRadius: 0, padding: "0.2rem 0.65rem", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer",
         }}
       >
         Salir de vista previa
@@ -50,30 +49,23 @@ function LoginScreen() {
   const { instance, inProgress } = useMsal();
   return (
     <div style={{
-      minHeight: "100vh", background: "#F8F9FA", display: "flex", flexDirection: "column",
+      minHeight: "100vh", background: "var(--paper)", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", padding: "2rem",
-      fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
     }}>
-      <div style={{ fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.15em", color: "#3E8C54", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-        Forma tu Cuerpo
-      </div>
-      <h1 style={{ fontSize: "2.25rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.03em", margin: "0 0 1.75rem" }}>FTC Hub</h1>
+      <div className="eyebrow" style={{ marginBottom: "0.75rem" }}>[ Forma tu Cuerpo ]</div>
+      <h1 style={{ fontSize: "3.25rem", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.045em", lineHeight: 1, margin: "0 0 2rem" }}>FTC Hub</h1>
       <button
         onClick={() => {
           const path = window.location.pathname + window.location.search;
           instance.loginRedirect(path && path !== "/" ? { ...loginRequest, state: path } : loginRequest);
         }}
         disabled={inProgress !== InteractionStatus.None}
-        style={{
-          display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.95rem", fontWeight: 700,
-          background: "#fff", color: "#1F2937", border: "1px solid #E5E7EB", borderRadius: 10,
-          padding: "0.85rem 1.6rem", cursor: inProgress !== InteractionStatus.None ? "not-allowed" : "pointer",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
+        className="btn btn-primary"
+        style={{ padding: "0.7rem 1.25rem", fontSize: "0.925rem" }}
       >
-        {inProgress !== InteractionStatus.None ? "Redirigiendo..." : "🔑 Entrar con Microsoft"}
+        {inProgress !== InteractionStatus.None ? "Redirigiendo…" : "Entrar con Microsoft"}
       </button>
-      <p style={{ marginTop: "1.25rem", fontSize: "0.8rem", color: "#6B7280" }}>Usa tu correo @formatucuerpo.com</p>
+      <p style={{ marginTop: "1.25rem", fontSize: "0.8rem", color: "var(--ink-3)" }}>Usa tu correo @formatucuerpo.com</p>
     </div>
   );
 }

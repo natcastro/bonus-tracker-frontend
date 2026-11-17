@@ -24,7 +24,7 @@ export default function LogisticsHubLogin() {
         padding: "40px 36px", width: "100%", maxWidth: 380,
       }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 12, background: HT.primary,
+          width: 44, height: 44, borderRadius: 0, background: HT.primary,
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "#fff", fontSize: 19, fontWeight: 800, margin: "0 auto 18px",
         }}>L</div>
@@ -45,7 +45,7 @@ export default function LogisticsHubLogin() {
               placeholder="natalie@formatucuerpo.com" autoFocus required
               style={{
                 width: "100%", fontFamily: HT.font, fontSize: 14, padding: "10px 12px",
-                border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
@@ -58,7 +58,7 @@ export default function LogisticsHubLogin() {
               placeholder="••••••" required
               style={{
                 width: "100%", fontFamily: HT.font, fontSize: 14, padding: "10px 12px",
-                border: `1px solid ${HT.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
@@ -66,13 +66,13 @@ export default function LogisticsHubLogin() {
           {error && (
             <div style={{
               fontSize: 12.5, color: HT.danger, background: HT.dangerSoft,
-              borderRadius: 8, padding: "8px 12px",
+              borderRadius: 0, padding: "8px 12px",
             }}>{error}</div>
           )}
 
           <button type="submit" style={{
             fontFamily: HT.font, fontSize: 14, fontWeight: 700, cursor: "pointer",
-            background: HT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "11px 0", marginTop: 6,
+            background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "11px 0", marginTop: 6,
           }}>Entrar</button>
         </form>
 

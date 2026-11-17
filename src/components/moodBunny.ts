@@ -11,9 +11,9 @@ import bunny10 from "../assets/bunnies/bunny-10.png";
 import bunny0 from "../assets/bunnies/bunny-0.png";
 
 // Mood mascot shared across dashboards — each bucket covers the 10 points below its label
-// (e.g. 91-100 -> ¡Súper feliz!, 0 -> Sin vida).
-export const MOOD_BUNNIES: { min: number; src: string; label: string }[] = [
-  { min: 91, src: bunny100, label: "¡Súper feliz!" },
+// (e.g. 89-100 -> ¡Súper feliz! (animated rig), 0 -> Sin vida).
+export const MOOD_BUNNIES: { min: number; src: string; label: string; rig?: "bunny100" }[] = [
+  { min: 89, src: bunny100, label: "¡Súper feliz!", rig: "bunny100" },
   { min: 81, src: bunny90,  label: "Feliz" },
   { min: 71, src: bunny80,  label: "Contento" },
   { min: 61, src: bunny70,  label: "Tranquilo" },

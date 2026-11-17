@@ -6,11 +6,11 @@ export const HT = {
   surfaceAlt: "#F1F2F7",
   border: "rgba(15,23,42,0.08)",
   borderStrong: "rgba(15,23,42,0.16)",
-  text1: "#0F172A",
+  text1: "#1F1E1C",
   text2: "#5B6472",
   text3: "#96A1AF",
 
-  primary: "#4F46E5",
+  primary: "#1F1E1C",
   primaryDark: "#3F37C9",
   primarySoft: "#EEEDFD",
 
@@ -28,8 +28,8 @@ export const HT = {
   shadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.05)",
   shadowLg: "0 4px 16px rgba(15,23,42,0.08), 0 24px 48px rgba(15,23,42,0.10)",
 
-  font: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`,
-  mono: `"SF Mono", "Menlo", "Monaco", Consolas, monospace`,
+  font: `var(--font-body), -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`,
+  mono: `var(--font-mono), "SF Mono", "Menlo", "Monaco", Consolas, monospace`,
 
   radius: 12,
   radiusLg: 16,
@@ -39,7 +39,7 @@ export const PLATFORM_CFG: Record<
   string,
   { label: string; bg: string; fg: string }
 > = {
-  tiktok: { label: "TikTok", bg: "#111827", fg: "#FFFFFF" },
+  tiktok: { label: "TikTok", bg: "#1F1E1C", fg: "#FFFFFF" },
   amazon: { label: "Amazon", bg: "#FEF3E2", fg: "#92400E" },
   shopify: { label: "Online", bg: "#EAF1FF", fg: "#1D4ED8" },
 };
@@ -49,7 +49,7 @@ export const LOCATION_CFG: Record<
   { color: string }
 > = {
   Belier: { color: "#2563EB" },
-  Norte: { color: "#7C3AED" },
+  Norte: { color: "#1F1E1C" },
   Plaza: { color: "#DB2777" },
   Colombia: { color: "#D97706" },
 };
@@ -60,7 +60,7 @@ export const STATUS_CFG: Record<
 > = {
   unassigned: { label: "Sin asignar", fg: "#5B6472", bg: "#F1F2F7" },
   pending_logistics: { label: "Pendiente de Logística", fg: "#1D4ED8", bg: "#EAF1FF" },
-  pending_store: { label: "Pendiente de Tienda", fg: "#6D28D9", bg: "#F1EBFE" },
+  pending_store: { label: "Pendiente de Tienda", fg: "#1F1E1C", bg: "#F4F4F1" },
   completed: { label: "Completado", fg: "#15803D", bg: "#E9F9EF" },
   attention: { label: "Requiere atención", fg: "#B91C1C", bg: "#FDECEC" },
 };

@@ -92,7 +92,7 @@ export default function HrHeadView({ store }: { store: HrStore }) {
               <h4 style={{ marginTop: 0 }}>Puntos por revisar</h4>
               <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>Cosas del Excel que conviene confirmar antes de usar a estas personas.</p>
               {store.contractors.filter(c => realIssues(c.issues).length > 0).map(c => (
-                <div key={c.id} style={{ padding: "6px 0", borderTop: "1px solid #e2e8f0", fontSize: "0.85rem" }}>
+                <div key={c.id} style={{ padding: "6px 0", borderTop: "1px solid #E8E7E2", fontSize: "0.85rem" }}>
                   <strong>{c.legalName}</strong>
                   <ul style={{ margin: "2px 0 0", paddingLeft: "1.1rem", color: "#991b1b" }}>{realIssues(c.issues).map(i => <li key={i}>{i}</li>)}</ul>
                 </div>

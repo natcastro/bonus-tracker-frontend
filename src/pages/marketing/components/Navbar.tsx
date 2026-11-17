@@ -20,14 +20,14 @@ export default function Navbar() {
   return (
     <nav className="top-nav">
       <div className="logo" style={{ cursor: "pointer" }} onClick={() => navigate("/marketing/tasks")}>
-        FTC Hub — <span style={{ color: MT.primary }}>Marketing</span>
+        FTC Hub — <span style={{ color: MT.text2, fontWeight: 500 }}>Marketing</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
         <NotificationBell />
         {access?.isAdmin && (
           <button onClick={() => setShowSettings(true)} title="Configurar correos de notificación" style={{
             display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30,
-            background: "transparent", border: `1px solid ${MT.border}`, borderRadius: 7, cursor: "pointer", color: MT.text2,
+            background: "transparent", border: `1px solid ${MT.border}`, borderRadius: 0, cursor: "pointer", color: MT.text2,
           }}>
             <GearIcon size={15} />
           </button>

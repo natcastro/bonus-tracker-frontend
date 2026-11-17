@@ -62,14 +62,14 @@ export default function CompletedPage() {
           placeholder="Buscar Order #…"
           style={{
             flex: "1 1 200px", fontFamily: HT.font, fontSize: 14, padding: "10px 14px",
-            border: `1px solid ${HT.border}`, borderRadius: 10, outline: "none", background: HT.surface,
+            border: `1px solid ${HT.border}`, borderRadius: 0, outline: "none", background: HT.surface,
           }}
         />
         <div style={{ display: "flex", gap: 6 }}>
           {PLATFORM_FILTERS.map((p) => (
             <button key={p.key} onClick={() => setPlatform(p.key)} style={{
               fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              padding: "0 14px", borderRadius: 10,
+              padding: "0 14px", borderRadius: 0,
               background: platform === p.key ? HT.text1 : HT.surface,
               color: platform === p.key ? "#fff" : HT.text2,
               border: `1px solid ${platform === p.key ? HT.text1 : HT.border}`, whiteSpace: "nowrap",
@@ -78,14 +78,14 @@ export default function CompletedPage() {
         </div>
         <select value={loc} onChange={(e) => setLoc(e.target.value)} style={{
           fontFamily: HT.font, fontSize: 13, fontWeight: 600, color: HT.text2,
-          border: `1px solid ${HT.border}`, borderRadius: 10, padding: "0 12px", background: HT.surface,
+          border: `1px solid ${HT.border}`, borderRadius: 0, padding: "0 12px", background: HT.surface,
         }}>
           <option value="all">Todas las tiendas</option>
           {LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
         </select>
         <button onClick={() => setAsc(!asc)} style={{
           fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-          background: HT.surface, color: HT.text2, border: `1px solid ${HT.border}`, borderRadius: 10, padding: "0 14px",
+          background: HT.surface, color: HT.text2, border: `1px solid ${HT.border}`, borderRadius: 0, padding: "0 14px",
         }}>{asc ? "↑ Antiguas" : "↓ Recientes"}</button>
       </div>
 
@@ -126,7 +126,7 @@ export default function CompletedPage() {
                 <span style={{
                   fontFamily: HT.font, fontSize: 11, fontWeight: 700,
                   color: onTime ? HT.success : HT.warn, background: onTime ? HT.successSoft : HT.warnSoft,
-                  borderRadius: 6, padding: "3px 8px",
+                  borderRadius: 0, padding: "3px 8px",
                 }}>{onTime ? "A tiempo" : "Tarde"}</span>
               </div>
             </div>

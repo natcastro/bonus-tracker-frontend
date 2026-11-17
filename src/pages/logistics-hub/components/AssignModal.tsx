@@ -25,7 +25,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="modal-layer" style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div onClick={step === "processing" ? undefined : onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)" }} />
       <div style={{
         position: "relative", width: 420, maxWidth: "92vw", background: HT.surface,
@@ -49,7 +49,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
                 return (
                   <button key={loc} onClick={() => setLocation(loc)} style={{
                     display: "flex", alignItems: "center", gap: 8, padding: "12px 14px",
-                    borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    borderRadius: 0, cursor: "pointer", textAlign: "left",
                     border: `1.5px solid ${active ? color : HT.border}`,
                     background: active ? `${color}0F` : HT.surface,
                     fontFamily: HT.font, fontSize: 14, fontWeight: 600, color: HT.text1,
@@ -71,7 +71,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
                 style={{
                   fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: location ? "pointer" : "not-allowed",
                   background: location ? HT.primary : HT.surfaceAlt, color: location ? "#fff" : HT.text3,
-                  border: "none", borderRadius: 8, padding: "10px 18px",
+                  border: "none", borderRadius: 0, padding: "10px 18px",
                 }}
               >Continuar</button>
             </div>
@@ -84,7 +84,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
               Confirmar asignación
             </div>
             <div style={{
-              background: HT.primarySoft, borderRadius: 10, padding: "14px 16px", marginBottom: 16,
+              background: HT.primarySoft, borderRadius: 0, padding: "14px 16px", marginBottom: 16,
             }}>
               <div style={{ fontSize: 13, color: HT.text2 }}>Esta orden será asignada a:</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: HT.primaryDark, marginTop: 2, letterSpacing: "0.01em" }}>
@@ -101,7 +101,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
               }}>Cancelar</button>
               <button onClick={confirm} style={{
                 fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-                background: HT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px",
+                background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px",
               }}>Confirmar asignación</button>
             </div>
           </>
@@ -140,7 +140,7 @@ export default function AssignModal({ order, onClose }: { order: HubOrder; onClo
             )}
             <button onClick={onClose} style={{
               fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-              background: HT.primary, color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px",
+              background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "10px 24px",
             }}>Cerrar</button>
           </div>
         )}

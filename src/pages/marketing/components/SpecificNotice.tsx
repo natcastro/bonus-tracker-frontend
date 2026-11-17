@@ -5,7 +5,7 @@ import { MT } from "../theme";
 export default function SpecificNotice() {
   return (
     <p style={{
-      margin: "0 0 6px", fontSize: 12, fontWeight: 800, color: MT.clay,
+      margin: "0 0 6px", fontSize: 12, fontWeight: 600, color: MT.clay,
       textTransform: "uppercase", letterSpacing: "0.04em",
     }}>
       ⚠ Importante: ser específico

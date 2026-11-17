@@ -4,47 +4,47 @@
 export const MT = {
   bg: "#FFFFFF",
   surface: "#FFFFFF",
-  surfaceAlt: "#F8F9FA",
-  border: "#EEEEEE",
-  borderStrong: "#E5E7EB",
-  text1: "#111827",
-  text2: "#6B7280",
-  text3: "#9CA3AF",
+  surfaceAlt: "#FAFAF8",
+  border: "#E8E7E2",
+  borderStrong: "#D6D5CE",
+  text1: "#1F1E1C",
+  text2: "#6F6E67",
+  text3: "#A3A29B",
 
-  primary: "#3E6B45",
-  primaryDark: "#2E5033",
-  primarySoft: "#E4EEE2",
+  primary: "#1F1E1C",
+  primaryDark: "#3A3936",
+  primarySoft: "#F4F4F1",
 
   moss: "#8A9B4E",
   mossSoft: "#EEF1DE",
 
   clay: "#B15E3B",
-  claySoft: "#F3E3D8",
+  claySoft: "#F5E3D6",
 
   warn: "#B08526",
   warnSoft: "#F4EBD3",
   danger: "#A6432B",
   dangerSoft: "#F5E1DA",
-  success: "#3E6B45",
-  successSoft: "#E4EEE2",
+  success: "#3E7D3A",
+  successSoft: "#E2EFD9",
   info: "#4F6D8C",
-  infoSoft: "#E6EDF3",
+  infoSoft: "#DCE8F1",
   violet: "#6B5B95",
-  violetSoft: "#ECE9F3",
+  violetSoft: "#E9E4F3",
 
-  shadow: "0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)",
-  shadowLg: "0 4px 16px rgba(17,24,39,0.08), 0 24px 48px rgba(17,24,39,0.10)",
+  shadow: "0 1px 2px rgba(31,30,28,0.04)",
+  shadowLg: "0 2px 6px rgba(31,30,28,0.06), 0 24px 48px -16px rgba(31,30,28,0.22)",
 
   // Same brand font (Lato) every other module's shared index.css already uses.
-  font: `var(--font-body, 'Lato'), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
-  mono: `"SF Mono", "Menlo", "Monaco", Consolas, monospace`,
+  font: `var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+  mono: `var(--font-mono), "SF Mono", "Menlo", "Monaco", Consolas, monospace`,
 
-  radius: 10,
-  radiusLg: 14,
+  radius: 8,
+  radiusLg: 10,
 };
 
 export const ROLE_CFG: Record<string, { label: string; color: string; soft: string }> = {
-  laura: { label: "Laura", color: MT.primary, soft: MT.primarySoft },
+  laura: { label: "Laura", color: "#5E7A2E", soft: "#EEF3DC" },
   diseno: { label: "Diseño", color: MT.clay, soft: MT.claySoft },
   carol: { label: "Karol", color: MT.info, soft: MT.infoSoft },
   video: { label: "Video", color: MT.violet, soft: MT.violetSoft },

@@ -42,7 +42,7 @@ export function NewContractorModal({ supervisors, onSave, onClose, initial }: { 
     <div className="form-group" style={{ maxWidth: 340 }}>
       <label>{label}</label>
       <MoneyInput value={value || null} currency={c.currency} invalid={overLimit(value, c.currency)} onChange={n => onChange(n ?? 0)} />
-      {value > 0 && <div style={{ fontSize: "0.82rem", marginTop: 4, color: overLimit(value, c.currency) ? "#b91c1c" : "#334155" }}>
+      {value > 0 && <div style={{ fontSize: "0.82rem", marginTop: 4, color: overLimit(value, c.currency) ? "#b91c1c" : "#3A3936" }}>
         = <strong>{amountInWords(value, c.currency)}</strong>{overLimit(value, c.currency) && <> — supera el límite de {formatMoney(cur.limit, c.currency)}. ¿Un cero de más?</>}
       </div>}
       {hint && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{hint}</div>}
@@ -87,7 +87,7 @@ export function NewContractorModal({ supervisors, onSave, onClose, initial }: { 
       <form className="modal" onSubmit={submit} style={{ maxWidth: 720, width: "94vw", maxHeight: "92vh", overflowY: "auto" }}>
         <div className="modal-header"><h3>{editing ? `Editar — ${initial!.legalName.split(" ")[0]}` : "Nueva persona"} — paso {step} de 3</h3></div>
         <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-          {[1, 2, 3].map(n => <div key={n} style={{ flex: 1, height: 4, borderRadius: 999, background: n <= step ? "#0f766e" : "#e2e8f0" }} />)}
+          {[1, 2, 3].map(n => <div key={n} style={{ flex: 1, height: 4, borderRadius: 999, background: n <= step ? "#0f766e" : "#E8E7E2" }} />)}
         </div>
         <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>Solo {HR_HEAD} puede crear cuentas. {step === 1 ? "¿Quién es y dónde está?" : step === 2 ? "¿Cómo se le paga?" : "Datos fijos que salen en su cuenta de cobro."}</p>
 

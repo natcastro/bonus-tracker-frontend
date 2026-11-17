@@ -271,13 +271,13 @@ export default function TeamDashboardPage() {
   const kpi = (label: string, value: string | number, color: string) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0.9rem 1.1rem", flex: 1, minWidth: 130 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color }}>{value}</div>
     </div>
   );
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.25rem 1.5rem", fontFamily: MT.font }}>
-      <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: MT.text1 }}>Dashboard</h1>
+      <h1 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: MT.text1 }}>Dashboard</h1>
       <p style={{ margin: "0.15rem 0 1.25rem", fontSize: 12.5, color: MT.text2 }}>
         Estadísticas del equipo completo, más un ranking de AHT de Diseño (borrador, cifras ajustables)
       </p>
@@ -295,7 +295,7 @@ export default function TeamDashboardPage() {
               onClick={() => setSelectedEmail(selectedEmail === d.email ? null : d.email)}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "2.1rem 1rem 1.25rem", minWidth: 0, flex: "1 1 210px",
-                borderRadius: 12, cursor: "pointer", textAlign: "center", fontFamily: MT.font, position: "relative",
+                borderRadius: 0, cursor: "pointer", textAlign: "center", fontFamily: MT.font, position: "relative",
                 border: `1.5px solid ${selectedEmail === d.email ? MT.clay : MT.border}`,
                 background: selectedEmail === d.email ? MT.claySoft : MT.surface,
                 boxShadow: MT.shadow,
@@ -304,10 +304,10 @@ export default function TeamDashboardPage() {
               <span style={{
                 position: "absolute", top: 10, left: 10, width: 22, height: 22, borderRadius: "50%",
                 background: i === 0 ? MT.moss : MT.border, color: i === 0 ? "#fff" : MT.text2,
-                fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center",
               }}>{i + 1}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 6, maxWidth: "100%", overflowWrap: "anywhere" }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ fontSize: 9.5, fontWeight: 800, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
-              <span style={{ fontSize: 24, fontWeight: 800, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: MT.text1, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 6, maxWidth: "100%", overflowWrap: "anywhere" }}>{d.name}{videoEmailList.includes(d.email) && <span style={{ fontSize: 9.5, fontWeight: 600, color: MT.violet, background: MT.violetSoft, borderRadius: 999, padding: "1px 7px" }}>VIDEO</span>}</span>
+              <span style={{ fontSize: 24, fontWeight: 600, color: MT.clay }}>{d.avgDays === null ? "—" : formatAht(d.avgDays)}</span>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: MT.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>AHT promedio</span>
               <span style={{ fontSize: 11.5, color: MT.text2, marginTop: 4, textAlign: "center" }}>{d.completedCount} entregas · {d.onTimePct}% a tiempo{d.inProgress > 0 ? ` · ${d.inProgress} en curso` : ""}</span>
             </button>
@@ -334,14 +334,14 @@ export default function TeamDashboardPage() {
           return (
           <div style={{ background: MT.surface, border: `1px solid ${MT.border}`, borderRadius: MT.radiusLg, padding: "1.25rem", marginTop: "1rem", boxShadow: MT.shadow }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: MT.text1 }}>{selected.name}</h2>
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: MT.text1 }}>{selected.name}</h2>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" style={{
-                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
                 }} />
                 <span style={{ color: MT.text3, fontSize: 12 }}>—</span>
                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Hasta" style={{
-                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 7,
+                  fontFamily: MT.font, fontSize: 12, padding: "6px 8px", border: `1px solid ${MT.border}`, borderRadius: 0,
                 }} />
                 {(dateFrom || dateTo) && (
                   <button onClick={() => { setDateFrom(""); setDateTo(""); }} style={{
@@ -352,15 +352,15 @@ export default function TeamDashboardPage() {
               </div>
               <div style={{ display: "flex", gap: "1.25rem" }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.clay }}>{avgDays === null ? "—" : formatAht(avgDays)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: MT.clay }}>{avgDays === null ? "—" : formatAht(avgDays)}</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>AHT</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: MT.text1 }}>{count}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: MT.text1 }}>{count}</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>Entregas</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: onTimePct >= 80 ? MT.primary : MT.warn }}>{onTimePct}%</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: onTimePct >= 80 ? MT.primary : MT.warn }}>{onTimePct}%</div>
                   <div style={{ fontSize: 9.5, color: MT.text3, textTransform: "uppercase" }}>A tiempo</div>
                 </div>
               </div>
@@ -371,7 +371,7 @@ export default function TeamDashboardPage() {
                 return (
                   <div key={w.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: MT.text2 }}>{w.total}</span>
-                    <div style={{ width: "60%", height: Math.max(2, h), background: MT.clay, borderRadius: "4px 4px 0 0" }} />
+                    <div style={{ width: "60%", height: Math.max(2, h), background: MT.clay, borderRadius: 0 }} />
                     <span style={{ fontSize: 9, color: MT.text3 }}>{w.label}</span>
                   </div>
                 );
@@ -385,7 +385,7 @@ export default function TeamDashboardPage() {
             {selected.open.length === 0 ? (
               <p style={{ fontSize: 12.5, color: MT.text3, margin: "0 0 1rem" }}>Nada abierto ahora.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${MT.border}`, borderRadius: 8, marginBottom: "1.1rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${MT.border}`, borderRadius: 0, marginBottom: "1.1rem" }}>
                 {selected.open.map((o, i) => (
                   <div key={o.key} onClick={() => { if (!(authedUser?.role === "video" && o.kind === "brief")) navigate(o.linkTo); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.6rem 0.8rem", cursor: "pointer", borderTop: i === 0 ? "none" : `1px solid ${MT.border}` }}>
                     <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: MT.text1 }}>{o.label}</span>
@@ -403,7 +403,7 @@ export default function TeamDashboardPage() {
             {selectedEntries.length === 0 ? (
               <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Sin entregas en este rango.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", maxHeight: 280, overflowY: "auto", border: `1px solid ${MT.border}`, borderRadius: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", maxHeight: 280, overflowY: "auto", border: `1px solid ${MT.border}`, borderRadius: 0 }}>
                 {selectedEntries.map((e, i) => (
                   <div
                     key={i}
@@ -451,8 +451,8 @@ export default function TeamDashboardPage() {
             return (
               <div key={w.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: MT.text2 }}>{w.total}</span>
-                <div style={{ width: "60%", height: Math.max(2, totalH), background: MT.border, borderRadius: "4px 4px 0 0", position: "relative", display: "flex", alignItems: "flex-end" }}>
-                  <div style={{ width: "100%", height: onTimeH, background: MT.primary, borderRadius: "4px 4px 0 0" }} />
+                <div style={{ width: "60%", height: Math.max(2, totalH), background: MT.border, borderRadius: 0, position: "relative", display: "flex", alignItems: "flex-end" }}>
+                  <div style={{ width: "100%", height: onTimeH, background: MT.primary, borderRadius: 0 }} />
                 </div>
                 <span style={{ fontSize: 9, color: MT.text3 }}>{w.label}</span>
               </div>
@@ -536,7 +536,7 @@ export default function TeamDashboardPage() {
                       <p style={{ fontSize: 12.5, color: MT.text3, margin: 0 }}>Nada pendiente por ahora.</p>
                     ) : withOpen.map(d => (
                       <div key={d.email} style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: MT.text1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: MT.text1 }}>
                           {d.name} <span style={{ fontSize: 11, fontWeight: 600, color: MT.text3 }}>{d.open.length} pendiente{d.open.length === 1 ? "" : "s"}</span>
                         </div>
                         {[...d.open].sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999")).map(o => {

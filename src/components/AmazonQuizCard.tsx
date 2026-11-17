@@ -33,8 +33,8 @@ export default function AmazonQuizCard({ name, initial, savedAt, onSave }: {
 
   const stepBtn = (key: string, v: number, current: number | null) => (
     <button key={v} type="button" onClick={() => setScore(key, v)} aria-pressed={current === v} style={{
-      flex: 1, minWidth: 64, padding: "0.45rem 0.3rem", borderRadius: 8, cursor: "pointer", fontSize: "0.78rem", fontWeight: 700,
-      border: `1.5px solid ${current === v ? "#16a34a" : "#e2e8f0"}`, background: current === v ? "#dcfce7" : "#fff", color: current === v ? "#166534" : "#475569",
+      flex: 1, minWidth: 64, padding: "0.45rem 0.3rem", borderRadius: 0, cursor: "pointer", fontSize: "0.78rem", fontWeight: 700,
+      border: `1.5px solid ${current === v ? "#16a34a" : "#E8E7E2"}`, background: current === v ? "#dcfce7" : "#fff", color: current === v ? "#166534" : "#57564F",
       transition: "background .12s, border-color .12s",
     }}>
       {STEP_LABEL[v]}<span style={{ display: "block", fontSize: "0.68rem", fontWeight: 600, opacity: 0.7 }}>{v}%</span>
@@ -53,8 +53,8 @@ export default function AmazonQuizCard({ name, initial, savedAt, onSave }: {
           <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>{pct}% de ${FULLTIME_AMAZON_PERF_CAP}.00</div>
         </div>
       </div>
-      <div style={{ height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden", marginBottom: "1.25rem" }}>
-        <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: "#16a34a", transition: "width .3s", borderRadius: 4 }} />
+      <div style={{ height: 8, background: "#E8E7E2", borderRadius: 0, overflow: "hidden", marginBottom: "1.25rem" }}>
+        <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: "#16a34a", transition: "width .3s", borderRadius: 0 }} />
       </div>
 
       {AMAZON_QUIZ_CRITERIA.map(c => {
@@ -67,20 +67,20 @@ export default function AmazonQuizCard({ name, initial, savedAt, onSave }: {
                 <span style={{ marginLeft: 8, fontSize: "0.72rem", fontWeight: 700, color: "#0891b2", background: "#ecfeff", borderRadius: 999, padding: "1px 8px" }}>vale {c.weight}%</span>
                 <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>{c.hint}</div>
               </div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: score === null ? "#94a3b8" : "#166534" }}>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: score === null ? "#A3A29B" : "#166534" }}>
                 {score === null ? "Sin calificar" : `${score}% → $${((FULLTIME_AMAZON_PERF_CAP * c.weight * score) / 10000).toFixed(2)}`}
               </div>
             </div>
             {c.auto ? (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {([["a2cReceived", "A2Cs recibidos"], ["a2cAnswered", "A2Cs respondidos"], ["a2cAffected", "Afectaron cuenta o dinero"]] as const).map(([k, label]) => (
-                  <label key={k} style={{ flex: "1 1 150px", fontSize: "0.74rem", fontWeight: 700, color: "#475569" }}>
+                  <label key={k} style={{ flex: "1 1 150px", fontSize: "0.74rem", fontWeight: 700, color: "#57564F" }}>
                     {label}
                     <input type="number" min={0} className="form-control" style={{ marginTop: 4 }} value={quiz[k] ?? ""} onChange={e => setQuiz(q => ({ ...q, [k]: num(e.target.value) }))} />
                   </label>
                 ))}
                 {quiz.a2cReceived !== null && quiz.a2cAnswered !== null && quiz.a2cReceived > 0 && (
-                  <div style={{ alignSelf: "flex-end", fontSize: "0.8rem", color: "#475569", paddingBottom: 8 }}>{quiz.a2cAnswered} de {quiz.a2cReceived} = {amazonA2cScore(quiz)}%</div>
+                  <div style={{ alignSelf: "flex-end", fontSize: "0.8rem", color: "#57564F", paddingBottom: 8 }}>{quiz.a2cAnswered} de {quiz.a2cReceived} = {amazonA2cScore(quiz)}%</div>
                 )}
               </div>
             ) : (
@@ -91,7 +91,7 @@ export default function AmazonQuizCard({ name, initial, savedAt, onSave }: {
       })}
 
       <div style={{ borderTop: "1px solid #eef2f7", paddingTop: "0.85rem" }}>
-        <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>Notas (opcional): qué pasó con los A2Cs, apelaciones pendientes, etc.</label>
+        <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#57564F" }}>Notas (opcional): qué pasó con los A2Cs, apelaciones pendientes, etc.</label>
         <textarea className="form-control" rows={3} style={{ marginTop: 4 }} value={quiz.notes} onChange={e => setQuiz(q => ({ ...q, notes: e.target.value }))} />
       </div>
       {error && <p className="error-msg" style={{ marginTop: 8 }}>{error}</p>}

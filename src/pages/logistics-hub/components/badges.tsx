@@ -7,7 +7,7 @@ export function PlatformBadge({ platform }: { platform: Platform }) {
     <span style={{
       fontFamily: HT.font, fontSize: 11, fontWeight: 700,
       background: cfg.bg, color: cfg.fg,
-      borderRadius: 6, padding: "3px 8px", letterSpacing: "0.01em",
+      borderRadius: 0, padding: "3px 8px", letterSpacing: "0.01em",
       whiteSpace: "nowrap",
     }}>{cfg.label}</span>
   );
@@ -48,7 +48,7 @@ export function AgeChip({ createdAt }: { createdAt: string }) {
   return (
     <span style={{
       fontFamily: HT.mono, fontSize: 12, fontWeight: 700,
-      background: bg, color: fg, borderRadius: 6, padding: "3px 7px",
+      background: bg, color: fg, borderRadius: 0, padding: "3px 7px",
     }}>{formatAge(createdAt)}</span>
   );
 }
@@ -67,7 +67,7 @@ export function DocPill({ label, state }: { label: string; state: "none" | "gene
       <span style={{ fontFamily: HT.font, fontSize: 10, color: HT.text3, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
       <span style={{
         fontFamily: HT.font, fontSize: 12, fontWeight: 600, color: c.fg, background: c.bg,
-        borderRadius: 6, padding: "2px 7px", width: "fit-content",
+        borderRadius: 0, padding: "2px 7px", width: "fit-content",
       }}>{c.text}</span>
     </span>
   );

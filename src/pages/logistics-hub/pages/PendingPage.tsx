@@ -22,7 +22,7 @@ function RoleSwitch({ role, setRole }: { role: HubRole; setRole: (r: HubRole) =>
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
-      background: HT.warnSoft, border: `1px solid rgba(217,119,6,0.2)`, borderRadius: 10, padding: "10px 14px",
+      background: HT.warnSoft, border: `1px solid rgba(217,119,6,0.2)`, borderRadius: 0, padding: "10px 14px",
     }}>
       <span style={{ fontFamily: HT.font, fontSize: 12, fontWeight: 700, color: HT.warn, whiteSpace: "nowrap" }}>
         Ver como:
@@ -56,7 +56,7 @@ function SectionToggle({ section, setSection, storeLabel }: {
       ] as { key: "logistics" | "store"; label: string }[]).map((t) => (
         <button key={t.key} onClick={() => setSection(t.key)} style={{
           fontFamily: HT.font, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-          padding: "8px 16px", borderRadius: 8,
+          padding: "8px 16px", borderRadius: 0,
           background: section === t.key ? HT.text1 : HT.surface,
           color: section === t.key ? "#fff" : HT.text2,
           border: `1px solid ${section === t.key ? HT.text1 : HT.border}`,
@@ -95,7 +95,7 @@ function LogisticsView({ tab, setTab }: { tab: LogisticsTab; setTab: (t: Logisti
         ] as { key: LogisticsTab; label: string }[]).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-            padding: "7px 14px", borderRadius: 8,
+            padding: "7px 14px", borderRadius: 0,
             background: tab === t.key ? HT.primarySoft : "transparent",
             color: tab === t.key ? HT.primary : HT.text2, border: "none",
           }}>{t.label}</button>
@@ -143,13 +143,13 @@ function LogisticsView({ tab, setTab }: { tab: LogisticsTab; setTab: (t: Logisti
                 ) : (
                   <button onClick={() => handleRetry(o)} style={{
                     fontFamily: HT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    background: HT.danger, color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px",
+                    background: HT.danger, color: "#fff", border: "none", borderRadius: 0, padding: "6px 12px",
                   }}>Reintentar</button>
                 )
               ) : (
                 <button onClick={() => setDocsOrder(o)} style={{
                   fontFamily: HT.font, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  background: HT.primary, color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px",
+                  background: HT.primary, color: "#fff", border: "none", borderRadius: 0, padding: "6px 12px",
                   whiteSpace: "nowrap",
                 }}>{o.location === "Colombia" ? "Cargar docs" : "Agregar Label"}</button>
               )}
@@ -210,7 +210,7 @@ function StoreView({ location }: { location: HubLocation }) {
                 fontFamily: HT.font, fontSize: 13, fontWeight: 700, textDecoration: "none", textAlign: "center",
                 color: o.labelViewedAt ? HT.success : HT.text1,
                 background: o.labelViewedAt ? HT.successSoft : HT.surfaceAlt,
-                border: "none", borderRadius: 8, padding: "9px 14px", whiteSpace: "nowrap",
+                border: "none", borderRadius: 0, padding: "9px 14px", whiteSpace: "nowrap",
               }}
             >{o.labelViewedAt ? "✓ Label visto" : "Ver Label"}</a>
 
@@ -221,7 +221,7 @@ function StoreView({ location }: { location: HubLocation }) {
                 fontFamily: HT.font, fontSize: 13, fontWeight: 700, textDecoration: "none", textAlign: "center",
                 color: o.invoiceViewedAt ? HT.success : HT.text1,
                 background: o.invoiceViewedAt ? HT.successSoft : HT.surfaceAlt,
-                border: "none", borderRadius: 8, padding: "9px 14px", whiteSpace: "nowrap",
+                border: "none", borderRadius: 0, padding: "9px 14px", whiteSpace: "nowrap",
               }}
             >{o.invoiceViewedAt ? "✓ Factura vista" : "Ver Factura"}</a>
 
@@ -233,7 +233,7 @@ function StoreView({ location }: { location: HubLocation }) {
                 fontFamily: HT.font, fontSize: 13, fontWeight: 700, cursor: canComplete ? "pointer" : "not-allowed",
                 color: canComplete ? "#fff" : HT.text3,
                 background: canComplete ? HT.success : HT.surfaceAlt,
-                border: "none", borderRadius: 8, padding: "9px 16px", whiteSpace: "nowrap",
+                border: "none", borderRadius: 0, padding: "9px 16px", whiteSpace: "nowrap",
               }}
             >{canComplete ? "✓ Completar" : "Completar"}</button>
           </div>
@@ -249,7 +249,7 @@ function StorePicker({ store, setStore }: { store: HubLocation; setStore: (l: Hu
       {ALL_STORES.map((s) => (
         <button key={s} onClick={() => setStore(s)} style={{
           fontFamily: HT.font, fontSize: 13, fontWeight: 600, cursor: "pointer",
-          padding: "7px 14px", borderRadius: 8,
+          padding: "7px 14px", borderRadius: 0,
           background: store === s ? HT.primarySoft : "transparent",
           color: store === s ? HT.primary : HT.text2, border: "none",
         }}>{s}</button>

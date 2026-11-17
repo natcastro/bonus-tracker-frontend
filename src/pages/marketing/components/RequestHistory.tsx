@@ -36,7 +36,7 @@ function FileRow({ url }: { url: string }) {
   const isImage = /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(url);
   return (
     <div style={{ marginTop: 8 }}>
-      {isImage && <img src={normalizeUrl(url)} alt="" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8, display: "block", marginBottom: 6 }} />}
+      {isImage && <img src={normalizeUrl(url)} alt="" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 0, display: "block", marginBottom: 6 }} />}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, color: MT.text2, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📎 {fileName(url)}</span>
         <a href={normalizeUrl(url)} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: MT.info, textDecoration: "none" }}>Ver</a>
@@ -93,7 +93,7 @@ export default function RequestHistory({ request, viewer, designerName }: { requ
         {entries.map((e, i) => {
           const color = e.who === "diseno" ? MT.clay : MT.violet;
           return (
-            <div key={i} style={{ borderLeft: `3px solid ${color}`, background: MT.surfaceAlt, borderRadius: 8, padding: "0.6rem 0.8rem" }}>
+            <div key={i} style={{ borderLeft: `3px solid ${color}`, background: MT.surfaceAlt, borderRadius: 0, padding: "0.6rem 0.8rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: MT.text1 }}>{e.title}</span>
                 <span style={{ fontSize: 11.5, color: MT.text3 }}>{(e.dateOnly ? whenDate : when).format(new Date(e.at))}</span>
