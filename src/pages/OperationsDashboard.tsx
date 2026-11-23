@@ -32,13 +32,13 @@ const APPROVAL_EMAIL_DOMAIN = "formatucuerpo.com";
 const MAX_APPROVAL_COPIES = 3;
 const isCompanyEmail = (e: string) => e.toLowerCase().endsWith(`@${APPROVAL_EMAIL_DOMAIN}`);
 
-// Admin actions in Operations (edit/delete/invalidate, agent changes) are only for this account —
+// Admin actions in Operations (delete/invalidate, agent changes) are only for these accounts. Editing/adding appeals is open to the whole Ops team —
 // no shared password. Matched against the Microsoft login email.
-const OPS_ADMIN_EMAILS = ["amazonassistant@formatucuerpo.com"];
+const OPS_ADMIN_EMAILS = ["amazonassistant@formatucuerpo.com", "quality.assurance.cs@formatucuerpo.com"];
 // Katalina (online supervisor) may invalidate / revalidate Thomas's appeals only — nothing else of the admin actions.
 const OPS_APPEAL_INVALIDATOR_EMAILS = ["supervisoronline@formatucuerpo.com"];
 const INVALIDATE_ONLY_THOMAS_MSG = "Solo puedes invalidar o revalidar los appeals de Thomas.";
-const ADMIN_ONLY_MSG = "Solo el administrador (amazonassistant@formatucuerpo.com) puede hacer esta acción.";
+const ADMIN_ONLY_MSG = "Solo el administrador (quality.assurance.cs@formatucuerpo.com) puede hacer esta acción.";
 
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
 // so historical records/cycles before the cutoffs stay untouched.
@@ -699,7 +699,7 @@ export default function OperationsDashboard() {
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>{a.status === "completed" ? OUTCOME_LABELS[a.outcome] : "—"}</td>
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>${a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                         <td>
-                          <button className="btn btn-sm btn-secondary" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(() => setEditingAppeal(a))}>Edit</button>{" "}
+                          <button className="btn btn-sm btn-secondary" onClick={() => setEditingAppeal(a)}>Edit</button>{" "}
                           <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
                           {a.invalidated ? (
                             <button className="btn btn-sm btn-secondary" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : (isAppealInvalidator ? INVALIDATE_ONLY_THOMAS_MSG : ADMIN_ONLY_MSG)} onClick={async () => { if (!canInvalidateAppeal(a)) return; await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
