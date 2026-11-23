@@ -35,9 +35,8 @@ const isCompanyEmail = (e: string) => e.toLowerCase().endsWith(`@${APPROVAL_EMAI
 // Admin actions in Operations (delete/invalidate, agent changes) are only for these accounts. Editing/adding appeals is open to the whole Ops team —
 // no shared password. Matched against the Microsoft login email.
 const OPS_ADMIN_EMAILS = ["amazonassistant@formatucuerpo.com", "quality.assurance.cs@formatucuerpo.com"];
-// Katalina (online supervisor) may invalidate / revalidate Thomas's appeals only — nothing else of the admin actions.
+// Katalina (online supervisor) may invalidate / revalidate any agent's appeals — nothing else of the admin actions.
 const OPS_APPEAL_INVALIDATOR_EMAILS = ["supervisoronline@formatucuerpo.com"];
-const INVALIDATE_ONLY_THOMAS_MSG = "Solo puedes invalidar o revalidar los appeals de Thomas.";
 const ADMIN_ONLY_MSG = "Solo el administrador (quality.assurance.cs@formatucuerpo.com) puede hacer esta acción.";
 
 // Thomas transitioned to full-time; Linda left the team. Both changes are date-gated
@@ -85,7 +84,7 @@ export default function OperationsDashboard() {
   const isAdmin = OPS_ADMIN_EMAILS.includes(email.trim().toLowerCase());
   const isHubAdmin = !!access?.isAdmin; // only for the approval-settings gear (Natalie)
   const isAppealInvalidator = OPS_APPEAL_INVALIDATOR_EMAILS.includes(email.trim().toLowerCase());
-  const canInvalidateAppeal = (a: OpsAppeal) => isAdmin || (isAppealInvalidator && a.agentId === THOMAS_AGENT_ID);
+  const canInvalidateAppeal = (_a: OpsAppeal) => isAdmin || isAppealInvalidator;
   const { instance: msal, accounts } = useMsal();
   const [activeTab, setActiveTab] = useState("summary");
   const defaultCycle = (() => {
@@ -700,11 +699,11 @@ export default function OperationsDashboard() {
                         <td style={a.invalidated ? { textDecoration: "line-through" } : undefined}>${a.status === "completed" && !a.invalidated ? (OPS_APPEALS_BONUS[a.outcome] ?? 0).toFixed(2) : "0.00"}</td>
                         <td>
                           <button className="btn btn-sm btn-secondary" onClick={() => setEditingAppeal(a)}>Edit</button>{" "}
-                          <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
+                          <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { if (!window.confirm("Are you sure you want to delete this appeal? This cannot be undone.")) return; await deleteOpsAppeal(a.id); await load(); })}>Delete</button>{" "}
                           {a.invalidated ? (
-                            <button className="btn btn-sm btn-secondary" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : (isAppealInvalidator ? INVALIDATE_ONLY_THOMAS_MSG : ADMIN_ONLY_MSG)} onClick={async () => { if (!canInvalidateAppeal(a)) return; await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
+                            <button className="btn btn-sm btn-secondary" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : ADMIN_ONLY_MSG} onClick={async () => { if (!canInvalidateAppeal(a)) return; await revalidateOpsAppeal(a.id); await load(); }}>Revalidar</button>
                           ) : (
-                            <button className="btn btn-sm btn-danger" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : (isAppealInvalidator ? INVALIDATE_ONLY_THOMAS_MSG : ADMIN_ONLY_MSG)} onClick={() => { if (!canInvalidateAppeal(a)) return; setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
+                            <button className="btn btn-sm btn-danger" disabled={!canInvalidateAppeal(a)} title={canInvalidateAppeal(a) ? undefined : ADMIN_ONLY_MSG} onClick={() => { if (!canInvalidateAppeal(a)) return; setInvalidatingAppeal(a); setInvalidateNote(""); setInvalidateError(""); }}>Invalidar</button>
                           )}
                         </td>
                       </tr>
@@ -853,7 +852,7 @@ export default function OperationsDashboard() {
                         <td>+${earned.toFixed(2)}</td>
                         <td>{t.id < 0
                           ? <span className="badge" title="Pulled automatically from TikTok Shop each day" style={{ background: "#e0f2fe", color: "#075985", border: "none" }}>Auto · TikTok</span>
-                          : <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
+                          : <button className="btn btn-sm btn-danger" disabled={!isAdmin} title={isAdmin ? undefined : ADMIN_ONLY_MSG} onClick={() => requireAdmin(async () => { if (!window.confirm("Are you sure you want to delete this TikTok score? This cannot be undone.")) return; await deleteOpsTikTokScore(t.id); await load(); })}>Delete</button>}</td>
                       </tr>
                     );
                   })}
